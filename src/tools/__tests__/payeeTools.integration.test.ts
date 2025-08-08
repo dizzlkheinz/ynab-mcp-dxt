@@ -1,0 +1,149 @@
+import { describe, it, expect, beforeAll } from 'vitest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import * as ynab from 'ynab';
+import { handleListPayees, handleGetPayee } from '../payeeTools.js';
+
+/**
+ * Integration tests for payee tools using real YNAB API
+ */
+describe('Payee Tools Integration', () => {
+  let ynabAPI: ynab.API;
+  let testBudgetId: string;
+  let testPayeeId: string;
+
+  beforeAll(async () => {
+    // Load API key from file
+    try {
+      const apiKeyFile = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8');
+      const lines = apiKeyFile.split('\n');
+      
+      let accessToken = '';
+      for (const line of lines) {
+        const [key, value] = line.split('=');
+        if (key === 'YNAB_API_KEY' && value) {
+          accessToken = value.trim();
+          break;
+        }
+      }
+      
+      if (!accessToken) {
+        throw new Error('YNAB_API_KEY not found in api_key.txt');
+      }
+      
+      ynabAPI = new ynab.API(accessToken);
+      console.log('✅ Loaded YNAB API key for integration tests');
+
+      // Get first budget ID for testing
+      const budgetsResponse = await ynabAPI.budgets.getBudgets();
+      testBudgetId = budgetsResponse.data.budgets[0].id;
+      console.log(`✅ Using test budget ID: ${testBudgetId}`);
+    } catch (error) {
+      throw new Error(`Failed to load API key from api_key.txt: ${error}`);
+    }
+  });
+
+  describe('handleListPayees', () => {
+    it('should successfully list payees from real API', async () => {
+      const result = await handleListPayees(ynabAPI, { budget_id: testBudgetId });
+      
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.payees).toBeDefined();
+      expect(Array.isArray(parsedContent.payees)).toBe(true);
+      expect(parsedContent.payees.length).toBeGreaterThan(0);
+      
+      // Store first payee ID for next test
+      testPayeeId = parsedContent.payees[0].id;
+      
+      // Verify payee structure
+      const firstPayee = parsedContent.payees[0];
+      expect(firstPayee.id).toBeDefined();
+      expect(firstPayee.name).toBeDefined();
+      expect(firstPayee.deleted).toBeDefined();
+      expect(typeof firstPayee.deleted).toBe('boolean');
+      
+      // Check for transfer payees
+      const transferPayees = parsedContent.payees.filter((p: any) => p.transfer_account_id !== null);
+      console.log(`✅ Successfully listed ${parsedContent.payees.length} payees`);
+      console.log(`   - ${transferPayees.length} transfer payees`);
+      console.log(`   - ${parsedContent.payees.length - transferPayees.length} regular payees`);
+    });
+
+    it('should handle invalid budget ID gracefully', async () => {
+      const result = await handleListPayees(ynabAPI, { budget_id: 'invalid-budget-id' });
+      
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.error).toBeDefined();
+      expect(parsedContent.error.message).toBeDefined();
+      
+      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+    });
+  });
+
+  describe('handleGetPayee', () => {
+    it('should successfully get payee details from real API', async () => {
+      // Use the payee ID from the previous test
+      const result = await handleGetPayee(ynabAPI, { 
+        budget_id: testBudgetId, 
+        payee_id: testPayeeId 
+      });
+      
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.payee).toBeDefined();
+      
+      const payee = parsedContent.payee;
+      expect(payee.id).toBe(testPayeeId);
+      expect(payee.name).toBeDefined();
+      expect(payee.deleted).toBeDefined();
+      expect(typeof payee.deleted).toBe('boolean');
+      
+      console.log(`✅ Successfully retrieved payee: ${payee.name}`);
+      if (payee.transfer_account_id) {
+        console.log(`   - Transfer payee for account: ${payee.transfer_account_id}`);
+      } else {
+        console.log(`   - Regular payee`);
+      }
+    });
+
+    it('should handle invalid payee ID gracefully', async () => {
+      const result = await handleGetPayee(ynabAPI, { 
+        budget_id: testBudgetId, 
+        payee_id: 'invalid-payee-id' 
+      });
+      
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.error).toBeDefined();
+      expect(parsedContent.error.message).toBeDefined();
+      
+      console.log(`✅ Correctly handled invalid payee ID: ${parsedContent.error.message}`);
+    });
+
+    it('should handle invalid budget ID gracefully', async () => {
+      const result = await handleGetPayee(ynabAPI, { 
+        budget_id: 'invalid-budget-id', 
+        payee_id: testPayeeId 
+      });
+      
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+      
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.error).toBeDefined();
+      expect(parsedContent.error.message).toBeDefined();
+      
+      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+    });
+  });
+});

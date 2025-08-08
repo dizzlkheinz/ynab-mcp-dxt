@@ -1,0 +1,1017 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as ynab from 'ynab';
+import { 
+  handleListTransactions, 
+  handleGetTransaction,
+  handleCreateTransaction,
+  handleUpdateTransaction,
+  handleDeleteTransaction,
+  ListTransactionsSchema,
+  GetTransactionSchema,
+  CreateTransactionSchema,
+  UpdateTransactionSchema,
+  DeleteTransactionSchema
+} from '../transactionTools.js';
+
+// Mock the YNAB API
+const mockYnabAPI = {
+  transactions: {
+    getTransactions: vi.fn(),
+    getTransactionsByAccount: vi.fn(),
+    getTransactionsByCategory: vi.fn(),
+    getTransactionById: vi.fn(),
+    createTransaction: vi.fn(),
+    updateTransaction: vi.fn(),
+    deleteTransaction: vi.fn(),
+  },
+} as unknown as ynab.API;
+
+describe('transactionTools', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe('ListTransactionsSchema', () => {
+    it('should validate valid parameters', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        category_id: 'category-789',
+        since_date: '2024-01-01',
+        type: 'uncategorized' as const,
+      };
+
+      const result = ListTransactionsSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should require budget_id', () => {
+      const invalidParams = {
+        account_id: 'account-456',
+      };
+
+      const result = ListTransactionsSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_type');
+        expect(result.error.issues[0].path).toEqual(['budget_id']);
+      }
+    });
+
+    it('should validate date format', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        since_date: '01/01/2024', // Invalid format
+      };
+
+      const result = ListTransactionsSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('Date must be in ISO format');
+      }
+    });
+
+    it('should validate type enum', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        type: 'invalid-type',
+      };
+
+      const result = ListTransactionsSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should allow optional parameters to be undefined', () => {
+      const minimalParams = {
+        budget_id: 'budget-123',
+      };
+
+      const result = ListTransactionsSchema.safeParse(minimalParams);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('handleListTransactions', () => {
+    const mockTransaction = {
+      id: 'transaction-123',
+      date: '2024-01-01',
+      amount: -50000, // $50.00 outflow in milliunits
+      memo: 'Test transaction',
+      cleared: 'cleared' as any,
+      approved: true,
+      flag_color: null,
+      account_id: 'account-456',
+      payee_id: 'payee-789',
+      category_id: 'category-101',
+      transfer_account_id: null,
+      transfer_transaction_id: null,
+      matched_transaction_id: null,
+      import_id: null,
+      deleted: false,
+    };
+
+    it('should list all transactions when no filters are provided', async () => {
+      const mockResponse = {
+        data: {
+          transactions: [mockTransaction],
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactions as any).mockResolvedValue(mockResponse);
+
+      const params = { budget_id: 'budget-123' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
+        'budget-123',
+        undefined,
+        undefined
+      );
+      expect(result.content[0].text).toContain('transaction-123');
+      expect(result.content[0].text).toContain('-50000');
+    });
+
+    it('should filter by account_id when provided', async () => {
+      const mockResponse = {
+        data: {
+          transactions: [mockTransaction],
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+      };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.getTransactionsByAccount).toHaveBeenCalledWith(
+        'budget-123',
+        'account-456',
+        undefined
+      );
+      expect(result.content[0].text).toContain('transaction-123');
+    });
+
+    it('should filter by category_id when provided', async () => {
+      const mockResponse = {
+        data: {
+          transactions: [mockTransaction],
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactionsByCategory as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        category_id: 'category-789',
+      };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.getTransactionsByCategory).toHaveBeenCalledWith(
+        'budget-123',
+        'category-789',
+        undefined
+      );
+      expect(result.content[0].text).toContain('transaction-123');
+    });
+
+    it('should include since_date parameter when provided', async () => {
+      const mockResponse = {
+        data: {
+          transactions: [mockTransaction],
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactions as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        since_date: '2024-01-01',
+        type: 'uncategorized' as const,
+      };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
+        'budget-123',
+        '2024-01-01',
+        'uncategorized'
+      );
+    });
+
+    it('should handle 401 authentication errors', async () => {
+      const error = new Error('401 Unauthorized');
+      (mockYnabAPI.transactions.getTransactions as any).mockRejectedValue(error);
+
+      const params = { budget_id: 'budget-123' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Invalid or expired YNAB access token');
+    });
+
+    it('should handle 404 not found errors', async () => {
+      const error = new Error('404 Not Found');
+      (mockYnabAPI.transactions.getTransactions as any).mockRejectedValue(error);
+
+      const params = { budget_id: 'invalid-budget' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Budget, account, category, or transaction not found');
+    });
+
+    it('should handle 429 rate limit errors', async () => {
+      const error = new Error('429 Too Many Requests');
+      (mockYnabAPI.transactions.getTransactions as any).mockRejectedValue(error);
+
+      const params = { budget_id: 'budget-123' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Rate limit exceeded. Please try again later');
+    });
+
+    it('should handle generic errors', async () => {
+      const error = new Error('Network error');
+      (mockYnabAPI.transactions.getTransactions as any).mockRejectedValue(error);
+
+      const params = { budget_id: 'budget-123' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Failed to list transactions');
+    });
+  });
+
+  describe('GetTransactionSchema', () => {
+    it('should validate valid parameters', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+
+      const result = GetTransactionSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should require budget_id', () => {
+      const invalidParams = {
+        transaction_id: 'transaction-456',
+      };
+
+      const result = GetTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_type');
+        expect(result.error.issues[0].path).toEqual(['budget_id']);
+      }
+    });
+
+    it('should require transaction_id', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+      };
+
+      const result = GetTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_type');
+        expect(result.error.issues[0].path).toEqual(['transaction_id']);
+      }
+    });
+
+    it('should reject empty strings', () => {
+      const invalidParams = {
+        budget_id: '',
+        transaction_id: '',
+      };
+
+      const result = GetTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('handleGetTransaction', () => {
+    const mockTransactionDetail = {
+      id: 'transaction-123',
+      date: '2024-01-01',
+      amount: -50000,
+      memo: 'Test transaction',
+      cleared: 'cleared' as any,
+      approved: true,
+      flag_color: null,
+      account_id: 'account-456',
+      payee_id: 'payee-789',
+      category_id: 'category-101',
+      transfer_account_id: null,
+      transfer_transaction_id: null,
+      matched_transaction_id: null,
+      import_id: null,
+      deleted: false,
+      account_name: 'Test Account',
+      payee_name: 'Test Payee',
+      category_name: 'Test Category',
+    };
+
+    it('should get transaction details successfully', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockTransactionDetail,
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactionById as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+      const result = await handleGetTransaction(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.getTransactionById).toHaveBeenCalledWith(
+        'budget-123',
+        'transaction-456'
+      );
+      
+      const response = JSON.parse(result.content[0].text);
+      expect(response.transaction.id).toBe('transaction-123');
+      expect(response.transaction.amount).toBe(-50000);
+      expect(response.transaction.account_name).toBe('Test Account');
+      expect(response.transaction.payee_name).toBe('Test Payee');
+      expect(response.transaction.category_name).toBe('Test Category');
+    });
+
+    it('should handle 404 not found errors', async () => {
+      const error = new Error('404 Not Found');
+      (mockYnabAPI.transactions.getTransactionById as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'invalid-transaction',
+      };
+      const result = await handleGetTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Budget, account, category, or transaction not found');
+    });
+
+    it('should handle authentication errors', async () => {
+      const error = new Error('401 Unauthorized');
+      (mockYnabAPI.transactions.getTransactionById as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+      const result = await handleGetTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Invalid or expired YNAB access token');
+    });
+
+    it('should handle generic errors', async () => {
+      const error = new Error('Network error');
+      (mockYnabAPI.transactions.getTransactionById as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+      const result = await handleGetTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Failed to get transaction');
+    });
+  });
+
+  describe('CreateTransactionSchema', () => {
+    it('should validate valid parameters with required fields only', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000, // $50.00 outflow in milliunits
+        date: '2024-01-01',
+      };
+
+      const result = CreateTransactionSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate valid parameters with all optional fields', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+        payee_name: 'Test Payee',
+        payee_id: 'payee-789',
+        category_id: 'category-101',
+        memo: 'Test memo',
+        cleared: 'cleared' as const,
+        approved: true,
+        flag_color: 'red' as const,
+      };
+
+      const result = CreateTransactionSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should require budget_id', () => {
+      const invalidParams = {
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+      };
+
+      const result = CreateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should require account_id', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        amount: -50000,
+        date: '2024-01-01',
+      };
+
+      const result = CreateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should require amount to be an integer', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -500.50, // Decimal not allowed
+        date: '2024-01-01',
+      };
+
+      const result = CreateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('Amount must be an integer in milliunits');
+      }
+    });
+
+    it('should validate date format', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '01/01/2024', // Invalid format
+      };
+
+      const result = CreateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('Date must be in ISO format');
+      }
+    });
+
+    it('should validate cleared status enum', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+        cleared: 'invalid-status',
+      };
+
+      const result = CreateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate flag_color enum', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+        flag_color: 'invalid-color',
+      };
+
+      const result = CreateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('handleCreateTransaction', () => {
+    const mockCreatedTransaction = {
+      id: 'new-transaction-123',
+      date: '2024-01-01',
+      amount: -50000,
+      memo: 'Test transaction',
+      cleared: 'cleared' as any,
+      approved: true,
+      flag_color: 'red' as any,
+      account_id: 'account-456',
+      payee_id: 'payee-789',
+      category_id: 'category-101',
+      transfer_account_id: null,
+      transfer_transaction_id: null,
+      matched_transaction_id: null,
+      import_id: null,
+      deleted: false,
+    };
+
+    it('should create transaction with required fields only', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockCreatedTransaction,
+        },
+      };
+
+      (mockYnabAPI.transactions.createTransaction as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+      };
+      const result = await handleCreateTransaction(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalledWith(
+        'budget-123',
+        {
+          transaction: {
+            account_id: 'account-456',
+            amount: -50000,
+            date: '2024-01-01',
+            payee_name: undefined,
+            payee_id: undefined,
+            category_id: undefined,
+            memo: undefined,
+            cleared: undefined,
+            approved: undefined,
+            flag_color: undefined,
+          },
+        }
+      );
+      
+      const response = JSON.parse(result.content[0].text);
+      expect(response.transaction.id).toBe('new-transaction-123');
+      expect(response.transaction.amount).toBe(-50000);
+    });
+
+    it('should create transaction with all optional fields', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockCreatedTransaction,
+        },
+      };
+
+      (mockYnabAPI.transactions.createTransaction as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+        payee_name: 'Test Payee',
+        payee_id: 'payee-789',
+        category_id: 'category-101',
+        memo: 'Test memo',
+        cleared: 'cleared' as const,
+        approved: true,
+        flag_color: 'red' as const,
+      };
+      const result = await handleCreateTransaction(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalledWith(
+        'budget-123',
+        {
+          transaction: {
+            account_id: 'account-456',
+            amount: -50000,
+            date: '2024-01-01',
+            payee_name: 'Test Payee',
+            payee_id: 'payee-789',
+            category_id: 'category-101',
+            memo: 'Test memo',
+            cleared: 'cleared',
+            approved: true,
+            flag_color: 'red',
+          },
+        }
+      );
+      
+      const response = JSON.parse(result.content[0].text);
+      expect(response.transaction.id).toBe('new-transaction-123');
+    });
+
+    it('should handle 404 not found errors', async () => {
+      const error = new Error('404 Not Found');
+      (mockYnabAPI.transactions.createTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'invalid-budget',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+      };
+      const result = await handleCreateTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Budget, account, category, or transaction not found');
+    });
+
+    it('should handle authentication errors', async () => {
+      const error = new Error('401 Unauthorized');
+      (mockYnabAPI.transactions.createTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+      };
+      const result = await handleCreateTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Invalid or expired YNAB access token');
+    });
+
+    it('should handle generic errors', async () => {
+      const error = new Error('Network error');
+      (mockYnabAPI.transactions.createTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+      };
+      const result = await handleCreateTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Failed to create transaction');
+    });
+  });
+
+  describe('UpdateTransactionSchema', () => {
+    it('should validate valid parameters with minimal fields', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000, // Updated amount
+      };
+
+      const result = UpdateTransactionSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should validate valid parameters with all optional fields', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        account_id: 'account-789',
+        amount: -60000,
+        date: '2024-01-02',
+        payee_name: 'Updated Payee',
+        payee_id: 'payee-999',
+        category_id: 'category-202',
+        memo: 'Updated memo',
+        cleared: 'reconciled' as const,
+        approved: false,
+        flag_color: 'blue' as const,
+      };
+
+      const result = UpdateTransactionSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should require budget_id', () => {
+      const invalidParams = {
+        transaction_id: 'transaction-456',
+        amount: -60000,
+      };
+
+      const result = UpdateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should require transaction_id', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        amount: -60000,
+      };
+
+      const result = UpdateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should require amount to be an integer when provided', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -600.50, // Decimal not allowed
+      };
+
+      const result = UpdateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('Amount must be an integer in milliunits');
+      }
+    });
+
+    it('should validate date format when provided', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        date: '01/02/2024', // Invalid format
+      };
+
+      const result = UpdateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain('Date must be in ISO format');
+      }
+    });
+
+    it('should validate cleared status enum when provided', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        cleared: 'invalid-status',
+      };
+
+      const result = UpdateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+
+    it('should validate flag_color enum when provided', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        flag_color: 'invalid-color',
+      };
+
+      const result = UpdateTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('handleUpdateTransaction', () => {
+    const mockUpdatedTransaction = {
+      id: 'transaction-456',
+      date: '2024-01-02',
+      amount: -60000,
+      memo: 'Updated memo',
+      cleared: 'reconciled' as any,
+      approved: false,
+      flag_color: 'blue' as any,
+      account_id: 'account-789',
+      payee_id: 'payee-999',
+      category_id: 'category-202',
+      transfer_account_id: null,
+      transfer_transaction_id: null,
+      matched_transaction_id: null,
+      import_id: null,
+      deleted: false,
+    };
+
+    it('should update transaction with single field', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockUpdatedTransaction,
+        },
+      };
+
+      (mockYnabAPI.transactions.updateTransaction as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000,
+      };
+      const result = await handleUpdateTransaction(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.updateTransaction).toHaveBeenCalledWith(
+        'budget-123',
+        'transaction-456',
+        {
+          transaction: {
+            amount: -60000,
+          },
+        }
+      );
+      
+      const response = JSON.parse(result.content[0].text);
+      expect(response.transaction.id).toBe('transaction-456');
+      expect(response.transaction.amount).toBe(-60000);
+    });
+
+    it('should update transaction with multiple fields', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockUpdatedTransaction,
+        },
+      };
+
+      (mockYnabAPI.transactions.updateTransaction as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        account_id: 'account-789',
+        amount: -60000,
+        date: '2024-01-02',
+        memo: 'Updated memo',
+        cleared: 'reconciled' as const,
+        approved: false,
+        flag_color: 'blue' as const,
+      };
+      const result = await handleUpdateTransaction(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.updateTransaction).toHaveBeenCalledWith(
+        'budget-123',
+        'transaction-456',
+        {
+          transaction: {
+            account_id: 'account-789',
+            amount: -60000,
+            date: '2024-01-02',
+            memo: 'Updated memo',
+            cleared: 'reconciled',
+            approved: false,
+            flag_color: 'blue',
+          },
+        }
+      );
+      
+      const response = JSON.parse(result.content[0].text);
+      expect(response.transaction.id).toBe('transaction-456');
+    });
+
+    it('should handle 404 not found errors', async () => {
+      const error = new Error('404 Not Found');
+      (mockYnabAPI.transactions.updateTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'invalid-transaction',
+        amount: -60000,
+      };
+      const result = await handleUpdateTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Budget, account, category, or transaction not found');
+    });
+
+    it('should handle authentication errors', async () => {
+      const error = new Error('401 Unauthorized');
+      (mockYnabAPI.transactions.updateTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000,
+      };
+      const result = await handleUpdateTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Invalid or expired YNAB access token');
+    });
+
+    it('should handle generic errors', async () => {
+      const error = new Error('Network error');
+      (mockYnabAPI.transactions.updateTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000,
+      };
+      const result = await handleUpdateTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Failed to update transaction');
+    });
+  });
+
+  describe('DeleteTransactionSchema', () => {
+    it('should validate valid parameters', () => {
+      const validParams = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+
+      const result = DeleteTransactionSchema.safeParse(validParams);
+      expect(result.success).toBe(true);
+    });
+
+    it('should require budget_id', () => {
+      const invalidParams = {
+        transaction_id: 'transaction-456',
+      };
+
+      const result = DeleteTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_type');
+        expect(result.error.issues[0].path).toEqual(['budget_id']);
+      }
+    });
+
+    it('should require transaction_id', () => {
+      const invalidParams = {
+        budget_id: 'budget-123',
+      };
+
+      const result = DeleteTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].code).toBe('invalid_type');
+        expect(result.error.issues[0].path).toEqual(['transaction_id']);
+      }
+    });
+
+    it('should reject empty strings', () => {
+      const invalidParams = {
+        budget_id: '',
+        transaction_id: '',
+      };
+
+      const result = DeleteTransactionSchema.safeParse(invalidParams);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe('handleDeleteTransaction', () => {
+    const mockDeletedTransaction = {
+      id: 'transaction-456',
+      deleted: true,
+    };
+
+    it('should delete transaction successfully', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockDeletedTransaction,
+        },
+      };
+
+      (mockYnabAPI.transactions.deleteTransaction as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+      const result = await handleDeleteTransaction(mockYnabAPI, params);
+
+      expect(mockYnabAPI.transactions.deleteTransaction).toHaveBeenCalledWith(
+        'budget-123',
+        'transaction-456'
+      );
+      
+      const response = JSON.parse(result.content[0].text);
+      expect(response.message).toBe('Transaction deleted successfully');
+      expect(response.transaction.id).toBe('transaction-456');
+      expect(response.transaction.deleted).toBe(true);
+    });
+
+    it('should handle 404 not found errors', async () => {
+      const error = new Error('404 Not Found');
+      (mockYnabAPI.transactions.deleteTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'invalid-transaction',
+      };
+      const result = await handleDeleteTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Budget, account, category, or transaction not found');
+    });
+
+    it('should handle authentication errors', async () => {
+      const error = new Error('401 Unauthorized');
+      (mockYnabAPI.transactions.deleteTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+      const result = await handleDeleteTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Invalid or expired YNAB access token');
+    });
+
+    it('should handle generic errors', async () => {
+      const error = new Error('Network error');
+      (mockYnabAPI.transactions.deleteTransaction as any).mockRejectedValue(error);
+
+      const params = {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      };
+      const result = await handleDeleteTransaction(mockYnabAPI, params);
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.error.message).toBe('Failed to delete transaction');
+    });
+  });
+});

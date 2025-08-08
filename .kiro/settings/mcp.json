@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "ynab-mcp-server": {
+      "command": "node",
+      "args": [
+        "C:\\Users\\ksutk\\projects\\mcp-for-ynab\\dist\\index.js"
+      ],
+      "cwd": "C:\\Users\\ksutk\\projects\\mcp-for-ynab",
+      "env": {
+        "YNAB_ACCESS_TOKEN": "o6ZhkNIZEWH4H88WsWRjvYrwjwqCMt6iUdQCr2VxjEI",
+        "NODE_ENV": "development",
+        "LOG_LEVEL": "info"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "get_budgets",
+        "get_accounts",
+        "get_categories",
+        "get_payees",
+        "get_transactions",
+        "get_month_summary",
+        "search_transactions",
+        "ynab:list_budgets",
+        "ynab:list_accounts",
+        "ynab:list_transactions",
+        "ynab:list_categories"
+      ]
+    }
+  }
+}

@@ -1,0 +1,84 @@
+import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import * as ynab from 'ynab';
+import { z } from 'zod';
+import { withToolErrorHandling } from '../types/index.js';
+
+/**
+ * Schema for ynab:list_payees tool parameters
+ */
+export const ListPayeesSchema = z.object({
+  budget_id: z.string().min(1, 'Budget ID is required'),
+});
+
+export type ListPayeesParams = z.infer<typeof ListPayeesSchema>;
+
+/**
+ * Schema for ynab:get_payee tool parameters
+ */
+export const GetPayeeSchema = z.object({
+  budget_id: z.string().min(1, 'Budget ID is required'),
+  payee_id: z.string().min(1, 'Payee ID is required'),
+});
+
+export type GetPayeeParams = z.infer<typeof GetPayeeSchema>;
+
+/**
+ * Handles the ynab:list_payees tool call
+ * Lists all payees for a specific budget
+ */
+export async function handleListPayees(
+  ynabAPI: ynab.API,
+  params: ListPayeesParams
+): Promise<CallToolResult> {
+  return await withToolErrorHandling(async () => {
+    const response = await ynabAPI.payees.getPayees(params.budget_id);
+    const payees = response.data.payees;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            payees: payees.map(payee => ({
+              id: payee.id,
+              name: payee.name,
+              transfer_account_id: payee.transfer_account_id,
+              deleted: payee.deleted,
+            })),
+          }, null, 2),
+        },
+      ],
+    };
+  }, 'ynab:list_payees', 'listing payees');
+}
+
+/**
+ * Handles the ynab:get_payee tool call
+ * Gets detailed information for a specific payee
+ */
+export async function handleGetPayee(
+  ynabAPI: ynab.API,
+  params: GetPayeeParams
+): Promise<CallToolResult> {
+  return await withToolErrorHandling(async () => {
+    const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
+    const payee = response.data.payee;
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            payee: {
+              id: payee.id,
+              name: payee.name,
+              transfer_account_id: payee.transfer_account_id,
+              deleted: payee.deleted,
+            },
+          }, null, 2),
+        },
+      ],
+    };
+  }, 'ynab:get_payee', 'getting payee details');
+}
+
