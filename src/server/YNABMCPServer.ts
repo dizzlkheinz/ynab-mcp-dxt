@@ -62,6 +62,16 @@ import {
   NaturalLanguageQuerySchema,
   SmartSuggestionsSchema
 } from '../tools/naturalLanguageTools.js';
+import {
+  handleFinancialOverview,
+  handleSpendingAnalysis,
+  handleCashFlowForecast,
+  handleBudgetHealthCheck,
+  FinancialOverviewSchema,
+  SpendingAnalysisSchema,
+  CashFlowForecastSchema,
+  BudgetHealthSchema
+} from '../tools/financialOverviewTools.js';
 
 /**
  * YNAB MCP Server class that provides integration with You Need A Budget API
@@ -821,6 +831,102 @@ Convert milliunits to dollars for easy reading.`
           },
           NaturalLanguageQuerySchema,
           SmartSuggestionsSchema,
+          {
+            name: 'financial_overview',
+            description: 'Get comprehensive financial overview with insights, trends, and analysis',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'Budget ID (optional, uses default budget if not specified)',
+                },
+                months: {
+                  type: 'number',
+                  minimum: 1,
+                  maximum: 12,
+                  default: 3,
+                  description: 'Number of months to analyze (1-12, default: 3)',
+                },
+                include_trends: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include spending trends analysis',
+                },
+                include_insights: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include AI-generated financial insights',
+                },
+              },
+              required: [],
+            },
+          },
+          {
+            name: 'spending_analysis',
+            description: 'Detailed spending analysis with category breakdowns and trends',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'Budget ID (optional)',
+                },
+                period_months: {
+                  type: 'number',
+                  minimum: 1,
+                  maximum: 12,
+                  default: 6,
+                  description: 'Analysis period in months (1-12, default: 6)',
+                },
+                category_id: {
+                  type: 'string',
+                  description: 'Optional: Focus on specific category',
+                },
+              },
+              required: [],
+            },
+          },
+          {
+            name: 'cash_flow_forecast',
+            description: 'Predict future cash flow based on historical data and scheduled transactions',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'Budget ID (optional)',
+                },
+                forecast_months: {
+                  type: 'number',
+                  minimum: 1,
+                  maximum: 12,
+                  default: 3,
+                  description: 'Number of months to forecast (1-12, default: 3)',
+                },
+              },
+              required: [],
+            },
+          },
+          {
+            name: 'budget_health_check',
+            description: 'Comprehensive budget health assessment with recommendations',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'Budget ID (optional)',
+                },
+                include_recommendations: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include actionable recommendations',
+                },
+              },
+              required: [],
+            },
+          },
         ],
       };
     });
@@ -1034,6 +1140,50 @@ Convert milliunits to dollars for easy reading.`
             method: 'tools/call',
             params: { name, arguments: args }
           });
+
+        case 'financial_overview':
+          try {
+            const params = FinancialOverviewSchema.parse(args || {});
+            return await handleFinancialOverview(this.ynabAPI, params);
+          } catch (error) {
+            throw new Error(
+              'Invalid parameters for ynab:financial_overview: ' +
+              (error instanceof Error ? error.message : 'Unknown validation error')
+            );
+          }
+
+        case 'spending_analysis':
+          try {
+            const params = SpendingAnalysisSchema.parse(args || {});
+            return await handleSpendingAnalysis(this.ynabAPI, params);
+          } catch (error) {
+            throw new Error(
+              'Invalid parameters for ynab:spending_analysis: ' +
+              (error instanceof Error ? error.message : 'Unknown validation error')
+            );
+          }
+
+        case 'cash_flow_forecast':
+          try {
+            const params = CashFlowForecastSchema.parse(args || {});
+            return await handleCashFlowForecast(this.ynabAPI, params);
+          } catch (error) {
+            throw new Error(
+              'Invalid parameters for ynab:cash_flow_forecast: ' +
+              (error instanceof Error ? error.message : 'Unknown validation error')
+            );
+          }
+
+        case 'budget_health_check':
+          try {
+            const params = BudgetHealthSchema.parse(args || {});
+            return await handleBudgetHealthCheck(this.ynabAPI, params);
+          } catch (error) {
+            throw new Error(
+              'Invalid parameters for ynab:budget_health_check: ' +
+              (error instanceof Error ? error.message : 'Unknown validation error')
+            );
+          }
 
         default:
           throw new Error(`Unknown tool: ${name}`);
