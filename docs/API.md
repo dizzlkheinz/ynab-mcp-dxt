@@ -13,12 +13,14 @@ This document provides comprehensive documentation for all tools available in th
 - [Category Management Tools](#category-management-tools)
 - [Payee Management Tools](#payee-management-tools)
 - [Monthly Data Tools](#monthly-data-tools)
+- [Financial Analysis Tools](#financial-analysis-tools)
+- [Natural Language & AI Tools](#natural-language--ai-tools)
 - [Utility Tools](#utility-tools)
 - [Error Handling](#error-handling)
 
 ## Overview
 
-The YNAB MCP Server provides 17 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
+The YNAB MCP Server provides 21 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
 
 ### Tool Naming Convention
 
@@ -461,6 +463,158 @@ Lists all months summary data for a budget.
 
 **Parameters:**
 - `budget_id` (string, required): The ID of the budget
+
+## Financial Analysis Tools
+
+### financial_overview
+
+Provides comprehensive multi-month financial analysis with AI-generated insights, spending trends, and performance metrics.
+
+**Parameters:**
+- `budget_id` (string, optional): Budget ID (uses default budget if not specified)
+- `months` (number, optional): Number of months to analyze (1-12, default: 3)
+- `include_trends` (boolean, optional): Include spending trends analysis (default: true)
+- `include_insights` (boolean, optional): Include AI-generated financial insights (default: true)
+
+**Example Request:**
+```json
+{
+  "name": "financial_overview",
+  "arguments": {
+    "months": 6,
+    "include_trends": true,
+    "include_insights": true
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"summary\": {\n    \"period\": \"6 months\",\n    \"budget_name\": \"My Budget\",\n    \"net_worth\": 15420.50,\n    \"liquid_assets\": 8500.25,\n    \"debt\": 2340.75\n  },\n  \"current_month\": {\n    \"income\": 5000000,\n    \"budgeted\": 4500000,\n    \"activity\": -4200000,\n    \"budget_utilization\": 93.3\n  },\n  \"spending_trends\": [\n    {\n      \"category\": \"Groceries\",\n      \"trend\": \"increasing\",\n      \"percentChange\": 15.2,\n      \"significance\": \"medium\"\n    }\n  ],\n  \"insights\": [\n    {\n      \"type\": \"warning\",\n      \"title\": \"Significant Increase in Groceries\",\n      \"description\": \"Spending in Groceries has increased by 15.2%\",\n      \"actionable\": true,\n      \"suggestions\": [\"Review recent transactions\"]\n    }\n  ]\n}"
+    }
+  ]
+}
+```
+
+### spending_analysis
+
+Performs detailed spending analysis with category breakdowns, trends, and variability metrics.
+
+**Parameters:**
+- `budget_id` (string, optional): Budget ID (uses default budget if not specified)
+- `period_months` (number, optional): Analysis period in months (1-12, default: 6)
+- `category_id` (string, optional): Focus analysis on specific category
+
+**Example Request:**
+```json
+{
+  "name": "spending_analysis",
+  "arguments": {
+    "period_months": 6,
+    "category_id": "category-id-123"
+  }
+}
+```
+
+### cash_flow_forecast
+
+Generates predictive cash flow modeling based on historical data and scheduled transactions.
+
+**Parameters:**
+- `budget_id` (string, optional): Budget ID (uses default budget if not specified)
+- `forecast_months` (number, optional): Number of months to forecast (1-12, default: 3)
+
+**Example Request:**
+```json
+{
+  "name": "cash_flow_forecast",
+  "arguments": {
+    "forecast_months": 3
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"forecast_period\": \"3 months\",\n  \"projections\": [\n    {\n      \"month\": \"2024-02-01\",\n      \"projected_income\": 5000.00,\n      \"projected_expenses\": 4200.00,\n      \"net_cash_flow\": 800.00,\n      \"confidence\": \"high\"\n    }\n  ],\n  \"assumptions\": [\n    \"Based on historical averages and scheduled transactions\"\n  ]\n}"
+    }
+  ]
+}
+```
+
+### budget_health_check
+
+Performs comprehensive budget health assessment with scoring and actionable recommendations.
+
+**Parameters:**
+- `budget_id` (string, optional): Budget ID (uses default budget if not specified)  
+- `include_recommendations` (boolean, optional): Include actionable recommendations (default: true)
+
+**Example Request:**
+```json
+{
+  "name": "budget_health_check",
+  "arguments": {
+    "include_recommendations": true
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"health_score\": 85,\n  \"score_explanation\": \"Good financial health with minor areas for improvement\",\n  \"metrics\": {\n    \"budget_utilization\": 93.3,\n    \"overspent_categories\": 2,\n    \"emergency_fund_status\": {\n      \"current_amount\": 2500.00,\n      \"status\": \"adequate\"\n    },\n    \"debt_to_asset_ratio\": 15.2\n  },\n  \"recommendations\": [\n    \"Address 2 overspent categories by moving funds or reducing spending\",\n    \"Consider building emergency fund to 6 months of expenses\"\n  ]\n}"
+    }
+  ]
+}
+```
+
+## Natural Language & AI Tools
+
+### natural-language-query
+
+Processes natural language queries about budget data and provides structured responses with tool suggestions.
+
+**Parameters:**
+- `query` (string, required): Natural language query about budget, transactions, accounts, etc.
+
+**Example Request:**
+```json
+{
+  "name": "natural-language-query",
+  "arguments": {
+    "query": "How much did I spend on groceries last month?"
+  }
+}
+```
+
+### get-smart-suggestions
+
+Provides contextual AI suggestions for YNAB operations based on recent activity and patterns.
+
+**Parameters:**
+- `context` (string, required): Context for suggestions - one of: "budgeting", "transactions", "analysis", "general"
+
+**Example Request:**
+```json
+{
+  "name": "get-smart-suggestions",
+  "arguments": {
+    "context": "budgeting"
+  }
+}
+```
 
 ## Utility Tools
 

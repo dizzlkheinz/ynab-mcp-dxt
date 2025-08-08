@@ -9,6 +9,7 @@ This document provides practical examples of using the YNAB MCP Server tools in 
 - [Account Management Examples](#account-management-examples)
 - [Transaction Management Examples](#transaction-management-examples)
 - [Category Management Examples](#category-management-examples)
+- [Financial Analysis Examples](#financial-analysis-examples)
 - [Advanced Workflows](#advanced-workflows)
 - [Integration Examples](#integration-examples)
 
@@ -576,6 +577,246 @@ async function updateCategoryBudget(budgetId, categoryId, newBudgetAmount) {
     throw error;
   }
 }
+```
+
+## Financial Analysis Examples
+
+### Comprehensive Financial Overview
+
+```javascript
+// Get comprehensive financial overview with insights
+async function getFinancialOverview(budgetId = null, months = 3) {
+  try {
+    const result = await client.callTool('financial_overview', {
+      budget_id: budgetId,
+      months: months,
+      include_trends: true,
+      include_insights: true
+    });
+    
+    const data = JSON.parse(result.content[0].text);
+    
+    console.log('=== Financial Overview ===');
+    console.log(`Period: ${data.summary.period}`);
+    console.log(`Net Worth: $${data.summary.net_worth.toFixed(2)}`);
+    console.log(`Liquid Assets: $${data.summary.liquid_assets.toFixed(2)}`);
+    console.log(`Total Debt: $${data.summary.debt.toFixed(2)}`);
+    
+    if (data.current_month) {
+      console.log(`\n=== Current Month ===`);
+      console.log(`Budget Utilization: ${data.current_month.budget_utilization.toFixed(1)}%`);
+      console.log(`Income: $${(data.current_month.income / 1000).toFixed(2)}`);
+      console.log(`Budgeted: $${(data.current_month.budgeted / 1000).toFixed(2)}`);
+    }
+    
+    // Display insights
+    if (data.insights && data.insights.length > 0) {
+      console.log(`\n=== AI Insights ===`);
+      data.insights.forEach((insight, index) => {
+        console.log(`${index + 1}. ${insight.title}`);
+        console.log(`   ${insight.description}`);
+        if (insight.suggestions) {
+          console.log(`   Suggestions: ${insight.suggestions.join(', ')}`);
+        }
+      });
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to get financial overview:', error.message);
+    throw error;
+  }
+}
+```
+
+### Detailed Spending Analysis
+
+```javascript
+// Analyze spending patterns by category
+async function analyzeSpending(budgetId = null, periodMonths = 6) {
+  try {
+    const result = await client.callTool('spending_analysis', {
+      budget_id: budgetId,
+      period_months: periodMonths
+    });
+    
+    const data = JSON.parse(result.content[0].text);
+    
+    console.log(`=== Spending Analysis (${data.period}) ===`);
+    
+    // Sort categories by total spent
+    const sortedCategories = data.category_analysis
+      .sort((a, b) => b.total_spent - a.total_spent)
+      .slice(0, 10); // Top 10 categories
+    
+    console.log('\nTop 10 Categories by Spending:');
+    sortedCategories.forEach((category, index) => {
+      console.log(`${index + 1}. ${category.category_name}`);
+      console.log(`   Total: $${category.total_spent.toFixed(2)}`);
+      console.log(`   Average: $${category.average_monthly.toFixed(2)}/month`);
+      console.log(`   Variability: ${category.variability.toFixed(1)}%`);
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to analyze spending:', error.message);
+    throw error;
+  }
+}
+```
+
+### Cash Flow Forecasting
+
+```javascript
+// Generate cash flow forecast
+async function forecastCashFlow(budgetId = null, forecastMonths = 3) {
+  try {
+    const result = await client.callTool('cash_flow_forecast', {
+      budget_id: budgetId,
+      forecast_months: forecastMonths
+    });
+    
+    const data = JSON.parse(result.content[0].text);
+    
+    console.log(`=== Cash Flow Forecast (${data.forecast_period}) ===`);
+    
+    data.projections.forEach((projection, index) => {
+      console.log(`\nMonth ${index + 1} (${projection.month}):`);
+      console.log(`  Income: $${projection.projected_income.toFixed(2)}`);
+      console.log(`  Expenses: $${projection.projected_expenses.toFixed(2)}`);
+      console.log(`  Net Cash Flow: $${projection.net_cash_flow.toFixed(2)}`);
+      console.log(`  Confidence: ${projection.confidence}`);
+    });
+    
+    console.log('\nAssumptions:');
+    data.assumptions.forEach(assumption => {
+      console.log(`- ${assumption}`);
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to forecast cash flow:', error.message);
+    throw error;
+  }
+}
+```
+
+### Budget Health Check
+
+```javascript
+// Perform comprehensive budget health assessment
+async function checkBudgetHealth(budgetId = null) {
+  try {
+    const result = await client.callTool('budget_health_check', {
+      budget_id: budgetId,
+      include_recommendations: true
+    });
+    
+    const data = JSON.parse(result.content[0].text);
+    
+    console.log('=== Budget Health Check ===');
+    console.log(`Overall Health Score: ${data.health_score}/100`);
+    console.log(`Assessment: ${data.score_explanation}`);
+    
+    console.log('\n=== Key Metrics ===');
+    console.log(`Budget Utilization: ${data.metrics.budget_utilization.toFixed(1)}%`);
+    console.log(`Overspent Categories: ${data.metrics.overspent_categories}`);
+    console.log(`Underfunded Categories: ${data.metrics.underfunded_categories}`);
+    console.log(`Emergency Fund: $${data.metrics.emergency_fund_status.current_amount.toFixed(2)} (${data.metrics.emergency_fund_status.status})`);
+    console.log(`Debt-to-Asset Ratio: ${data.metrics.debt_to_asset_ratio.toFixed(1)}%`);
+    
+    if (data.recommendations && data.recommendations.length > 0) {
+      console.log('\n=== Recommendations ===');
+      data.recommendations.forEach((rec, index) => {
+        console.log(`${index + 1}. ${rec}`);
+      });
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to check budget health:', error.message);
+    throw error;
+  }
+}
+```
+
+### Natural Language Query Processing
+
+```javascript
+// Process natural language financial questions
+async function askFinancialQuestion(question) {
+  try {
+    const result = await client.callTool('natural-language-query', {
+      query: question
+    });
+    
+    const data = JSON.parse(result.content[0].text);
+    
+    console.log(`Question: ${question}`);
+    console.log(`Understanding: ${data.intent.entity} (${data.confidence}% confidence)`);
+    
+    if (data.suggested_action) {
+      console.log(`Suggested Tool: ${data.suggested_action.tool}`);
+      console.log(`Parameters:`, data.suggested_action.parameters);
+    }
+    
+    if (data.clarification) {
+      console.log(`Clarification: ${data.clarification}`);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to process natural language query:', error.message);
+    throw error;
+  }
+}
+
+// Example usage
+await askFinancialQuestion("How much did I spend on dining out last month?");
+await askFinancialQuestion("Am I overspending in any categories?");
+await askFinancialQuestion("What's my net worth trend?");
+```
+
+### Smart Financial Suggestions
+
+```javascript
+// Get contextual AI suggestions
+async function getSmartSuggestions(context = 'general') {
+  try {
+    const result = await client.callTool('get-smart-suggestions', {
+      context: context
+    });
+    
+    const data = JSON.parse(result.content[0].text);
+    
+    console.log(`=== Smart Suggestions (${data.context}) ===`);
+    
+    console.log('\nRecommended Actions:');
+    data.suggestions.forEach((action, index) => {
+      console.log(`${index + 1}. ${action}`);
+    });
+    
+    console.log('\nFinancial Tips:');
+    data.tips.forEach((tip, index) => {
+      console.log(`${index + 1}. ${tip}`);
+    });
+    
+    console.log('\nExample Queries:');
+    data.queries.forEach((query, index) => {
+      console.log(`${index + 1}. "${query}"`);
+    });
+    
+    return data;
+  } catch (error) {
+    console.error('Failed to get smart suggestions:', error.message);
+    throw error;
+  }
+}
+
+// Example usage for different contexts
+await getSmartSuggestions('budgeting');
+await getSmartSuggestions('analysis');
+await getSmartSuggestions('transactions');
 ```
 
 ## Advanced Workflows
