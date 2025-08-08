@@ -1,0 +1,123 @@
+{
+  "dxt_version": "0.1",
+  "name": "ynab-mcp-server",
+  "display_name": "YNAB MCP Server",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for YNAB (You Need A Budget) integration",
+  "long_description": "This extension provides AI assistants with secure access to You Need A Budget (YNAB) data and functionality. The server acts as a bridge between AI applications and the YNAB API, exposing budget management capabilities through standardized MCP tools including budget management, account operations, transaction handling, category management, payee operations, and utility functions.",
+  "author": {
+    "name": "YNAB MCP Server Team"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ynab-mcp-server"
+  },
+  "keywords": ["mcp", "ynab", "budget", "finance", "personal-finance", "api"],
+  "license": "MIT",
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/dist/index.js"],
+      "env": {
+        "YNAB_ACCESS_TOKEN": "${user_config.ynab_access_token}",
+        "NODE_ENV": "production"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "list_budgets",
+      "description": "List all budgets associated with the user's account"
+    },
+    {
+      "name": "get_budget",
+      "description": "Get detailed information for a specific budget"
+    },
+    {
+      "name": "list_accounts",
+      "description": "List all accounts for a specific budget"
+    },
+    {
+      "name": "get_account",
+      "description": "Get detailed information for a specific account"
+    },
+    {
+      "name": "create_account",
+      "description": "Create a new account in the specified budget"
+    },
+    {
+      "name": "list_transactions",
+      "description": "List transactions for a budget with optional filtering"
+    },
+    {
+      "name": "get_transaction",
+      "description": "Get detailed information for a specific transaction"
+    },
+    {
+      "name": "create_transaction",
+      "description": "Create a new transaction in the specified budget and account"
+    },
+    {
+      "name": "update_transaction",
+      "description": "Update an existing transaction"
+    },
+    {
+      "name": "delete_transaction",
+      "description": "Delete a transaction from the specified budget"
+    },
+    {
+      "name": "list_categories",
+      "description": "List all categories for a specific budget"
+    },
+    {
+      "name": "get_category",
+      "description": "Get detailed information for a specific category"
+    },
+    {
+      "name": "update_category",
+      "description": "Update the budgeted amount for a category in the current month"
+    },
+    {
+      "name": "list_payees",
+      "description": "List all payees for a specific budget"
+    },
+    {
+      "name": "get_payee",
+      "description": "Get detailed information for a specific payee"
+    },
+    {
+      "name": "get_month",
+      "description": "Get budget data for a specific month"
+    },
+    {
+      "name": "list_months",
+      "description": "List all months summary data for a budget"
+    },
+    {
+      "name": "get_user",
+      "description": "Get information about the authenticated user"
+    },
+    {
+      "name": "convert_amount",
+      "description": "Convert between dollars and milliunits with integer arithmetic for precision"
+    }
+  ],
+  "compatibility": {
+    "claude_desktop": ">=0.12.0",
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  },
+  "user_config": {
+    "ynab_access_token": {
+      "type": "string",
+      "title": "YNAB Personal Access Token",
+      "description": "Your YNAB Personal Access Token. You can generate this from your YNAB account settings at https://app.youneedabudget.com/settings/developer",
+      "sensitive": true,
+      "required": true
+    }
+  }
+}

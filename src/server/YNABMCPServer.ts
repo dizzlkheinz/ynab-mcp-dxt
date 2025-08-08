@@ -597,7 +597,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:create_account':
+        case 'create_account':
           try {
             const params = CreateAccountSchema.parse(args);
             return await handleCreateAccount(this.ynabAPI, params);
@@ -608,7 +608,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:list_transactions':
+        case 'list_transactions':
           try {
             const params = ListTransactionsSchema.parse(args);
             return await handleListTransactions(this.ynabAPI, params);
@@ -619,7 +619,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:get_transaction':
+        case 'get_transaction':
           try {
             const params = GetTransactionSchema.parse(args);
             return await handleGetTransaction(this.ynabAPI, params);
@@ -630,7 +630,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:create_transaction':
+        case 'create_transaction':
           try {
             const params = CreateTransactionSchema.parse(args);
             return await handleCreateTransaction(this.ynabAPI, params);
@@ -641,7 +641,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:update_transaction':
+        case 'update_transaction':
           try {
             const params = UpdateTransactionSchema.parse(args);
             return await handleUpdateTransaction(this.ynabAPI, params);
@@ -652,7 +652,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:delete_transaction':
+        case 'delete_transaction':
           try {
             const params = DeleteTransactionSchema.parse(args);
             return await handleDeleteTransaction(this.ynabAPI, params);
@@ -663,7 +663,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:list_categories':
+        case 'list_categories':
           try {
             const params = ListCategoriesSchema.parse(args);
             return await handleListCategories(this.ynabAPI, params);
@@ -674,7 +674,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:get_category':
+        case 'get_category':
           try {
             const params = GetCategorySchema.parse(args);
             return await handleGetCategory(this.ynabAPI, params);
@@ -685,7 +685,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:update_category':
+        case 'update_category':
           try {
             const params = UpdateCategorySchema.parse(args);
             return await handleUpdateCategory(this.ynabAPI, params);
@@ -696,7 +696,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:list_payees':
+        case 'list_payees':
           try {
             const params = ListPayeesSchema.parse(args);
             return await handleListPayees(this.ynabAPI, params);
@@ -707,7 +707,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:get_payee':
+        case 'get_payee':
           try {
             const params = GetPayeeSchema.parse(args);
             return await handleGetPayee(this.ynabAPI, params);
@@ -718,7 +718,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:get_month':
+        case 'get_month':
           try {
             const params = GetMonthSchema.parse(args);
             return await handleGetMonth(this.ynabAPI, params);
@@ -729,7 +729,7 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:list_months':
+        case 'list_months':
           try {
             const params = ListMonthsSchema.parse(args);
             return await handleListMonths(this.ynabAPI, params);
@@ -740,10 +740,10 @@ export class YNABMCPServer {
             );
           }
 
-        case 'ynab:get_user':
+        case 'get_user':
           return await handleGetUser(this.ynabAPI);
 
-        case 'ynab:convert_amount':
+        case 'convert_amount':
           try {
             const params = ConvertAmountSchema.parse(args);
             return await handleConvertAmount(params);

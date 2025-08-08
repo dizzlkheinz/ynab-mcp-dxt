@@ -138,3 +138,5 @@ local/
 
 # ynab python mcp
 ynab-mcp-python-old/
+
+.kiro/

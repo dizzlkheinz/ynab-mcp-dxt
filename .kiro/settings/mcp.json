@@ -13,17 +13,20 @@
       },
       "disabled": false,
       "autoApprove": [
-        "get_budgets",
-        "get_accounts",
-        "get_categories",
-        "get_payees",
-        "get_transactions",
-        "get_month_summary",
-        "search_transactions",
-        "ynab:list_budgets",
-        "ynab:list_accounts",
-        "ynab:list_transactions",
-        "ynab:list_categories"
+        "list_budgets",
+        "get_budget",
+        "list_accounts",
+        "get_account",
+        "list_categories",
+        "get_category",
+        "list_payees",
+        "get_payee",
+        "list_transactions",
+        "get_transaction",
+        "list_months",
+        "get_month",
+        "get_user",
+        "convert_amount"
       ]
     }
   }

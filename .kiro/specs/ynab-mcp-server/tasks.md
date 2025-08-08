@@ -301,7 +301,12 @@
   - _Requirements: 10.1, 10.4, 10.5_
 
 
-- [ ] 15. create claude desktop .dxt file
+- [x] 15. create claude desktop .dxt file
+
+
+
+
+
   - create claude desktop .dxt file
   - use mcps perplexity, context7 to figure out how to do this
 
