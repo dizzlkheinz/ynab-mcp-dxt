@@ -136,7 +136,14 @@ api_key.txt
 .local/
 local/
 
-# ynab python mcp
-ynab-mcp-python-old/
+# Temporary build artifacts
+*.dxt
+manifest.json
+test-extract/
 
+# Old implementations
+ynab-mcp-python-old/
+ynab-mcp-dxt-updated/
+
+# IDE specific
 .kiro/

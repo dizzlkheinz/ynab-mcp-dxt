@@ -27,6 +27,8 @@
     "test:performance": "vitest run src/__tests__/performance.test.ts",
     "test:comprehensive": "tsx src/__tests__/testRunner.ts",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:performance",
+    "generate:dxt": "powershell -ExecutionPolicy Bypass -File scripts/generate-dxt.ps1",
+    "package:dxt": "npm run build:prod && npm run generate:dxt",
     "prepare": "npm run build",
     "prepublishOnly": "npm run test:all && npm run build:prod"
   },
