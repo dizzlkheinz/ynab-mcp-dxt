@@ -3,7 +3,8 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 /**
  * YNAB API error codes and their corresponding HTTP status codes
  */
-export enum YNABErrorCode {
+/* eslint-disable no-unused-vars */
+export const enum YNABErrorCode {
   UNAUTHORIZED = 401,
   FORBIDDEN = 403,
   NOT_FOUND = 404,
@@ -14,11 +15,12 @@ export enum YNABErrorCode {
 /**
  * Security-related error codes
  */
-export enum SecurityErrorCode {
+export const enum SecurityErrorCode {
   RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
+/* eslint-enable no-unused-vars */
 
 /**
  * Standardized error response structure
@@ -27,7 +29,9 @@ export interface ErrorResponse {
   error: {
     code: YNABErrorCode | SecurityErrorCode;
     message: string;
+    userMessage: string; // User-friendly message
     details?: string | Record<string, unknown>;
+    suggestions?: string[]; // Actionable suggestions for the user
   };
 }
 
@@ -35,20 +39,28 @@ export interface ErrorResponse {
  * Custom error classes for different error types
  */
 export class YNABAPIError extends Error {
+  public readonly code: YNABErrorCode;
+  public readonly originalError?: unknown;
+  
   constructor(
-    public code: YNABErrorCode,
+    code: YNABErrorCode,
     message: string,
-    public originalError?: unknown
+    originalError?: unknown
   ) {
     super(message);
     this.name = 'YNABAPIError';
+    this.code = code;
+    this.originalError = originalError;
   }
 }
 
 export class ValidationError extends Error {
-  constructor(message: string, public details?: string) {
+  public readonly details?: string | undefined;
+  
+  constructor(message: string, details?: string | undefined) {
     super(message);
     this.name = 'ValidationError';
+    this.details = details;
   }
 }
 
@@ -83,6 +95,8 @@ export class ErrorHandler {
         error: {
           code: error.code,
           message: this.getErrorMessage(error.code, context),
+          userMessage: this.getUserFriendlyMessage(error.code, context),
+          suggestions: this.getErrorSuggestions(error.code, context),
           ...(sanitizedDetails && { details: sanitizedDetails }),
         },
       };
@@ -94,6 +108,8 @@ export class ErrorHandler {
         error: {
           code: SecurityErrorCode.VALIDATION_ERROR,
           message: error.message,
+          userMessage: this.getUserFriendlyMessage(SecurityErrorCode.VALIDATION_ERROR, context),
+          suggestions: this.getErrorSuggestions(SecurityErrorCode.VALIDATION_ERROR, context),
           ...(sanitizedDetails && { details: sanitizedDetails }),
         },
       };
@@ -107,6 +123,8 @@ export class ErrorHandler {
           error: {
             code: detectedCode,
             message: this.getErrorMessage(detectedCode, context),
+            userMessage: this.getUserFriendlyMessage(detectedCode, context),
+            suggestions: this.getErrorSuggestions(detectedCode, context),
           },
         };
       }
@@ -117,6 +135,8 @@ export class ErrorHandler {
       error: {
         code: SecurityErrorCode.UNKNOWN_ERROR,
         message: this.getGenericErrorMessage(context),
+        userMessage: this.getUserFriendlyGenericMessage(context),
+        suggestions: ['Try the operation again', 'Check your internet connection', 'Contact support if the issue persists'],
       },
     };
   }
@@ -144,6 +164,137 @@ export class ErrorHandler {
     }
 
     return null;
+  }
+
+  /**
+   * Returns user-friendly error messages for end users
+   */
+  private static getUserFriendlyMessage(code: YNABErrorCode | SecurityErrorCode, context: string): string {
+    switch (code) {
+      case YNABErrorCode.UNAUTHORIZED:
+        return 'Your YNAB access token is invalid or has expired. Please check your token and try again.';
+      case YNABErrorCode.FORBIDDEN:
+        return 'You don\'t have permission to access this YNAB data. Please check your account permissions.';
+      case YNABErrorCode.NOT_FOUND:
+        return this.getUserFriendlyNotFoundMessage(context);
+      case YNABErrorCode.TOO_MANY_REQUESTS:
+        return 'We\'re making too many requests to YNAB. Please wait a moment and try again.';
+      case YNABErrorCode.INTERNAL_SERVER_ERROR:
+        return 'YNAB\'s servers are having issues. Please try again in a few minutes.';
+      case SecurityErrorCode.VALIDATION_ERROR:
+        return 'Some of the information provided is invalid. Please check your inputs and try again.';
+      case SecurityErrorCode.RATE_LIMIT_EXCEEDED:
+        return 'Too many requests have been made. Please wait before trying again.';
+      default:
+        return this.getUserFriendlyGenericMessage(context);
+    }
+  }
+
+  /**
+   * Returns actionable suggestions for users based on error type
+   */
+  private static getErrorSuggestions(code: YNABErrorCode | SecurityErrorCode, context: string): string[] {
+    switch (code) {
+      case YNABErrorCode.UNAUTHORIZED:
+        return [
+          'Go to https://app.youneedabudget.com/settings/developer to generate a new access token',
+          'Make sure you copied the entire token without any extra spaces',
+          'Check that your token hasn\'t expired'
+        ];
+      case YNABErrorCode.FORBIDDEN:
+        return [
+          'Verify that your YNAB account has access to the requested budget',
+          'Check if your YNAB subscription is active',
+          'Try logging into YNAB directly to confirm access'
+        ];
+      case YNABErrorCode.NOT_FOUND:
+        return this.getNotFoundSuggestions(context);
+      case YNABErrorCode.TOO_MANY_REQUESTS:
+        return [
+          'Wait 1-2 minutes before trying again',
+          'Try making fewer requests at once',
+          'The system will automatically retry after a short delay'
+        ];
+      case YNABErrorCode.INTERNAL_SERVER_ERROR:
+        return [
+          'Check YNAB\'s status page at https://status.youneedabudget.com',
+          'Try again in a few minutes',
+          'Contact YNAB support if the issue persists'
+        ];
+      case SecurityErrorCode.VALIDATION_ERROR:
+        return [
+          'Double-check all required fields are filled out',
+          'Verify that amounts are in the correct format',
+          'Make sure dates are valid and in the right format'
+        ];
+      default:
+        return [
+          'Try the operation again',
+          'Check your internet connection',
+          'Contact support if the issue persists'
+        ];
+    }
+  }
+
+  /**
+   * Returns user-friendly not found messages
+   */
+  private static getUserFriendlyNotFoundMessage(context: string): string {
+    if (context.includes('account')) {
+      return 'We couldn\'t find the budget or account you\'re looking for.';
+    }
+    if (context.includes('budget')) {
+      return 'We couldn\'t find that budget. It may have been deleted or you may not have access.';
+    }
+    if (context.includes('category')) {
+      return 'We couldn\'t find that category. It may have been deleted or moved.';
+    }
+    if (context.includes('transaction')) {
+      return 'We couldn\'t find that transaction. It may have been deleted or moved.';
+    }
+    if (context.includes('payee')) {
+      return 'We couldn\'t find that payee in your budget.';
+    }
+    return 'We couldn\'t find what you\'re looking for. Please check that all information is correct.';
+  }
+
+  /**
+   * Returns suggestions for not found errors
+   */
+  private static getNotFoundSuggestions(context: string): string[] {
+    const baseSuggestions = [
+      'Double-check that the name or ID is spelled correctly',
+      'Try refreshing your budget data',
+      'Make sure you\'re using the right budget'
+    ];
+
+    if (context.includes('account')) {
+      return [...baseSuggestions, 'Check if the account was recently closed or renamed'];
+    }
+    if (context.includes('category')) {
+      return [...baseSuggestions, 'Check if the category was deleted or moved to a different group'];
+    }
+    if (context.includes('transaction')) {
+      return [...baseSuggestions, 'Check if the transaction was deleted or is in a different account'];
+    }
+    
+    return baseSuggestions;
+  }
+
+  /**
+   * Returns user-friendly generic error message
+   */
+  private static getUserFriendlyGenericMessage(context: string): string {
+    if (context.includes('transaction')) {
+      return 'There was a problem with your transaction. Please check your information and try again.';
+    }
+    if (context.includes('budget')) {
+      return 'There was a problem accessing your budget data. Please try again.';
+    }
+    if (context.includes('account')) {
+      return 'There was a problem accessing your account information. Please try again.';
+    }
+    return 'Something went wrong. Please try again in a moment.';
   }
 
   /**

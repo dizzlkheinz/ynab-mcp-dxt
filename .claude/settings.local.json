@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(find:*)",
+      "Bash(powershell:*)",
+      "mcp__perplexity-ask__perplexity_ask",
+      "Bash(npm search:*)",
+      "Bash(npm install:*)",
+      "Bash(dxt:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(node:*)",
+      "Bash(npm run lint)",
+      "Bash(npx eslint:*)"
+    ],
+    "deny": []
+  }
+}

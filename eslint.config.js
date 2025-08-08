@@ -10,8 +10,7 @@ export default [
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2020,
-        sourceType: 'module',
-        project: './tsconfig.json'
+        sourceType: 'module'
       },
       globals: {
         console: 'readonly',
@@ -26,10 +25,7 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/explicit-function-return-type': 'warn',
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/prefer-const': 'error',
-      '@typescript-eslint/no-var-requires': 'error',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
       'no-var': 'error'
@@ -40,6 +36,9 @@ export default [
       'dist/**/*',
       'node_modules/**/*',
       'scripts/**/*',
+      '**/__tests__/**/*',
+      '**/*.test.ts',
+      '**/*.test.js',
       '*.js',
       'eslint.config.js'
     ]

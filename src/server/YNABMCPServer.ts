@@ -56,6 +56,12 @@ import {
   handleConvertAmount,
   ConvertAmountSchema
 } from '../tools/utilityTools.js';
+import {
+  handleNaturalLanguageQuery,
+  handleSmartSuggestions,
+  NaturalLanguageQuerySchema,
+  SmartSuggestionsSchema
+} from '../tools/naturalLanguageTools.js';
 
 /**
  * YNAB MCP Server class that provides integration with You Need A Budget API
@@ -296,7 +302,7 @@ export class YNABMCPServer {
       const { name, arguments: args } = request.params;
       
       switch (name) {
-        case 'create-transaction':
+        case 'create-transaction': {
           const budgetName = args?.['budget_name'] || 'first available budget';
           const accountName = args?.['account_name'] || '[ACCOUNT_NAME]';
           const amount = args?.['amount'] || '[AMOUNT]';
@@ -329,8 +335,9 @@ Use the appropriate YNAB MCP tools to:
               }
             ]
           };
+        }
           
-        case 'budget-summary':
+        case 'budget-summary': {
           const summaryBudget = args?.['budget_name'] || 'first available budget';
           const month = args?.['month'] || 'current month';
           
@@ -357,8 +364,9 @@ Format the response in a clear, easy-to-read summary.`
               }
             ]
           };
+        }
           
-        case 'account-balances':
+        case 'account-balances': {
           const balanceBudget = args?.['budget_name'] || 'first available budget';
           const accountType = args?.['account_type'] || 'all accounts';
           
@@ -386,6 +394,7 @@ Convert milliunits to dollars for easy reading.`
               }
             ]
           };
+        }
           
         default:
           throw new Error(`Unknown prompt: ${name}`);
@@ -810,6 +819,8 @@ Convert milliunits to dollars for easy reading.`
               required: ['amount', 'to_milliunits'],
             },
           },
+          NaturalLanguageQuerySchema,
+          SmartSuggestionsSchema,
         ],
       };
     });
@@ -1011,6 +1022,18 @@ Convert milliunits to dollars for easy reading.`
               error instanceof Error ? error.message : 'Unknown validation error'
             );
           }
+
+        case 'natural-language-query':
+          return await handleNaturalLanguageQuery({ 
+            method: 'tools/call',
+            params: { name, arguments: args }
+          });
+
+        case 'get-smart-suggestions':
+          return await handleSmartSuggestions({ 
+            method: 'tools/call',
+            params: { name, arguments: args }
+          });
 
         default:
           throw new Error(`Unknown tool: ${name}`);

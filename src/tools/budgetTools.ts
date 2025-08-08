@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
+import { cacheManager, CACHE_TTLS } from '../server/cacheManager.js';
 
 /**
  * Schema for ynab:get_budget tool parameters
@@ -18,8 +19,38 @@ export type GetBudgetParams = z.infer<typeof GetBudgetSchema>;
  */
 export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResult> {
   return await withToolErrorHandling(async () => {
+    const cacheKey = 'budgets:list';
+    
+    // Check cache first
+    const cached = cacheManager.get<ynab.BudgetSummary[]>(cacheKey);
+    if (cached) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              budgets: cached.map(budget => ({
+                id: budget.id,
+                name: budget.name,
+                last_modified_on: budget.last_modified_on,
+                first_month: budget.first_month,
+                last_month: budget.last_month,
+                currency_format: budget.currency_format
+              })),
+              cached: true,
+              cache_info: 'Data retrieved from cache for improved performance'
+            }, null, 2)
+          }
+        ]
+      };
+    }
+    
+    // Fetch from API and cache
     const response = await ynabAPI.budgets.getBudgets();
     const budgets = response.data.budgets;
+    
+    // Cache the result
+    cacheManager.set(cacheKey, budgets, CACHE_TTLS.BUDGETS);
 
     return {
       content: [
@@ -35,6 +66,8 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
               date_format: budget.date_format,
               currency_format: budget.currency_format,
             })),
+            cached: false,
+            cache_info: 'Fresh data retrieved from YNAB API'
           }, null, 2),
         },
       ],

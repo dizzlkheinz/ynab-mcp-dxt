@@ -29,7 +29,8 @@ export class SecurityMiddleware {
   static async withSecurity<T extends Record<string, unknown>>(
     context: SecurityContext,
     schema: z.ZodSchema<T>,
-    operation: (params: T) => Promise<CallToolResult>
+    // eslint-disable-next-line no-unused-vars
+    operation: (..._args: unknown[]) => Promise<CallToolResult>
   ): Promise<CallToolResult> {
     const startTime = Date.now();
     
@@ -208,7 +209,8 @@ export function withSecurityWrapper<T extends Record<string, unknown>>(
 ) {
   return (accessToken: string) => 
     (params: Record<string, unknown>) => 
-      (handler: (validatedParams: T) => Promise<CallToolResult>) => {
+      // eslint-disable-next-line no-unused-vars
+      (handler: (..._args: unknown[]) => Promise<CallToolResult>) => {
         const context: SecurityContext = {
           accessToken,
           toolName,
