@@ -1,0 +1,32 @@
+{
+  "dxt_version": "0.1",
+  "name": "ynab-mcp-server",
+  "version": "1.0.0",
+  "description": "Model Context Protocol server for YNAB (You Need A Budget) integration. Provides tools for budget management, transaction tracking, and financial analysis.",
+  "author": {
+    "name": "kdizzl"
+  },
+  "user_config": {
+    "YNAB_ACCESS_TOKEN": {
+      "type": "string",
+      "title": "YNAB Personal Access Token",
+      "description": "Your YNAB Personal Access Token. Generate one at: https://app.youneedabudget.com/settings/developer",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "YNAB_ACCESS_TOKEN": "${YNAB_ACCESS_TOKEN}"
+      }
+    }
+  },
+  "license": "AGPL-3.0"
+}
