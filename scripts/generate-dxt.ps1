@@ -1,92 +1,83 @@
-# Simple PowerShell script to generate a .dxt file for the YNAB MCP Server
-# A .dxt file is just a compressed archive with the built server and metadata
+# PowerShell script to generate a .dxt file using the official Anthropic DXT CLI
 
 param(
     [string]$OutputDir = "dist"
 )
 
-Write-Host "Generating YNAB MCP Server .dxt package..." -ForegroundColor Green
+Write-Host "Generating YNAB MCP Server .dxt package using official CLI..." -ForegroundColor Green
 
 # Configuration
-$PackageName = "ynab-mcp-server"
 $PackageJson = Get-Content "package.json" | ConvertFrom-Json
+$PackageName = $PackageJson.name
 $Version = $PackageJson.version
-$DxtFile = "$PackageName-$Version.dxt"
 
 # Ensure we have a built version
 if (-not (Test-Path "dist/index.js")) {
     Write-Host "❌ Build not found. Running build first..." -ForegroundColor Red
-    npm run build:prod
-}
-
-# Create temporary package directory
-$TempDir = Join-Path $env:TEMP "ynab-mcp-$(Get-Random)"
-$PackageDir = Join-Path $TempDir "package"
-New-Item -ItemType Directory -Path $PackageDir -Force | Out-Null
-
-Write-Host "Packaging files..." -ForegroundColor Yellow
-
-# Copy essential files
-Copy-Item -Recurse "dist" "$PackageDir/"
-Copy-Item "package.json" "$PackageDir/"
-Copy-Item "README.md" "$PackageDir/"
-if (Test-Path "LICENSE") { Copy-Item "LICENSE" "$PackageDir/" }
-if (Test-Path "docs") { Copy-Item -Recurse "docs" "$PackageDir/" }
-
-# Create simple manifest
-$Manifest = @{
-    name = $PackageName
-    version = $Version
-    description = "Model Context Protocol server for YNAB integration"
-    main = "dist/index.js"
-    type = "mcp-server"
-    requiredEnv = @("YNAB_ACCESS_TOKEN")
-} | ConvertTo-Json -Depth 3
-
-$Manifest | Out-File -FilePath "$PackageDir/manifest.json" -Encoding UTF8
-
-# Create MCP config template
-$McpConfig = @{
-    mcpServers = @{
-        $PackageName = @{
-            command = "node"
-            args = @("dist/index.js")
-            env = @{
-                YNAB_ACCESS_TOKEN = "your_token_here"
-            }
-        }
+    npm run build
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Build failed!" -ForegroundColor Red
+        exit 1
     }
-} | ConvertTo-Json -Depth 4
-
-$McpConfig | Out-File -FilePath "$PackageDir/mcp-config.json" -Encoding UTF8
-
-# Create the .dxt file (zip archive)
-Write-Host "Creating .dxt archive..." -ForegroundColor Yellow
-$DxtPath = Join-Path $OutputDir $DxtFile
-
-# Ensure output directory exists
-if (-not (Test-Path $OutputDir)) {
-    New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 }
 
-# Create zip archive (Windows equivalent of tar.gz)
-Compress-Archive -Path "$PackageDir\*" -DestinationPath $DxtPath -Force
+# Check if official DXT CLI is installed
+try {
+    $dxtVersion = & dxt --version
+    Write-Host "✅ Using DXT CLI version: $dxtVersion" -ForegroundColor Green
+} catch {
+    Write-Host "❌ DXT CLI not found. Installing..." -ForegroundColor Yellow
+    npm install -g @anthropic-ai/dxt
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Failed to install DXT CLI!" -ForegroundColor Red
+        exit 1
+    }
+}
 
-# Cleanup
-Remove-Item -Recurse -Force $TempDir
+# Ensure manifest.json exists and is valid
+if (-not (Test-Path "manifest.json")) {
+    Write-Host "❌ manifest.json not found. Creating one..." -ForegroundColor Yellow
+    & dxt init -y
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "❌ Failed to create manifest!" -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Validate the manifest
+Write-Host "Validating manifest..." -ForegroundColor Yellow
+& dxt validate manifest.json
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ Manifest validation failed!" -ForegroundColor Red
+    exit 1
+}
+
+# Pack the DXT using official CLI
+Write-Host "Packing DXT file..." -ForegroundColor Yellow
+$DxtFile = "$PackageName-$Version.dxt"
+$OutputPath = Join-Path $OutputDir $DxtFile
+
+& dxt pack . $OutputPath
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ DXT packing failed!" -ForegroundColor Red
+    exit 1
+}
 
 # Get file size
-if (Test-Path $DxtPath) {
-    $FileSize = (Get-Item $DxtPath).Length
+if (Test-Path $OutputPath) {
+    $FileSize = (Get-Item $OutputPath).Length
     $FileSizeKB = [math]::Round($FileSize / 1KB, 1)
+    $FileSizeMB = [math]::Round($FileSize / 1MB, 1)
+    
+    Write-Host "✅ Created $OutputPath" -ForegroundColor Green
+    Write-Host "📦 Size: $FileSizeKB KB ($FileSizeMB MB)" -ForegroundColor Cyan
 } else {
-    $FileSizeKB = 0
+    Write-Host "❌ DXT file was not created!" -ForegroundColor Red
+    exit 1
 }
 
-Write-Host "Created $DxtPath" -ForegroundColor Green
-Write-Host "Size: $FileSizeKB KB" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "To install:" -ForegroundColor Yellow
-Write-Host "1. Extract: Expand-Archive $DxtFile" -ForegroundColor White
+Write-Host "🚀 Installation Instructions:" -ForegroundColor Yellow
+Write-Host "1. Drag and drop the .dxt file into Claude Desktop" -ForegroundColor White
 Write-Host "2. Set YNAB_ACCESS_TOKEN environment variable" -ForegroundColor White
-Write-Host "3. Add to Claude Desktop MCP config" -ForegroundColor White
+Write-Host "3. Restart Claude Desktop" -ForegroundColor White

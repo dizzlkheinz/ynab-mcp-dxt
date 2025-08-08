@@ -3,6 +3,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ListPromptsRequestSchema,
+  ReadResourceRequestSchema,
+  GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { AuthenticationError, ConfigurationError, ServerConfig, ErrorHandler } from '../types/index.js';
@@ -79,6 +83,8 @@ export class YNABMCPServer {
       {
         capabilities: {
           tools: {},
+          resources: {},
+          prompts: {},
         },
       }
     );
@@ -134,6 +140,258 @@ export class YNABMCPServer {
    * Sets up MCP server request handlers
    */
   private setupHandlers(): void {
+    // Handle list resources requests
+    this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
+      return {
+        resources: [
+          {
+            uri: 'ynab://budgets',
+            name: 'YNAB Budgets',
+            description: 'List of all available budgets',
+            mimeType: 'application/json'
+          },
+          {
+            uri: 'ynab://user',
+            name: 'YNAB User Info',
+            description: 'Current user information and subscription details',
+            mimeType: 'application/json'
+          }
+        ]
+      };
+    });
+
+    // Handle read resource requests
+    this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+      const { uri } = request.params;
+      
+      switch (uri) {
+        case 'ynab://budgets':
+          try {
+            const response = await this.ynabAPI.budgets.getBudgets();
+            const budgets = response.data.budgets.map(budget => ({
+              id: budget.id,
+              name: budget.name,
+              last_modified_on: budget.last_modified_on,
+              first_month: budget.first_month,
+              last_month: budget.last_month,
+              currency_format: budget.currency_format
+            }));
+            
+            return {
+              contents: [
+                {
+                  uri: uri,
+                  mimeType: 'application/json',
+                  text: JSON.stringify({ budgets }, null, 2)
+                }
+              ]
+            };
+          } catch (error) {
+            throw new Error(`Failed to fetch budgets: ${error}`);
+          }
+          
+        case 'ynab://user':
+          try {
+            const response = await this.ynabAPI.user.getUser();
+            const user = {
+              id: response.data.user.id
+            };
+            
+            return {
+              contents: [
+                {
+                  uri: uri,
+                  mimeType: 'application/json',
+                  text: JSON.stringify({ user }, null, 2)
+                }
+              ]
+            };
+          } catch (error) {
+            throw new Error(`Failed to fetch user info: ${error}`);
+          }
+          
+        default:
+          throw new Error(`Unknown resource: ${uri}`);
+      }
+    });
+
+    // Handle list prompts requests
+    this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
+      return {
+        prompts: [
+          {
+            name: 'create-transaction',
+            description: 'Create a new transaction in YNAB',
+            arguments: [
+              {
+                name: 'budget_name',
+                description: 'Name of the budget (optional, uses first budget if not specified)',
+                required: false
+              },
+              {
+                name: 'account_name',
+                description: 'Name of the account',
+                required: true
+              },
+              {
+                name: 'amount',
+                description: 'Transaction amount (negative for expenses, positive for income)',
+                required: true
+              },
+              {
+                name: 'payee',
+                description: 'Who you paid or received money from',
+                required: true
+              },
+              {
+                name: 'category',
+                description: 'Budget category (optional)',
+                required: false
+              },
+              {
+                name: 'memo',
+                description: 'Additional notes (optional)',
+                required: false
+              }
+            ]
+          },
+          {
+            name: 'budget-summary',
+            description: 'Get a summary of your budget status',
+            arguments: [
+              {
+                name: 'budget_name',
+                description: 'Name of the budget (optional, uses first budget if not specified)',
+                required: false
+              },
+              {
+                name: 'month',
+                description: 'Month to analyze (YYYY-MM format, optional, uses current month if not specified)',
+                required: false
+              }
+            ]
+          },
+          {
+            name: 'account-balances',
+            description: 'Check balances across all accounts',
+            arguments: [
+              {
+                name: 'budget_name',
+                description: 'Name of the budget (optional, uses first budget if not specified)',
+                required: false
+              },
+              {
+                name: 'account_type',
+                description: 'Filter by account type (checking, savings, creditCard, etc.)',
+                required: false
+              }
+            ]
+          }
+        ]
+      };
+    });
+
+    // Handle get prompt requests
+    this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
+      const { name, arguments: args } = request.params;
+      
+      switch (name) {
+        case 'create-transaction':
+          const budgetName = args?.['budget_name'] || 'first available budget';
+          const accountName = args?.['account_name'] || '[ACCOUNT_NAME]';
+          const amount = args?.['amount'] || '[AMOUNT]';
+          const payee = args?.['payee'] || '[PAYEE]';
+          const category = args?.['category'] || '[CATEGORY]';
+          const memo = args?.['memo'] || '';
+          
+          return {
+            description: `Create a transaction for ${payee} in ${accountName}`,
+            messages: [
+              {
+                role: 'user',
+                content: {
+                  type: 'text',
+                  text: `Please create a transaction with the following details:
+- Budget: ${budgetName}
+- Account: ${accountName}
+- Amount: $${amount}
+- Payee: ${payee}
+- Category: ${category}
+- Memo: ${memo}
+
+Use the appropriate YNAB MCP tools to:
+1. First, list budgets to find the budget ID
+2. List accounts for that budget to find the account ID
+3. If a category is specified, list categories to find the category ID
+4. Create the transaction with the correct amount in milliunits (multiply by 1000)
+5. Confirm the transaction was created successfully`
+                }
+              }
+            ]
+          };
+          
+        case 'budget-summary':
+          const summaryBudget = args?.['budget_name'] || 'first available budget';
+          const month = args?.['month'] || 'current month';
+          
+          return {
+            description: `Get budget summary for ${summaryBudget}`,
+            messages: [
+              {
+                role: 'user',
+                content: {
+                  type: 'text',
+                  text: `Please provide a comprehensive budget summary for ${summaryBudget} (${month}):
+
+1. List all budgets and select the appropriate one
+2. Get monthly data for ${month}
+3. List categories to show budget vs actual spending
+4. Provide insights on:
+   - Total budgeted vs actual spending
+   - Categories that are over/under budget
+   - Available money to budget
+   - Any overspending that needs attention
+
+Format the response in a clear, easy-to-read summary.`
+                }
+              }
+            ]
+          };
+          
+        case 'account-balances':
+          const balanceBudget = args?.['budget_name'] || 'first available budget';
+          const accountType = args?.['account_type'] || 'all accounts';
+          
+          return {
+            description: `Check account balances for ${accountType}`,
+            messages: [
+              {
+                role: 'user',
+                content: {
+                  type: 'text',
+                  text: `Please show account balances for ${balanceBudget}:
+
+1. List all budgets and select the appropriate one
+2. List accounts for that budget
+3. Filter by account type: ${accountType}
+4. Show balances in a clear format with:
+   - Account name and type
+   - Current balance
+   - Cleared vs uncleared amounts
+   - Total by account type
+   - Net worth summary (assets - liabilities)
+
+Convert milliunits to dollars for easy reading.`
+                }
+              }
+            ]
+          };
+          
+        default:
+          throw new Error(`Unknown prompt: ${name}`);
+      }
+    });
+
     // Handle list tools requests
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
