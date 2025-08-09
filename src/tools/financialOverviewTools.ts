@@ -60,7 +60,7 @@ export async function handleFinancialOverview(
   params: FinancialOverviewParams
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(async () => {
-    const budgetId = params.budget_id || await getDefaultBudgetId(ynabAPI);
+    const budgetId = params.budget_id!; // Will always be provided by the server
     const cacheKey = `financial-overview:${budgetId}:${params.months}:${params.include_trends}:${params.include_insights}`;
     
     const cached = cacheManager.get<any>(cacheKey);
@@ -114,16 +114,19 @@ export async function handleFinancialOverview(
         period: `${params.months} months`,
         last_updated: new Date().toISOString(),
         budget_name: budget.data.budget.name,
-        net_worth: accountBalances.netWorth,
+        liquid_net_worth: accountBalances.liquidNetWorth,
+        total_net_worth: accountBalances.totalNetWorth,
         liquid_assets: accountBalances.liquidAssets,
+        total_assets: accountBalances.totalAssets,
+        total_liabilities: accountBalances.totalLiabilities,
         debt: accountBalances.totalDebt,
       },
       current_month: validMonths[0] ? {
         month: validMonths[0].data.month.month,
-        income: validMonths[0].data.month.income,
-        budgeted: validMonths[0].data.month.budgeted,
-        activity: validMonths[0].data.month.activity,
-        to_be_budgeted: validMonths[0].data.month.to_be_budgeted,
+        income: ynab.utils.convertMilliUnitsToCurrencyAmount(validMonths[0].data.month.income),
+        budgeted: ynab.utils.convertMilliUnitsToCurrencyAmount(validMonths[0].data.month.budgeted),
+        activity: ynab.utils.convertMilliUnitsToCurrencyAmount(validMonths[0].data.month.activity),
+        to_be_budgeted: ynab.utils.convertMilliUnitsToCurrencyAmount(validMonths[0].data.month.to_be_budgeted),
         budget_utilization: calculateBudgetUtilization(validMonths[0].data.month),
       } : null,
       account_overview: {
@@ -133,6 +136,8 @@ export async function handleFinancialOverview(
         savings_balance: accountBalances.savingsBalance,
         credit_card_balance: accountBalances.creditCardBalance,
         investment_balance: accountBalances.investmentBalance,
+        real_estate_balance: accountBalances.realEstateBalance,
+        mortgage_balance: accountBalances.mortgageBalance,
       },
       category_performance: categoryAnalysis,
       net_worth_trend: netWorthTrend,
@@ -165,7 +170,7 @@ export async function handleSpendingAnalysis(
   params: SpendingAnalysisParams
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(async () => {
-    const budgetId = params.budget_id || await getDefaultBudgetId(ynabAPI);
+    const budgetId = params.budget_id!; // Will always be provided by the server
     
     const currentDate = new Date();
     const monthsToAnalyze = Array.from({ length: params.period_months }, (_, i) => {
@@ -198,7 +203,7 @@ export async function handleCashFlowForecast(
   params: CashFlowForecastParams
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(async () => {
-    const budgetId = params.budget_id || await getDefaultBudgetId(ynabAPI);
+    const budgetId = params.budget_id!; // Will always be provided by the server
     
     const currentDate = new Date();
     const historicalMonths = Array.from({ length: 6 }, (_, i) => {
@@ -236,7 +241,7 @@ export async function handleBudgetHealthCheck(
   params: BudgetHealthParams
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(async () => {
-    const budgetId = params.budget_id || await getDefaultBudgetId(ynabAPI);
+    const budgetId = params.budget_id!; // Will always be provided by the server
     
     const currentMonth = ynab.utils.getCurrentMonthInISOFormat();
     const [budget, currentMonthData, recentTransactions] = await Promise.all([
@@ -261,28 +266,43 @@ export async function handleBudgetHealthCheck(
   }, 'ynab:budget-health-check', 'performing budget health check');
 }
 
-async function getDefaultBudgetId(ynabAPI: ynab.API): Promise<string> {
-  const budgets = await ynabAPI.budgets.getBudgets();
-  const defaultBudget = budgets.data.budgets.find(b => !b.name.includes('Template'));
-  return defaultBudget?.id || budgets.data.budgets[0]?.id || '';
-}
 
 function calculateAccountBalances(accounts: ynab.Account[]) {
   const balances = {
-    netWorth: 0,
+    // On-budget (liquid) net worth - only accounts that can be budgeted
+    liquidNetWorth: 0,
     liquidAssets: 0,
     totalDebt: 0,
+    
+    // True total net worth including all assets and liabilities
+    totalNetWorth: 0,
+    totalAssets: 0,
+    totalLiabilities: 0,
+    
+    // Account type breakdowns
     checkingBalance: 0,
     savingsBalance: 0,
     creditCardBalance: 0,
     investmentBalance: 0,
+    realEstateBalance: 0,
+    mortgageBalance: 0,
+    otherAssetBalance: 0,
+    otherLiabilityBalance: 0,
   };
 
   accounts.forEach(account => {
     const balance = ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance);
     
+    // Calculate liquid/on-budget net worth (budgetable money)
     if (account.on_budget) {
-      balances.netWorth += balance;
+      balances.liquidNetWorth += balance;
+    }
+
+    // Calculate total net worth (all assets minus all liabilities)
+    if (balance > 0) {
+      balances.totalAssets += balance;
+    } else {
+      balances.totalLiabilities += Math.abs(balance);
     }
 
     switch (account.type) {
@@ -298,13 +318,35 @@ function calculateAccountBalances(accounts: ynab.Account[]) {
         balances.creditCardBalance += balance;
         if (balance < 0) balances.totalDebt += Math.abs(balance);
         break;
+      case ynab.AccountType.Mortgage:
+        balances.mortgageBalance += balance; // Will be negative
+        break;
+      case ynab.AccountType.OtherAsset:
+        // Check if this looks like real estate based on balance size or name
+        if (balance > 100000 && (account.name.toLowerCase().includes('house') || 
+                                 account.name.toLowerCase().includes('condo') || 
+                                 account.name.toLowerCase().includes('property') ||
+                                 account.name.toLowerCase().includes('laguna'))) {
+          balances.realEstateBalance += balance;
+        } else {
+          // Likely investments (RRSP, TFSA, etc.)
+          balances.investmentBalance += balance;
+        }
+        balances.otherAssetBalance += balance;
+        break;
+      case ynab.AccountType.OtherLiability:
+        balances.otherLiabilityBalance += balance;
+        break;
       default:
-        if (account.type.includes('investment')) {
+        if (account.type.toString().toLowerCase().includes('investment')) {
           balances.investmentBalance += balance;
         }
         break;
     }
   });
+
+  // Calculate total net worth
+  balances.totalNetWorth = balances.totalAssets - balances.totalLiabilities;
 
   return balances;
 }
@@ -340,10 +382,12 @@ function analyzeCategoryPerformance(months: any[], categories: ynab.Category[]) 
 
 function calculateNetWorthTrend(months: any[], currentBalances: any) {
   return {
-    current: currentBalances.netWorth,
+    liquid_net_worth: currentBalances.liquidNetWorth,
+    total_net_worth: currentBalances.totalNetWorth,
     historical: months.map((monthData, index) => ({
       month: monthData?.data.month.month,
-      net_worth: currentBalances.netWorth,
+      liquid_net_worth: currentBalances.liquidNetWorth,
+      total_net_worth: currentBalances.totalNetWorth,
       change_from_previous: index < months.length - 1 ? 0 : 0,
     })),
     trend: 'stable',

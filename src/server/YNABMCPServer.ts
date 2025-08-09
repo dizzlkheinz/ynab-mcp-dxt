@@ -81,6 +81,7 @@ export class YNABMCPServer {
   private ynabAPI: ynab.API;
   private config: ServerConfig;
   private exitOnError: boolean;
+  private defaultBudgetId?: string;
 
   constructor(exitOnError: boolean = true) {
     this.exitOnError = exitOnError;
@@ -458,17 +459,40 @@ Convert milliunits to dollars for easy reading.`
             },
           },
           {
-            name: 'list_accounts',
-            description: 'List all accounts for a specific budget',
+            name: 'set_default_budget',
+            description: 'Set the default budget for subsequent operations',
             inputSchema: {
               type: 'object',
               properties: {
                 budget_id: {
                   type: 'string',
-                  description: 'The ID of the budget to list accounts for',
+                  description: 'The ID of the budget to set as default',
                 },
               },
               required: ['budget_id'],
+            },
+          },
+          {
+            name: 'get_default_budget',
+            description: 'Get the currently set default budget',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'list_accounts',
+            description: 'List all accounts for a specific budget (uses default budget if not specified)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'The ID of the budget to list accounts for (optional, uses default budget if not provided)',
+                },
+              },
+              required: [],
             },
           },
           {
@@ -969,9 +993,70 @@ Convert milliunits to dollars for easy reading.`
             );
           }
 
+        case 'set_default_budget':
+          try {
+            const { budget_id } = args as { budget_id: string };
+            if (!budget_id) {
+              throw new Error('budget_id is required');
+            }
+            
+            // Validate that the budget exists
+            try {
+              await this.ynabAPI.budgets.getBudgetById(budget_id);
+              this.setDefaultBudget(budget_id);
+              
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      success: true,
+                      message: `Default budget set to: ${budget_id}`,
+                      default_budget_id: budget_id
+                    }, null, 2)
+                  }
+                ]
+              };
+            } catch (error) {
+              throw new Error(`Invalid budget ID: ${budget_id}. Budget not found.`);
+            }
+          } catch (error) {
+            return ErrorHandler.createValidationError(
+              'Invalid parameters for ynab:set_default_budget',
+              error instanceof Error ? error.message : 'Unknown validation error'
+            );
+          }
+
+        case 'get_default_budget':
+          try {
+            const defaultBudget = this.getDefaultBudget();
+            
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    default_budget_id: defaultBudget || null,
+                    has_default: !!defaultBudget,
+                    message: defaultBudget 
+                      ? `Default budget is set to: ${defaultBudget}`
+                      : 'No default budget is currently set'
+                  }, null, 2)
+                }
+              ]
+            };
+          } catch (error) {
+            return ErrorHandler.createValidationError(
+              'Error getting default budget',
+              error instanceof Error ? error.message : 'Unknown error'
+            );
+          }
+
         case 'list_accounts':
           try {
-            const params = ListAccountsSchema.parse(args);
+            const rawParams = args as any;
+            const budgetId = this.getBudgetId(rawParams?.budget_id);
+            const params = ListAccountsSchema.parse({ ...rawParams, budget_id: budgetId });
             return await handleListAccounts(this.ynabAPI, params);
           } catch (error) {
             return ErrorHandler.createValidationError(
@@ -1163,7 +1248,8 @@ Convert milliunits to dollars for easy reading.`
         case 'financial_overview':
           try {
             const params = FinancialOverviewSchema.parse(args || {});
-            return await handleFinancialOverview(this.ynabAPI, params);
+            const budgetId = this.getBudgetId(params.budget_id);
+            return await handleFinancialOverview(this.ynabAPI, { ...params, budget_id: budgetId });
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:financial_overview: ' +
@@ -1174,7 +1260,8 @@ Convert milliunits to dollars for easy reading.`
         case 'spending_analysis':
           try {
             const params = SpendingAnalysisSchema.parse(args || {});
-            return await handleSpendingAnalysis(this.ynabAPI, params);
+            const budgetId = this.getBudgetId(params.budget_id);
+            return await handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:spending_analysis: ' +
@@ -1185,7 +1272,8 @@ Convert milliunits to dollars for easy reading.`
         case 'cash_flow_forecast':
           try {
             const params = CashFlowForecastSchema.parse(args || {});
-            return await handleCashFlowForecast(this.ynabAPI, params);
+            const budgetId = this.getBudgetId(params.budget_id);
+            return await handleCashFlowForecast(this.ynabAPI, { ...params, budget_id: budgetId });
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:cash_flow_forecast: ' +
@@ -1196,7 +1284,8 @@ Convert milliunits to dollars for easy reading.`
         case 'budget_health_check':
           try {
             const params = BudgetHealthSchema.parse(args || {});
-            return await handleBudgetHealthCheck(this.ynabAPI, params);
+            const budgetId = this.getBudgetId(params.budget_id);
+            return await handleBudgetHealthCheck(this.ynabAPI, { ...params, budget_id: budgetId });
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:budget_health_check: ' +
@@ -1247,5 +1336,32 @@ Convert milliunits to dollars for easy reading.`
    */
   getServer(): Server {
     return this.server;
+  }
+
+  /**
+   * Sets the default budget ID for operations
+   */
+  setDefaultBudget(budgetId: string): void {
+    this.defaultBudgetId = budgetId;
+  }
+
+  /**
+   * Gets the default budget ID
+   */
+  getDefaultBudget(): string | undefined {
+    return this.defaultBudgetId;
+  }
+
+  /**
+   * Gets the budget ID to use - either provided or default
+   */
+  getBudgetId(providedBudgetId?: string): string {
+    if (providedBudgetId) {
+      return providedBudgetId;
+    }
+    if (this.defaultBudgetId) {
+      return this.defaultBudgetId;
+    }
+    throw new Error('No budget ID provided and no default budget set. Use set_default_budget first.');
   }
 }

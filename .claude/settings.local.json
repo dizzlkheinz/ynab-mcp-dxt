@@ -20,7 +20,16 @@
       "Bash(npm run:*)",
       "Bash(git restore:*)",
       "WebFetch(domain:api.youneedabudget.com)",
-      "WebFetch(domain:api.ynab.com)"
+      "WebFetch(domain:api.ynab.com)",
+      "Bash(git push:*)",
+      "mcp__ynab-mcp-server__get_user",
+      "mcp__ynab-mcp-server__list_budgets",
+      "mcp__ynab-mcp-server__list_transactions",
+      "mcp__ynab-mcp-server__financial_overview",
+      "mcp__ynab-mcp-server__list_accounts",
+      "Bash(del test-default-budget.js)",
+      "Bash(rm:*)",
+      "mcp__ynab-mcp-server__set_default_budget"
     ],
     "deny": []
   }
