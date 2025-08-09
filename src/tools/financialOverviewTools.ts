@@ -378,7 +378,7 @@ function analyzeSpendingTrends(months: any[], categories: ynab.Category[]): Spen
       const yMean = avgSpending;
       const ssTot = monthlySpending.reduce((sum, data) => sum + Math.pow(data.spending - yMean, 2), 0);
       const yPredicted = monthlySpending.map(data => (sumY / n) + slope * (data.month - (sumX / n)));
-      const ssRes = monthlySpending.reduce((sum, data, i) => sum + Math.pow(data.spending - yPredicted[i], 2), 0);
+      const ssRes = monthlySpending.reduce((sum, data, i) => sum + Math.pow(data.spending - (yPredicted[i] || 0), 2), 0);
       const rSquared = ssTot > 0 ? 1 - (ssRes / ssTot) : 0;
       
       // Determine trend direction and significance
@@ -538,7 +538,7 @@ function generateBudgetOptimizationInsights(
     }) || [];
 
   if (currentMonthOverBudgeted.length > 0) {
-    const totalOverBudgeted = currentMonthOverBudgeted.reduce((sum, cat) => sum + (cat.spent - cat.budgeted), 0);
+    const totalOverBudgeted = currentMonthOverBudgeted.reduce((sum: number, cat: any) => sum + (cat.spent - cat.budgeted), 0);
     insights.push({
       type: 'info',
       category: 'budgeting',
@@ -550,7 +550,7 @@ function generateBudgetOptimizationInsights(
         'This is normal if you carry funds forward from previous months',
         'Consider increasing monthly assignments if this pattern continues',
         'Review if these represent one-time expenses or ongoing needs',
-        `Categories: ${currentMonthOverBudgeted.map(c => `${c.name} ($${(c.spent - c.budgeted).toFixed(2)} over)`).slice(0, 3).join(', ')}${currentMonthOverBudgeted.length > 3 ? '...' : ''}`
+        `Categories: ${currentMonthOverBudgeted.map((c: any) => `${c.name} ($${(c.spent - c.budgeted).toFixed(2)} over)`).slice(0, 3).join(', ')}${currentMonthOverBudgeted.length > 3 ? '...' : ''}`
       ],
     });
   }
@@ -569,7 +569,7 @@ function generateBudgetOptimizationInsights(
     })) || [];
 
   if (largeUnusedBalances.length > 0) {
-    const totalUnused = largeUnusedBalances.reduce((sum, cat) => sum + cat.balance, 0);
+    const totalUnused = largeUnusedBalances.reduce((sum: number, cat: any) => sum + cat.balance, 0);
     insights.push({
       type: 'recommendation',
       category: 'efficiency',
@@ -581,7 +581,7 @@ function generateBudgetOptimizationInsights(
         'Consider if these balances are intentional (sinking funds, emergency categories)',
         'Move excess funds to debt payoff or savings goals',
         'Reduce future budget assignments if funds consistently go unused',
-        `Largest balances: ${largeUnusedBalances.slice(0, 3).map(c => `${c.name} ($${c.balance.toFixed(2)})`).join(', ')}`
+        `Largest balances: ${largeUnusedBalances.slice(0, 3).map((c: any) => `${c.name} ($${c.balance.toFixed(2)})`).join(', ')}`
       ],
     });
   }
