@@ -654,7 +654,7 @@ async function analyzeSpending(budgetId = null, periodMonths = 6) {
       console.log(`${index + 1}. ${category.category_name}`);
       console.log(`   Total: $${category.total_spent.toFixed(2)}`);
       console.log(`   Average: $${category.average_monthly.toFixed(2)}/month`);
-      console.log(`   Variability: ${category.variability.toFixed(1)}%`);
+      console.log(`   Variability: ${category.variability.toFixed(1)}% (CV)`);
     });
     
     return data;

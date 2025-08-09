@@ -469,6 +469,12 @@ function performDetailedSpendingAnalysis(months: any[], categories: ynab.Categor
       const avgMonthlySpending = totalSpent / months.length;
       const maxSpending = Math.max(...monthlySpending.map(m => m.activity));
       const minSpending = Math.min(...monthlySpending.map(m => m.activity));
+      
+      // Calculate coefficient of variation (CV) as a proper measure of variability
+      const spendingValues = monthlySpending.map(m => m.activity);
+      const variance = spendingValues.reduce((sum, value) => sum + Math.pow(value - avgMonthlySpending, 2), 0) / spendingValues.length;
+      const standardDeviation = Math.sqrt(variance);
+      const coefficientOfVariation = avgMonthlySpending > 0 ? (standardDeviation / avgMonthlySpending) * 100 : 0;
 
       return {
         category_name: category.name,
@@ -476,7 +482,7 @@ function performDetailedSpendingAnalysis(months: any[], categories: ynab.Categor
         average_monthly: avgMonthlySpending,
         max_monthly: maxSpending,
         min_monthly: minSpending,
-        variability: maxSpending > 0 ? ((maxSpending - minSpending) / maxSpending) * 100 : 0,
+        variability: coefficientOfVariation,
         monthly_breakdown: monthlySpending,
       };
     }).filter(analysis => analysis.total_spent > 0),

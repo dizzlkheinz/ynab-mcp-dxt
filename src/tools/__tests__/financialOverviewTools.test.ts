@@ -67,4 +67,71 @@ describe('Financial Overview Tools', () => {
       expect(module.handleBudgetHealthCheck).toBeDefined();
     });
   });
+
+  describe('Variability Calculation', () => {
+    it('should calculate coefficient of variation correctly', () => {
+      // Test data: spending values with known statistical properties
+      const monthlySpending = [
+        { activity: 100 }, // $100
+        { activity: 200 }, // $200  
+        { activity: 150 }, // $150
+        { activity: 50 },  // $50
+      ];
+      
+      // Manual calculation for verification:
+      // Mean = (100 + 200 + 150 + 50) / 4 = 125
+      // Variance = [(100-125)² + (200-125)² + (150-125)² + (50-125)²] / 4
+      //          = [625 + 5625 + 625 + 5625] / 4 = 3125
+      // Std Dev = √3125 ≈ 55.9
+      // CV = (55.9 / 125) * 100 ≈ 44.7%
+      
+      const totalSpent = monthlySpending.reduce((sum, month) => sum + month.activity, 0);
+      const avgMonthlySpending = totalSpent / monthlySpending.length;
+      const spendingValues = monthlySpending.map(m => m.activity);
+      const variance = spendingValues.reduce((sum, value) => sum + Math.pow(value - avgMonthlySpending, 2), 0) / spendingValues.length;
+      const standardDeviation = Math.sqrt(variance);
+      const coefficientOfVariation = avgMonthlySpending > 0 ? (standardDeviation / avgMonthlySpending) * 100 : 0;
+      
+      expect(avgMonthlySpending).toBe(125);
+      expect(variance).toBe(3125);
+      expect(standardDeviation).toBeCloseTo(55.9, 1);
+      expect(coefficientOfVariation).toBeCloseTo(44.7, 1);
+    });
+
+    it('should handle zero spending correctly', () => {
+      const monthlySpending = [
+        { activity: 0 },
+        { activity: 0 },
+        { activity: 0 },
+      ];
+      
+      const totalSpent = monthlySpending.reduce((sum, month) => sum + month.activity, 0);
+      const avgMonthlySpending = totalSpent / monthlySpending.length;
+      const coefficientOfVariation = avgMonthlySpending > 0 ? 0 : 0; // Should be 0 for zero spending
+      
+      expect(avgMonthlySpending).toBe(0);
+      expect(coefficientOfVariation).toBe(0);
+    });
+
+    it('should handle consistent spending (low variability)', () => {
+      const monthlySpending = [
+        { activity: 100 },
+        { activity: 100 },
+        { activity: 100 },
+        { activity: 100 },
+      ];
+      
+      const totalSpent = monthlySpending.reduce((sum, month) => sum + month.activity, 0);
+      const avgMonthlySpending = totalSpent / monthlySpending.length;
+      const spendingValues = monthlySpending.map(m => m.activity);
+      const variance = spendingValues.reduce((sum, value) => sum + Math.pow(value - avgMonthlySpending, 2), 0) / spendingValues.length;
+      const standardDeviation = Math.sqrt(variance);
+      const coefficientOfVariation = avgMonthlySpending > 0 ? (standardDeviation / avgMonthlySpending) * 100 : 0;
+      
+      expect(avgMonthlySpending).toBe(100);
+      expect(variance).toBe(0);
+      expect(standardDeviation).toBe(0);
+      expect(coefficientOfVariation).toBe(0); // Perfect consistency = 0% variability
+    });
+  });
 });

@@ -502,7 +502,7 @@ Provides comprehensive multi-month financial analysis with AI-generated insights
 
 ### spending_analysis
 
-Performs detailed spending analysis with category breakdowns, trends, and variability metrics.
+Performs detailed spending analysis with category breakdowns, trends, and statistical variability metrics using coefficient of variation.
 
 **Parameters:**
 - `budget_id` (string, optional): Budget ID (uses default budget if not specified)
