@@ -360,14 +360,33 @@ Use the appropriate YNAB MCP tools to:
                   type: 'text',
                   text: `Please provide a comprehensive budget summary for ${summaryBudget} (${month}):
 
+IMPORTANT: In YNAB, understand these key fields:
+- budgeted: Amount assigned to the category this month
+- activity: Spending/income in the category this month (negative = spending)  
+- balance: Available amount in the category = previous balance + budgeted + activity
+- OVERSPENDING occurs when balance < 0 (Available goes negative), NOT when spending > budgeted for the month
+
+SPENDING TRENDS: The analysis uses linear regression over multiple months to detect real spending patterns. Each trend includes:
+- explanation: User-friendly description of what the trend means
+- reliability_score: Confidence level (0-100%) indicating how reliable the trend is
+- data_points: Number of months used in the analysis
+Focus on trends with high reliability scores for actionable insights.
+
+BUDGET OPTIMIZATION: The system provides three types of optimization insights:
+1. "Consistently Under-Spent Categories" - Based on multi-month historical trends (reliable patterns)
+2. "Categories Over Monthly Assignment" - Current month only (spending > budgeted but Available still positive)  
+3. "Large Unused Category Balances" - Categories with substantial unused funds
+Distinguish between current-month patterns vs historical trends when presenting insights.
+
 1. List all budgets and select the appropriate one
 2. Get monthly data for ${month}
 3. List categories to show budget vs actual spending
 4. Provide insights on:
    - Total budgeted vs actual spending
-   - Categories that are over/under budget
+   - Categories where Available balance is negative (true overspending - when the category's balance field is < 0)
+   - Categories where spending exceeded this month's assignment (but still have positive Available balance)
    - Available money to budget
-   - Any overspending that needs attention
+   - Any true overspending where categories went into the red (negative Available balance)
 
 Format the response in a clear, easy-to-read summary.`
                 }

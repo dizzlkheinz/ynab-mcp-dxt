@@ -40,6 +40,9 @@ interface SpendingTrend {
   percentChange: number;
   trend: 'increasing' | 'decreasing' | 'stable';
   significance: 'high' | 'medium' | 'low';
+  explanation: string;
+  data_points: number;
+  reliability_score: number;
 }
 
 interface BudgetInsight {
@@ -133,7 +136,16 @@ export async function handleFinancialOverview(
       },
       category_performance: categoryAnalysis,
       net_worth_trend: netWorthTrend,
-      spending_trends: trends,
+      spending_trends: {
+        analysis_method: "Linear regression analysis over available months of spending data",
+        explanation: "Trends are calculated using statistical linear regression to identify spending patterns. Categories need at least 3 months of spending data. Confidence scores indicate how reliable each trend is.",
+        confidence_levels: {
+          "high": "70%+ confidence - strong, reliable trend",
+          "medium": "50-70% confidence - moderate trend", 
+          "low": "below 50% confidence - weak or inconsistent trend"
+        },
+        trends: trends,
+      },
       insights: insights,
     };
 
@@ -342,30 +354,68 @@ function analyzeSpendingTrends(months: any[], categories: ynab.Category[]): Spen
   const trends: SpendingTrend[] = [];
 
   categories.forEach(category => {
-    const recentActivity = months.slice(0, 2).map(monthData => {
+    // Get spending data for all available months (up to 6)
+    const monthlySpending = months.map((monthData, index) => {
       const monthCategory = monthData?.data.month.categories.find((c: any) => c.id === category.id);
-      return monthCategory ? Math.abs(ynab.utils.convertMilliUnitsToCurrencyAmount(monthCategory.activity)) : 0;
-    });
+      const spending = monthCategory ? Math.abs(ynab.utils.convertMilliUnitsToCurrencyAmount(monthCategory.activity)) : 0;
+      return { month: index, spending };
+    }).filter(data => data.spending > 0); // Only include months with spending
 
-    const olderActivity = months.slice(2, 4).map(monthData => {
-      const monthCategory = monthData?.data.month.categories.find((c: any) => c.id === category.id);
-      return monthCategory ? Math.abs(ynab.utils.convertMilliUnitsToCurrencyAmount(monthCategory.activity)) : 0;
-    });
-
-    const currentAvg = recentActivity.reduce((sum, val) => sum + val, 0) / recentActivity.length;
-    const previousAvg = olderActivity.reduce((sum, val) => sum + val, 0) / olderActivity.length;
-
-    if (currentAvg > 0 || previousAvg > 0) {
-      const percentChange = previousAvg > 0 ? ((currentAvg - previousAvg) / previousAvg) * 100 : 0;
+    // Need at least 3 months of data to calculate a meaningful trend
+    if (monthlySpending.length >= 3) {
+      // Calculate linear regression trend
+      const n = monthlySpending.length;
+      const sumX = monthlySpending.reduce((sum, data) => sum + data.month, 0);
+      const sumY = monthlySpending.reduce((sum, data) => sum + data.spending, 0);
+      const sumXY = monthlySpending.reduce((sum, data) => sum + (data.month * data.spending), 0);
+      const sumXX = monthlySpending.reduce((sum, data) => sum + (data.month * data.month), 0);
+      
+      // Linear regression slope (trend direction)
+      const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+      const avgSpending = sumY / n;
+      
+      // Calculate R-squared for trend reliability
+      const yMean = avgSpending;
+      const ssTot = monthlySpending.reduce((sum, data) => sum + Math.pow(data.spending - yMean, 2), 0);
+      const yPredicted = monthlySpending.map(data => (sumY / n) + slope * (data.month - (sumX / n)));
+      const ssRes = monthlySpending.reduce((sum, data, i) => sum + Math.pow(data.spending - yPredicted[i], 2), 0);
+      const rSquared = ssTot > 0 ? 1 - (ssRes / ssTot) : 0;
+      
+      // Determine trend direction and significance
+      const percentChange = avgSpending > 0 ? (slope * (n - 1) / avgSpending) * 100 : 0;
+      const trendDirection = Math.abs(percentChange) < 5 ? 'stable' : percentChange > 0 ? 'increasing' : 'decreasing';
+      const significanceLevel = rSquared > 0.7 && Math.abs(percentChange) > 25 ? 'high' : 
+                               rSquared > 0.5 && Math.abs(percentChange) > 10 ? 'medium' : 'low';
+      
+      // Generate user-friendly explanation
+      let explanation = `Based on ${n} months of data, `;
+      if (trendDirection === 'stable') {
+        explanation += `spending in ${category.name} has remained relatively stable with less than 5% change.`;
+      } else if (trendDirection === 'increasing') {
+        explanation += `spending in ${category.name} has been increasing by ${Math.abs(percentChange).toFixed(1)}% over the analysis period.`;
+      } else {
+        explanation += `spending in ${category.name} has been decreasing by ${Math.abs(percentChange).toFixed(1)}% over the analysis period.`;
+      }
+      
+      if (significanceLevel === 'high') {
+        explanation += ` This is a strong, reliable trend (${(rSquared * 100).toFixed(0)}% confidence).`;
+      } else if (significanceLevel === 'medium') {
+        explanation += ` This is a moderate trend (${(rSquared * 100).toFixed(0)}% confidence).`;
+      } else {
+        explanation += ` This trend is weak or inconsistent (${(rSquared * 100).toFixed(0)}% confidence).`;
+      }
       
       trends.push({
         category: category.name,
         categoryId: category.id,
-        currentPeriod: currentAvg,
-        previousPeriod: previousAvg,
+        currentPeriod: monthlySpending[0]?.spending || 0, // Most recent month
+        previousPeriod: monthlySpending[monthlySpending.length - 1]?.spending || 0, // Oldest month
         percentChange,
-        trend: Math.abs(percentChange) < 5 ? 'stable' : percentChange > 0 ? 'increasing' : 'decreasing',
-        significance: Math.abs(percentChange) > 25 ? 'high' : Math.abs(percentChange) > 10 ? 'medium' : 'low',
+        trend: trendDirection,
+        significance: significanceLevel,
+        explanation,
+        data_points: n,
+        reliability_score: Math.round(rSquared * 100),
       });
     }
   });
@@ -426,16 +476,113 @@ function generateFinancialInsights(
     });
   }
 
-  const underutilizedCategories = trends.filter(t => t.currentPeriod > 0 && t.trend === 'decreasing' && t.significance === 'high');
-  if (underutilizedCategories.length > 0) {
+  // Generate budget optimization insights
+  const budgetOptimization = generateBudgetOptimizationInsights(months, trends, budget);
+  insights.push(...budgetOptimization);
+
+  return insights;
+}
+
+function generateBudgetOptimizationInsights(
+  months: any[],
+  trends: SpendingTrend[],
+  budget: ynab.BudgetDetail
+): BudgetInsight[] {
+  const insights: BudgetInsight[] = [];
+  const currentMonth = months[0]?.data.month;
+  
+  if (!currentMonth) return insights;
+
+  // Analysis 1: Categories consistently under-spending (historical pattern)
+  const consistentlyUnderSpent = trends.filter(t => 
+    t.trend === 'decreasing' && 
+    t.significance === 'high' && 
+    t.reliability_score >= 70 &&
+    t.data_points >= 4 // At least 4 months of data
+  );
+  
+  if (consistentlyUnderSpent.length > 0) {
     insights.push({
       type: 'success',
       category: 'efficiency',
-      title: 'Potential Budget Reallocation Opportunity',
-      description: `Several categories show significant spending decreases, suggesting possible budget reallocation opportunities.`,
+      title: 'Consistently Under-Spent Categories (Historical Pattern)',
+      description: `${consistentlyUnderSpent.length} categories show reliable decreasing spending trends over ${consistentlyUnderSpent[0]?.data_points || 'multiple'} months, suggesting budget reallocation opportunities.`,
       impact: 'medium',
       actionable: true,
-      suggestions: ['Consider reallocating unused budgets to goals', 'Review if budget amounts are still appropriate', 'Increase allocations to priority areas'],
+      suggestions: [
+        'Review if reduced spending reflects changed needs or improved habits',
+        'Consider reallocating excess budget to savings goals or debt payoff',
+        'Reduce budget allocations for next month if trend continues',
+        `Categories: ${consistentlyUnderSpent.map(c => c.category).join(', ')}`
+      ],
+    });
+  }
+
+  // Analysis 2: Current month over-budgeted (but not necessarily problematic)
+  const currentMonthOverBudgeted = currentMonth.categories
+    ?.filter((cat: any) => {
+      const budgeted = ynab.utils.convertMilliUnitsToCurrencyAmount(cat.budgeted);
+      const activity = Math.abs(ynab.utils.convertMilliUnitsToCurrencyAmount(cat.activity));
+      // Over-budgeted this month but still has positive available balance
+      return budgeted > 0 && activity > 0 && activity > budgeted && cat.balance >= 0;
+    })
+    ?.map((cat: any) => {
+      const budgeted = ynab.utils.convertMilliUnitsToCurrencyAmount(cat.budgeted);
+      const activity = Math.abs(ynab.utils.convertMilliUnitsToCurrencyAmount(cat.activity));
+      return {
+        name: budget.categories?.find(c => c.id === cat.id)?.name || 'Unknown',
+        budgeted,
+        spent: activity,
+        available: ynab.utils.convertMilliUnitsToCurrencyAmount(cat.balance)
+      };
+    }) || [];
+
+  if (currentMonthOverBudgeted.length > 0) {
+    const totalOverBudgeted = currentMonthOverBudgeted.reduce((sum, cat) => sum + (cat.spent - cat.budgeted), 0);
+    insights.push({
+      type: 'info',
+      category: 'budgeting',
+      title: 'Categories Over Monthly Assignment (Current Month)',
+      description: `${currentMonthOverBudgeted.length} categories spent more than assigned this month, but used available funds from previous months. Total: $${totalOverBudgeted.toFixed(2)} over monthly assignments.`,
+      impact: 'low',
+      actionable: true,
+      suggestions: [
+        'This is normal if you carry funds forward from previous months',
+        'Consider increasing monthly assignments if this pattern continues',
+        'Review if these represent one-time expenses or ongoing needs',
+        `Categories: ${currentMonthOverBudgeted.map(c => `${c.name} ($${(c.spent - c.budgeted).toFixed(2)} over)`).slice(0, 3).join(', ')}${currentMonthOverBudgeted.length > 3 ? '...' : ''}`
+      ],
+    });
+  }
+
+  // Analysis 3: Categories with large unused balances
+  const largeUnusedBalances = currentMonth.categories
+    ?.filter((cat: any) => {
+      const balance = ynab.utils.convertMilliUnitsToCurrencyAmount(cat.balance);
+      const budgeted = ynab.utils.convertMilliUnitsToCurrencyAmount(cat.budgeted);
+      return balance > 100 && budgeted > 0 && balance > budgeted * 2; // More than 2x monthly budget sitting unused
+    })
+    ?.map((cat: any) => ({
+      name: budget.categories?.find(c => c.id === cat.id)?.name || 'Unknown',
+      balance: ynab.utils.convertMilliUnitsToCurrencyAmount(cat.balance),
+      budgeted: ynab.utils.convertMilliUnitsToCurrencyAmount(cat.budgeted)
+    })) || [];
+
+  if (largeUnusedBalances.length > 0) {
+    const totalUnused = largeUnusedBalances.reduce((sum, cat) => sum + cat.balance, 0);
+    insights.push({
+      type: 'recommendation',
+      category: 'efficiency',
+      title: 'Large Unused Category Balances',
+      description: `${largeUnusedBalances.length} categories have substantial unused funds totaling $${totalUnused.toFixed(2)}. These could be reallocated to goals or priorities.`,
+      impact: 'medium',
+      actionable: true,
+      suggestions: [
+        'Consider if these balances are intentional (sinking funds, emergency categories)',
+        'Move excess funds to debt payoff or savings goals',
+        'Reduce future budget assignments if funds consistently go unused',
+        `Largest balances: ${largeUnusedBalances.slice(0, 3).map(c => `${c.name} ($${c.balance.toFixed(2)})`).join(', ')}`
+      ],
     });
   }
 

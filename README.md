@@ -5,7 +5,7 @@ A Model Context Protocol (MCP) server that provides AI assistants with secure ac
 ## Features
 
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
-- **Smart Financial Analysis**: Advanced financial overview tools with AI-generated insights, spending analysis, and cash flow forecasting
+- **Smart Financial Analysis**: Statistical spending trends using linear regression, accurate overspending detection, comprehensive budget optimization insights, and AI-generated recommendations
 - **Secure Authentication**: Uses YNAB Personal Access Tokens with proper security practices
 - **Comprehensive Error Handling**: Robust error handling with detailed feedback and security-conscious error messages
 - **Type Safety**: Built with TypeScript for enhanced reliability and developer experience

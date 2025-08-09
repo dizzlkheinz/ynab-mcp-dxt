@@ -468,7 +468,7 @@ Lists all months summary data for a budget.
 
 ### financial_overview
 
-Provides comprehensive multi-month financial analysis with AI-generated insights, spending trends, and performance metrics.
+Provides comprehensive multi-month financial analysis with statistical spending trends, budget optimization insights, and AI-generated recommendations. Uses linear regression for trend analysis and provides confidence scores for reliability.
 
 **Parameters:**
 - `budget_id` (string, optional): Budget ID (uses default budget if not specified)
@@ -494,11 +494,30 @@ Provides comprehensive multi-month financial analysis with AI-generated insights
   "content": [
     {
       "type": "text",
-      "text": "{\n  \"summary\": {\n    \"period\": \"6 months\",\n    \"budget_name\": \"My Budget\",\n    \"net_worth\": 15420.50,\n    \"liquid_assets\": 8500.25,\n    \"debt\": 2340.75\n  },\n  \"current_month\": {\n    \"income\": 5000000,\n    \"budgeted\": 4500000,\n    \"activity\": -4200000,\n    \"budget_utilization\": 93.3\n  },\n  \"spending_trends\": [\n    {\n      \"category\": \"Groceries\",\n      \"trend\": \"increasing\",\n      \"percentChange\": 15.2,\n      \"significance\": \"medium\"\n    }\n  ],\n  \"insights\": [\n    {\n      \"type\": \"warning\",\n      \"title\": \"Significant Increase in Groceries\",\n      \"description\": \"Spending in Groceries has increased by 15.2%\",\n      \"actionable\": true,\n      \"suggestions\": [\"Review recent transactions\"]\n    }\n  ]\n}"
+      "text": "{\n  \"summary\": {\n    \"period\": \"6 months\",\n    \"budget_name\": \"My Budget\",\n    \"net_worth\": 15420.50,\n    \"liquid_assets\": 8500.25,\n    \"debt\": 2340.75\n  },\n  \"current_month\": {\n    \"income\": 5000000,\n    \"budgeted\": 4500000,\n    \"activity\": -4200000,\n    \"budget_utilization\": 93.3\n  },\n  \"spending_trends\": {\n    \"analysis_method\": \"Linear regression analysis over available months of spending data\",\n    \"explanation\": \"Trends are calculated using statistical linear regression to identify spending patterns. Categories need at least 3 months of spending data. Confidence scores indicate how reliable each trend is.\",\n    \"confidence_levels\": {\n      \"high\": \"70%+ confidence - strong, reliable trend\",\n      \"medium\": \"50-70% confidence - moderate trend\",\n      \"low\": \"below 50% confidence - weak or inconsistent trend\"\n    },\n    \"trends\": [\n      {\n        \"category\": \"Groceries\",\n        \"trend\": \"increasing\",\n        \"percentChange\": 15.2,\n        \"significance\": \"medium\",\n        \"explanation\": \"Based on 6 months of data, spending in Groceries has been increasing by 15.2% over the analysis period. This is a moderate trend (65% confidence).\",\n        \"data_points\": 6,\n        \"reliability_score\": 65\n      }\n    ]\n  },\n  \"insights\": [\n    {\n      \"type\": \"warning\",\n      \"title\": \"Overspent Categories Detected\",\n      \"description\": \"1 categories are currently overspent (Available balance negative).\",\n      \"impact\": \"high\",\n      \"actionable\": true,\n      \"suggestions\": [\"Move money from other categories\", \"Reduce spending in overspent categories\"]\n    },\n    {\n      \"type\": \"success\",\n      \"title\": \"Consistently Under-Spent Categories (Historical Pattern)\",\n      \"description\": \"3 categories show reliable decreasing spending trends over 6 months, suggesting budget reallocation opportunities.\",\n      \"impact\": \"medium\",\n      \"actionable\": true,\n      \"suggestions\": [\"Review if reduced spending reflects changed needs\", \"Consider reallocating excess budget to savings goals\"]\n    },\n    {\n      \"type\": \"info\",\n      \"title\": \"Categories Over Monthly Assignment (Current Month)\",\n      \"description\": \"2 categories spent more than assigned this month, but used available funds from previous months.\",\n      \"impact\": \"low\",\n      \"actionable\": true,\n      \"suggestions\": [\"This is normal if you carry funds forward from previous months\"]\n    }\n  ]\n}"
     }
   ]
 }
 ```
+
+#### Key Features & Improvements
+
+**🔍 Accurate Overspending Detection**
+- Correctly identifies overspending as when Available balance goes negative (balance < 0)
+- Distinguishes between true overspending vs spending more than monthly assignment
+- No longer incorrectly flags categories with positive Available balances
+
+**📊 Statistical Spending Trends**
+- Uses linear regression analysis across multiple months for reliable trend detection
+- Provides confidence scores (0-100%) indicating trend reliability
+- Requires minimum 3 months of data for meaningful analysis
+- Clear explanations for each trend with statistical backing
+
+**💡 Comprehensive Budget Optimization**
+- **Historical Pattern Analysis**: Categories consistently under-spending over multiple months
+- **Current Month Analysis**: Categories over monthly assignment but still have positive Available balance
+- **Balance Analysis**: Categories with large unused funds that could be reallocated
+- Clear labeling distinguishes between current-month vs historical patterns
 
 ### spending_analysis
 

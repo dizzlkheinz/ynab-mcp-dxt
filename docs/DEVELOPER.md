@@ -960,4 +960,83 @@ const result = await client.callTool('list_budgets', {});
 DebugLogger.logAPICall('list_budgets', {}, result);
 ```
 
+## Recent Improvements & Key Features
+
+### 🔍 Accurate Overspending Detection
+
+The financial analysis now correctly identifies overspending using YNAB's definition:
+
+**✅ Correct Approach (Current)**
+```javascript
+// Overspending occurs when Available balance goes negative
+const overspentCategories = categories.filter(cat => cat.balance < 0);
+```
+
+**❌ Previous Incorrect Approach** 
+```javascript
+// This incorrectly flagged categories as overspent
+const incorrect = categories.filter(cat => Math.abs(cat.activity) > cat.budgeted);
+```
+
+**Key Understanding:**
+- `balance` = Available amount = previous balance + budgeted + activity
+- Overspending = `balance < 0` (Available goes negative)
+- Spending more than monthly budgeted ≠ overspending if funds carried forward
+
+### 📊 Statistical Spending Trends
+
+The new trend analysis uses linear regression for reliable pattern detection:
+
+```javascript
+// Example of enhanced trend data
+{
+  "category": "Groceries",
+  "trend": "increasing", 
+  "percentChange": 15.2,
+  "explanation": "Based on 6 months of data, spending in Groceries has been increasing by 15.2% over the analysis period. This is a moderate trend (65% confidence).",
+  "data_points": 6,
+  "reliability_score": 65,
+  "significance": "medium"
+}
+```
+
+**Key Features:**
+- Linear regression over multiple months (minimum 3 months required)
+- Confidence scores (0-100%) for trend reliability
+- User-friendly explanations for each trend
+- Statistical significance levels (high/medium/low)
+
+### 💡 Comprehensive Budget Optimization
+
+Three types of optimization insights are now provided:
+
+1. **Historical Pattern Analysis** - Multi-month trends with statistical backing
+2. **Current Month Analysis** - Monthly spending vs assignments  
+3. **Balance Analysis** - Unused funds identification
+
+```javascript
+// Example budget optimization insight
+{
+  "type": "success",
+  "title": "Consistently Under-Spent Categories (Historical Pattern)",
+  "description": "3 categories show reliable decreasing spending trends over 6 months",
+  "suggestions": [
+    "Review if reduced spending reflects changed needs",
+    "Consider reallocating excess budget to savings goals",
+    "Categories: Dining Out, Entertainment, Shopping"
+  ]
+}
+```
+
+### 🎯 Clear Analysis Scope
+
+All insights now clearly indicate their analysis scope:
+- **Historical Pattern**: Multi-month trends with reliability scores
+- **Current Month**: This month's spending vs assignments
+- **Balance Analysis**: Available funds across categories
+
+This eliminates confusion about whether insights are based on current-month data or historical patterns.
+
+---
+
 This developer guide provides practical patterns and solutions for common scenarios. For complete API documentation, see the [API Reference](API.md).
