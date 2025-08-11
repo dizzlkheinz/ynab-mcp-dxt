@@ -667,39 +667,6 @@ async function analyzeSpending(budgetId = null, periodMonths = 6) {
 
 ### Cash Flow Forecasting
 
-```javascript
-// Generate cash flow forecast
-async function forecastCashFlow(budgetId = null, forecastMonths = 3) {
-  try {
-    const result = await client.callTool('cash_flow_forecast', {
-      budget_id: budgetId,
-      forecast_months: forecastMonths
-    });
-    
-    const data = JSON.parse(result.content[0].text);
-    
-    console.log(`=== Cash Flow Forecast (${data.forecast_period}) ===`);
-    
-    data.projections.forEach((projection, index) => {
-      console.log(`\nMonth ${index + 1} (${projection.month}):`);
-      console.log(`  Income: $${projection.projected_income.toFixed(2)}`);
-      console.log(`  Expenses: $${projection.projected_expenses.toFixed(2)}`);
-      console.log(`  Net Cash Flow: $${projection.net_cash_flow.toFixed(2)}`);
-      console.log(`  Confidence: ${projection.confidence}`);
-    });
-    
-    console.log('\nAssumptions:');
-    data.assumptions.forEach(assumption => {
-      console.log(`- ${assumption}`);
-    });
-    
-    return data;
-  } catch (error) {
-    console.error('Failed to forecast cash flow:', error.message);
-    throw error;
-  }
-}
-```
 
 ### Budget Health Check
 
@@ -740,86 +707,8 @@ async function checkBudgetHealth(budgetId = null) {
 }
 ```
 
-### Natural Language Query Processing
+### Advanced Workflows
 
-```javascript
-// Process natural language financial questions
-async function askFinancialQuestion(question) {
-  try {
-    const result = await client.callTool('natural-language-query', {
-      query: question
-    });
-    
-    const data = JSON.parse(result.content[0].text);
-    
-    console.log(`Question: ${question}`);
-    console.log(`Understanding: ${data.intent.entity} (${data.confidence}% confidence)`);
-    
-    if (data.suggested_action) {
-      console.log(`Suggested Tool: ${data.suggested_action.tool}`);
-      console.log(`Parameters:`, data.suggested_action.parameters);
-    }
-    
-    if (data.clarification) {
-      console.log(`Clarification: ${data.clarification}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Failed to process natural language query:', error.message);
-    throw error;
-  }
-}
-
-// Example usage
-await askFinancialQuestion("How much did I spend on dining out last month?");
-await askFinancialQuestion("Am I overspending in any categories?");
-await askFinancialQuestion("What's my net worth trend?");
-```
-
-### Smart Financial Suggestions
-
-```javascript
-// Get contextual AI suggestions
-async function getSmartSuggestions(context = 'general') {
-  try {
-    const result = await client.callTool('get-smart-suggestions', {
-      context: context
-    });
-    
-    const data = JSON.parse(result.content[0].text);
-    
-    console.log(`=== Smart Suggestions (${data.context}) ===`);
-    
-    console.log('\nRecommended Actions:');
-    data.suggestions.forEach((action, index) => {
-      console.log(`${index + 1}. ${action}`);
-    });
-    
-    console.log('\nFinancial Tips:');
-    data.tips.forEach((tip, index) => {
-      console.log(`${index + 1}. ${tip}`);
-    });
-    
-    console.log('\nExample Queries:');
-    data.queries.forEach((query, index) => {
-      console.log(`${index + 1}. "${query}"`);
-    });
-    
-    return data;
-  } catch (error) {
-    console.error('Failed to get smart suggestions:', error.message);
-    throw error;
-  }
-}
-
-// Example usage for different contexts
-await getSmartSuggestions('budgeting');
-await getSmartSuggestions('analysis');
-await getSmartSuggestions('transactions');
-```
-
-## Advanced Workflows
 
 ### Monthly Budget Review
 

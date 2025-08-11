@@ -57,21 +57,14 @@ import {
   ConvertAmountSchema
 } from '../tools/utilityTools.js';
 import {
-  handleNaturalLanguageQuery,
-  handleSmartSuggestions,
-  NaturalLanguageQuerySchema,
-  SmartSuggestionsSchema
-} from '../tools/naturalLanguageTools.js';
-import {
   handleFinancialOverview,
   handleSpendingAnalysis,
-  handleCashFlowForecast,
   handleBudgetHealthCheck,
   FinancialOverviewSchema,
   SpendingAnalysisSchema,
-  CashFlowForecastSchema,
   BudgetHealthSchema
 } from '../tools/financialOverviewTools.js';
+import { cacheManager } from './cacheManager.js';
 
 /**
  * YNAB MCP Server class that provides integration with You Need A Budget API
@@ -872,8 +865,6 @@ Convert milliunits to dollars for easy reading.`
               required: ['amount', 'to_milliunits'],
             },
           },
-          NaturalLanguageQuerySchema,
-          SmartSuggestionsSchema,
           {
             name: 'financial_overview',
             description: 'Get comprehensive financial overview with insights, trends, and analysis',
@@ -931,27 +922,6 @@ Convert milliunits to dollars for easy reading.`
             },
           },
           {
-            name: 'cash_flow_forecast',
-            description: 'Predict future cash flow based on historical data and scheduled transactions',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'Budget ID (optional)',
-                },
-                forecast_months: {
-                  type: 'number',
-                  minimum: 1,
-                  maximum: 12,
-                  default: 3,
-                  description: 'Number of months to forecast (1-12, default: 3)',
-                },
-              },
-              required: [],
-            },
-          },
-          {
             name: 'budget_health_check',
             description: 'Comprehensive budget health assessment with recommendations',
             inputSchema: {
@@ -967,6 +937,15 @@ Convert milliunits to dollars for easy reading.`
                   description: 'Include actionable recommendations',
                 },
               },
+              required: [],
+            },
+          },
+          {
+            name: 'get_memory_usage',
+            description: 'Get current memory usage statistics for the MCP server',
+            inputSchema: {
+              type: 'object',
+              properties: {},
               required: [],
             },
           },
@@ -1017,7 +996,7 @@ Convert milliunits to dollars for easy reading.`
                   }
                 ]
               };
-            } catch (error) {
+            } catch {
               throw new Error(`Invalid budget ID: ${budget_id}. Budget not found.`);
             }
           } catch (error) {
@@ -1054,8 +1033,8 @@ Convert milliunits to dollars for easy reading.`
 
         case 'list_accounts':
           try {
-            const rawParams = args as any;
-            const budgetId = this.getBudgetId(rawParams?.budget_id);
+            const rawParams = args as Record<string, unknown>;
+            const budgetId = this.getBudgetId(rawParams?.['budget_id'] as string | undefined);
             const params = ListAccountsSchema.parse({ ...rawParams, budget_id: budgetId });
             return await handleListAccounts(this.ynabAPI, params);
           } catch (error) {
@@ -1233,17 +1212,6 @@ Convert milliunits to dollars for easy reading.`
             );
           }
 
-        case 'natural-language-query':
-          return await handleNaturalLanguageQuery({ 
-            method: 'tools/call',
-            params: { name, arguments: args }
-          });
-
-        case 'get-smart-suggestions':
-          return await handleSmartSuggestions({ 
-            method: 'tools/call',
-            params: { name, arguments: args }
-          });
 
         case 'financial_overview':
           try {
@@ -1269,17 +1237,6 @@ Convert milliunits to dollars for easy reading.`
             );
           }
 
-        case 'cash_flow_forecast':
-          try {
-            const params = CashFlowForecastSchema.parse(args || {});
-            const budgetId = this.getBudgetId(params.budget_id);
-            return await handleCashFlowForecast(this.ynabAPI, { ...params, budget_id: budgetId });
-          } catch (error) {
-            throw new Error(
-              'Invalid parameters for ynab:cash_flow_forecast: ' +
-              (error instanceof Error ? error.message : 'Unknown validation error')
-            );
-          }
 
         case 'budget_health_check':
           try {
@@ -1292,6 +1249,9 @@ Convert milliunits to dollars for easy reading.`
               (error instanceof Error ? error.message : 'Unknown validation error')
             );
           }
+
+        case 'get_memory_usage':
+          return this.getMemoryUsage();
 
         default:
           throw new Error(`Unknown tool: ${name}`);
@@ -1363,5 +1323,84 @@ Convert milliunits to dollars for easy reading.`
       return this.defaultBudgetId;
     }
     throw new Error('No budget ID provided and no default budget set. Use set_default_budget first.');
+  }
+
+  /**
+   * Gets current memory usage statistics for the MCP server process
+   */
+  private getMemoryUsage() {
+    const memUsage = process.memoryUsage();
+    const uptimeMs = process.uptime() * 1000;
+    const cacheStats = cacheManager.getStats();
+    
+    // Convert bytes to MB for readability
+    const formatBytes = (bytes: number) => Math.round(bytes / 1024 / 1024 * 100) / 100;
+    
+    // Estimate cache memory usage by serializing and measuring size
+    const estimateCacheSize = () => {
+      try {
+        const serialized = JSON.stringify(Array.from(cacheManager['cache'].entries()));
+        return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
+      } catch {
+        return 0;
+      }
+    };
+    
+    const stats = {
+      pid: process.pid,
+      uptime_ms: Math.round(uptimeMs),
+      uptime_readable: this.formatUptime(uptimeMs),
+      memory: {
+        rss: formatBytes(memUsage.rss),
+        heap_used: formatBytes(memUsage.heapUsed),
+        heap_total: formatBytes(memUsage.heapTotal),
+        external: formatBytes(memUsage.external),
+        array_buffers: formatBytes(memUsage.arrayBuffers || 0)
+      },
+      cache: {
+        entries: cacheStats.size,
+        estimated_size_kb: estimateCacheSize(),
+        keys: cacheStats.keys
+      },
+      memory_description: {
+        rss: "Resident Set Size - total memory allocated for the process",
+        heap_used: "Used heap memory (objects, closures, etc.)",
+        heap_total: "Total heap memory allocated",
+        external: "Memory used by C++ objects bound to JavaScript objects",
+        array_buffers: "Memory allocated for ArrayBuffer and SharedArrayBuffer"
+      },
+      node_version: process.version,
+      platform: process.platform,
+      arch: process.arch
+    };
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(stats, null, 2)
+        }
+      ]
+    };
+  }
+
+  /**
+   * Formats uptime from milliseconds to readable format
+   */
+  private formatUptime(ms: number): string {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
   }
 }

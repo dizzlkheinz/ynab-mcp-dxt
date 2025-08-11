@@ -5,6 +5,7 @@
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { YNABMCPServer } from '../server/YNABMCPServer.js';
+import { getCurrentMonth } from '../utils/dateUtils.js';
 import {
   getTestConfig,
   createTestServer,
@@ -429,7 +430,7 @@ describe('YNAB MCP Server - End-to-End Workflows', () => {
       expect(months.data.months.length).toBeGreaterThan(0);
       
       // Get current month data
-      const currentMonth = new Date().toISOString().split('T')[0].substring(0, 7) + '-01';
+      const currentMonth = getCurrentMonth();
       const monthResult = await executeToolCall(server, 'ynab:get_month', {
         budget_id: testBudgetId,
         month: currentMonth

@@ -1,36 +1,27 @@
 {
   "permissions": {
     "allow": [
+      "mcp__ynab-mcp-server__budget_health_check",
       "Bash(npm run build:*)",
-      "Bash(find:*)",
-      "Bash(powershell:*)",
-      "mcp__perplexity-ask__perplexity_ask",
-      "Bash(npm search:*)",
-      "Bash(npm install:*)",
-      "Bash(dxt:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(node:*)",
-      "Bash(npm run lint)",
-      "Bash(npx eslint:*)",
-      "mcp__visioncraft__vision-query",
-      "Bash(npm test)",
-      "Bash(npm test:*)",
-      "Bash(npm run dxt:generate:*)",
-      "Bash(npm run:*)",
-      "Bash(git restore:*)",
-      "WebFetch(domain:api.youneedabudget.com)",
-      "WebFetch(domain:api.ynab.com)",
-      "Bash(git push:*)",
-      "mcp__ynab-mcp-server__get_user",
-      "mcp__ynab-mcp-server__list_budgets",
-      "mcp__ynab-mcp-server__list_transactions",
       "mcp__ynab-mcp-server__financial_overview",
+      "mcp__ynab-mcp-server__list_budgets",
+      "mcp__ynab-mcp-server__set_default_budget",
       "mcp__ynab-mcp-server__list_accounts",
-      "Bash(del test-default-budget.js)",
-      "Bash(rm:*)",
-      "mcp__ynab-mcp-server__set_default_budget"
+      "WebFetch(domain:docs.anthropic.com)"
     ],
     "deny": []
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "npm",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -Command Start-Sleep -Seconds 2; Write-Host '🔄 Reconnecting to YNAB MCP server...'; /mcp reconnect ynab-mcp-server; Start-Sleep -Seconds 1; /mcp reconnect ynab-mcp-server; Write-Host '✅ MCP server reconnected'"
+          }
+        ]
+      }
+    ]
   }
 }

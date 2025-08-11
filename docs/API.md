@@ -20,7 +20,7 @@ This document provides comprehensive documentation for all tools available in th
 
 ## Overview
 
-The YNAB MCP Server provides 21 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
+The YNAB MCP Server provides 18 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
 
 ### Tool Naming Convention
 
@@ -539,35 +539,6 @@ Performs detailed spending analysis with category breakdowns, trends, and statis
 }
 ```
 
-### cash_flow_forecast
-
-Generates predictive cash flow modeling based on historical data and scheduled transactions.
-
-**Parameters:**
-- `budget_id` (string, optional): Budget ID (uses default budget if not specified)
-- `forecast_months` (number, optional): Number of months to forecast (1-12, default: 3)
-
-**Example Request:**
-```json
-{
-  "name": "cash_flow_forecast",
-  "arguments": {
-    "forecast_months": 3
-  }
-}
-```
-
-**Example Response:**
-```json
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "{\n  \"forecast_period\": \"3 months\",\n  \"projections\": [\n    {\n      \"month\": \"2024-02-01\",\n      \"projected_income\": 5000.00,\n      \"projected_expenses\": 4200.00,\n      \"net_cash_flow\": 800.00,\n      \"confidence\": \"high\"\n    }\n  ],\n  \"assumptions\": [\n    \"Based on historical averages and scheduled transactions\"\n  ]\n}"
-    }
-  ]
-}
-```
 
 ### budget_health_check
 
@@ -599,41 +570,6 @@ Performs comprehensive budget health assessment with scoring and actionable reco
 }
 ```
 
-## Natural Language & AI Tools
-
-### natural-language-query
-
-Processes natural language queries about budget data and provides structured responses with tool suggestions.
-
-**Parameters:**
-- `query` (string, required): Natural language query about budget, transactions, accounts, etc.
-
-**Example Request:**
-```json
-{
-  "name": "natural-language-query",
-  "arguments": {
-    "query": "How much did I spend on groceries last month?"
-  }
-}
-```
-
-### get-smart-suggestions
-
-Provides contextual AI suggestions for YNAB operations based on recent activity and patterns.
-
-**Parameters:**
-- `context` (string, required): Context for suggestions - one of: "budgeting", "transactions", "analysis", "general"
-
-**Example Request:**
-```json
-{
-  "name": "get-smart-suggestions",
-  "arguments": {
-    "context": "budgeting"
-  }
-}
-```
 
 ## Utility Tools
 

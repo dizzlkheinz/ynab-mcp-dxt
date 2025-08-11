@@ -56,7 +56,7 @@ npm start
 
 ## Available Tools
 
-The server provides 21 MCP tools organized into categories:
+The server provides 18 MCP tools organized into categories:
 
 ### Budget Management
 - `list_budgets` - List all user budgets
@@ -90,12 +90,8 @@ The server provides 21 MCP tools organized into categories:
 ### Financial Analysis & Insights
 - `financial_overview` - Comprehensive multi-month financial analysis with trends and AI insights
 - `spending_analysis` - Detailed spending analysis with category breakdowns and trends
-- `cash_flow_forecast` - Predictive cash flow modeling based on historical data and scheduled transactions
 - `budget_health_check` - Budget health assessment with scoring and actionable recommendations
 
-### Natural Language & AI Tools
-- `natural-language-query` - Process natural language queries about budget data
-- `get-smart-suggestions` - Get contextual AI suggestions for YNAB operations
 
 ### Utilities
 - `get_user` - Get authenticated user information
