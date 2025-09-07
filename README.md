@@ -60,7 +60,7 @@ There are two ways to use this server as a Claude Desktop MCP extension: downloa
 
 ### Option A: Install from Releases
 
-- Download the latest `.dxt` from the GitHub Releases page.
+- Download the latest `.dxt` from the GitHub Releases page: https://github.com/dizzlkheinz/mcp-for-ynab/releases/latest
 - Open Claude Desktop and drag-and-drop the `.dxt` file into the app.
 - Open the extension’s settings in Claude Desktop and set `YNAB_ACCESS_TOKEN` when prompted.
 - Restart Claude Desktop if requested.
