@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Load environment variables from a .env file if present
+import 'dotenv/config';
+
 import { YNABMCPServer } from './server/YNABMCPServer.js';
 import { AuthenticationError, ConfigurationError } from './types/index.js';
 

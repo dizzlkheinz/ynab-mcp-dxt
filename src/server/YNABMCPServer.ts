@@ -949,6 +949,15 @@ Convert milliunits to dollars for easy reading.`
               required: [],
             },
           },
+          {
+            name: 'get_env_status',
+            description: 'Debug: Show YNAB token presence and server environment info (masked)',
+            inputSchema: {
+              type: 'object',
+              properties: {},
+              required: [],
+            },
+          },
         ],
       };
     });
@@ -1252,6 +1261,38 @@ Convert milliunits to dollars for easy reading.`
 
         case 'get_memory_usage':
           return this.getMemoryUsage();
+
+        case 'get_env_status': {
+          const token = process.env['YNAB_ACCESS_TOKEN'];
+          const masked = token && token.length >= 8
+            ? `${token.slice(0, 4)}...${token.slice(-4)}`
+            : token
+              ? `${token[0]}***` // very short token, still mask
+              : null;
+
+          const envKeys = Object.keys(process.env || {});
+          const ynabEnvKeys = envKeys.filter(k => k.toUpperCase().includes('YNAB'));
+
+          const payload = {
+            token_present: !!token,
+            token_length: token ? token.length : 0,
+            token_preview: masked,
+            ynab_env_keys_present: ynabEnvKeys,
+            node_version: process.version,
+            platform: process.platform,
+            pid: process.pid,
+            cwd: process.cwd(),
+          };
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(payload, null, 2)
+              }
+            ]
+          };
+        }
 
         default:
           throw new Error(`Unknown tool: ${name}`);

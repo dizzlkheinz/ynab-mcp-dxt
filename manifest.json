@@ -24,7 +24,7 @@
         "${__dirname}/dist/index.js"
       ],
       "env": {
-        "YNAB_ACCESS_TOKEN": "${YNAB_ACCESS_TOKEN}"
+        "YNAB_ACCESS_TOKEN": "${user_config.YNAB_ACCESS_TOKEN}"
       }
     }
   },
