@@ -5,6 +5,9 @@ import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
   js.configs.recommended,
+  // Apply TypeScript ESLint strict and stylistic defaults (flat configs)
+  ...tseslint.configs['flat/strict'],
+  ...tseslint.configs['flat/stylistic'],
   {
     files: ['src/**/*.ts'],
     languageOptions: {
@@ -25,6 +28,10 @@ export default [
       '@typescript-eslint': tseslint
     },
     rules: {
+      '@typescript-eslint/no-inferrable-types': 'off',
+      '@typescript-eslint/no-extraneous-class': 'off',
+      '@typescript-eslint/consistent-generic-constructors': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
