@@ -244,6 +244,16 @@ This server follows security best practices:
 7. Push to the branch (`git push origin feature/amazing-feature`)
 8. Open a Pull Request
 
+### Issues & PRs
+
+- Report a bug: https://github.com/dizzlkheinz/mcp-for-ynab/issues/new?template=bug_report.md
+- Request a feature: https://github.com/dizzlkheinz/mcp-for-ynab/issues/new?template=feature_request.md
+- Open a PR: https://github.com/dizzlkheinz/mcp-for-ynab/compare
+
+Notes:
+- PRs use an auto-applied template and a public API checklist (see docs/VERSIONING.md)
+- For release planning, use the “Release Checklist” issue template
+
 ## License
 
 This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0). See the
