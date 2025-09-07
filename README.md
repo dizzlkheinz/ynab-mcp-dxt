@@ -260,5 +260,5 @@ This project is licensed under the GNU Affero General Public License v3.0 (AGPL-
 
 - Built with the [YNAB JavaScript SDK](https://github.com/ynab/ynab-sdk-js)
 - Uses the [Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk)
-- Developed and automated with the OpenAI Codex CLI (open‑source agentic coding interface)
-- Packaged as a DXT extension for Anthropic Claude Desktop (thanks to Anthropic Claude Code and DXT)
+- Developed and automated with the OpenAI Codex CLI (open‑source agentic coding interface) and Claude Code
+- Packaged as a DXT extension for Anthropic Claude Desktop (thanks to DXT)
