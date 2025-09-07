@@ -6,6 +6,8 @@ This project follows Semantic Versioning (SemVer): MAJOR.MINOR.PATCH
 - MINOR: Backwards‑compatible features and additions
 - PATCH: Backwards‑compatible bug fixes, internal refactors, docs, packaging
 
+> Current status: Pre‑1.0 (0.y.z). The API may change without notice.
+
 ## What is the public API surface?
 
 For this MCP server, the public API is everything an MCP client or user relies on at runtime:
@@ -85,4 +87,3 @@ Use this list to determine your version bump and ensure stability:
 3. Verify DXT runs and `get_env_status` shows the token when set
 4. Tag: `git tag -a vX.Y.Z -m "..." && git push --tags`
 5. Create a GitHub release and attach the `.dxt`
-
