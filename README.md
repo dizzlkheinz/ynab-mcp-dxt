@@ -54,6 +54,43 @@ npm start
 5. Copy the generated token immediately (it's only shown once)
 6. Add it to your `.env` file: `YNAB_ACCESS_TOKEN=your_token_here`
 
+## Use with Claude Desktop (.dxt)
+
+There are two ways to use this server as a Claude Desktop MCP extension: download a release DXT or build it locally.
+
+### Option A: Install from Releases
+
+- Download the latest `.dxt` from the GitHub Releases page.
+- Open Claude Desktop and drag-and-drop the `.dxt` file into the app.
+- Open the extension’s settings in Claude Desktop and set `YNAB_ACCESS_TOKEN` when prompted.
+- Restart Claude Desktop if requested.
+
+### Option B: Build locally and install
+
+```bash
+# Build a bundled DXT (includes lint + format checks)
+npm run package:dxt
+
+# The .dxt will be created at
+dist/ynab-mcp-server-<version>.dxt
+```
+
+- Drag-and-drop the generated `.dxt` into Claude Desktop.
+- In the extension’s settings, set `YNAB_ACCESS_TOKEN` (your YNAB Personal Access Token).
+
+### Verify the token and connectivity
+
+- Run the diagnostic tool `get_env_status` to confirm the token is present (masked preview shown).
+- Try a simple call:
+  - Read resource `ynab://user` (should return your user id), or
+  - Run the `list_budgets` tool.
+
+### Troubleshooting
+
+- “Invalid or expired token” → Recheck `YNAB_ACCESS_TOKEN` in the extension settings; generate a new token in YNAB if needed.
+- Use `get_env_status` to confirm Claude passed the token into the server (shows token_present and token_length).
+- This DXT is a single-file Node bundle (no node_modules). If Claude Desktop reports a Node/runtime issue, update Claude Desktop to a recent version and try again.
+
 ## Available Tools
 
 The server provides 18 MCP tools organized into categories:
