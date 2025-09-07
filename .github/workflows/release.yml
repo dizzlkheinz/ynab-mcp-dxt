@@ -3,6 +3,9 @@ name: Release DXT
 on:
   release:
     types: [published]
+  push:
+    tags:
+      - 'v*.*.*'
   workflow_dispatch:
 
 permissions:
@@ -53,8 +56,11 @@ jobs:
       - name: Pack DXT
         run: dxt pack . "${{ steps.meta.outputs.file }}"
 
-      - name: Upload release asset
+      - name: Upload or create release with asset
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           files: ${{ steps.meta.outputs.file }}
+          generate_release_notes: true
           fail_on_unmatched_files: true
