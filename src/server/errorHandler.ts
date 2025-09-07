@@ -3,7 +3,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 /**
  * YNAB API error codes and their corresponding HTTP status codes
  */
-/* eslint-disable no-unused-vars */
+ 
 export const enum YNABErrorCode {
   UNAUTHORIZED = 401,
   FORBIDDEN = 403,
@@ -20,7 +20,7 @@ export const enum SecurityErrorCode {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
-/* eslint-enable no-unused-vars */
+ 
 
 /**
  * Standardized error response structure

@@ -134,9 +134,9 @@ export class RateLimiter {
 export class RateLimitError extends Error {
   constructor(
     message: string,
-    // eslint-disable-next-line no-unused-vars
+     
     public readonly resetTime: Date,
-    // eslint-disable-next-line no-unused-vars
+     
     public readonly remaining: number = 0
   ) {
     super(message);
