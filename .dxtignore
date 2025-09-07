@@ -1,0 +1,17 @@
+node_modules/
+src/
+**/__tests__/
+**/*.test.*
+coverage/
+*.log
+.git/
+.github/
+.vscode/
+**/*.map
+tsconfig*.json
+vitest.config.ts
+eslint.config.js
+test-results.json
+README.md
+
+# keep dist/, manifest.json, docs/

@@ -17,11 +17,11 @@
   },
   "server": {
     "type": "node",
-    "entry_point": "dist/index.js",
+    "entry_point": "dist/bundle/index.cjs",
     "mcp_config": {
       "command": "node",
       "args": [
-        "${__dirname}/dist/index.js"
+        "${__dirname}/dist/bundle/index.cjs"
       ],
       "env": {
         "YNAB_ACCESS_TOKEN": "${user_config.YNAB_ACCESS_TOKEN}"

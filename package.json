@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "prebuild": "npm run clean && npm run validate-env && npm run lint",
-    "build": "tsc && npm run generate:dxt",
-    "build:prod": "npm run prebuild && tsc --project tsconfig.prod.json && npm run verify-build",
+    "build": "tsc && npm run bundle",
+    "build:prod": "npm run prebuild && tsc --project tsconfig.prod.json && npm run bundle:prod && npm run verify-build",
     "clean": "rimraf dist",
     "dev": "tsc --watch",
     "start": "node -r dotenv/config dist/index.js",
@@ -28,6 +28,8 @@
     "test:comprehensive": "tsx src/__tests__/testRunner.ts",
     "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e && npm run test:performance",
     "generate:dxt": "powershell -ExecutionPolicy Bypass -File scripts/generate-dxt.ps1",
+    "bundle": "esbuild dist/index.js --bundle --platform=node --format=cjs --outfile=dist/bundle/index.cjs --sourcemap",
+    "bundle:prod": "esbuild dist/index.js --bundle --platform=node --format=cjs --outfile=dist/bundle/index.cjs --minify",
     "package:dxt": "npm run build:prod && npm run generate:dxt",
     "prepare": "npm run build",
     "prepublishOnly": "npm run test:all && npm run build:prod"
@@ -49,6 +51,7 @@
     "zod": "^4.0.15"
   },
   "devDependencies": {
+    "esbuild": "^0.23.0",
     "@eslint/js": "^9.32.0",
     "@types/d3-array": "^3.2.1",
     "@types/node": "^22.10.2",
