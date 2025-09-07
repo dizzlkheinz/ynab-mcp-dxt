@@ -1,0 +1,8 @@
+dist/
+node_modules/
+coverage/
+*.dxt
+*.log
+.git/
+.github/
+docs/**/*.md

@@ -17,6 +17,8 @@
     "verify-build": "node scripts/verify-build.js",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "type-check": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -51,17 +53,20 @@
     "zod": "^4.0.15"
   },
   "devDependencies": {
-    "esbuild": "^0.23.0",
-    "@eslint/js": "^9.32.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.3.3",
+    "@eslint/js": "^9.35.0",
     "@types/d3-array": "^3.2.1",
     "@types/node": "^22.10.2",
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitest/coverage-v8": "^2.1.8",
-    "eslint": "^9.0.0",
+    "esbuild": "^0.23.0",
+    "eslint": "^9.35.0",
     "rimraf": "^5.0.10",
     "tsx": "^4.19.2",
-    "typescript": "^5.7.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.42.0",
     "vitest": "^2.1.8"
   }
 }

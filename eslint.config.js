@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
   js.configs.recommended,
@@ -31,6 +32,8 @@ export default [
       'no-var': 'error'
     }
   },
+  // Turn off formatting-related rules to defer to Prettier
+  eslintConfigPrettier,
   {
     ignores: [
       'dist/**/*',
