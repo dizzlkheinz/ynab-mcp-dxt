@@ -28,9 +28,9 @@ describe('Utility Tools Integration Tests', () => {
   describe('handleConvertAmount', () => {
     it('should convert various dollar amounts to milliunits', async () => {
       const testCases = [
-        { dollars: 1.00, expectedMilliunits: 1000 },
+        { dollars: 1.0, expectedMilliunits: 1000 },
         { dollars: 0.01, expectedMilliunits: 10 },
-        { dollars: 10.50, expectedMilliunits: 10500 },
+        { dollars: 10.5, expectedMilliunits: 10500 },
         { dollars: 999.99, expectedMilliunits: 999990 },
         { dollars: 0, expectedMilliunits: 0 },
         { dollars: -5.25, expectedMilliunits: -5250 },
@@ -46,15 +46,17 @@ describe('Utility Tools Integration Tests', () => {
         expect(response.conversion.converted_amount).toBe(testCase.expectedMilliunits);
         expect(response.conversion.to_milliunits).toBe(true);
         expect(response.conversion.description).toContain(`$${testCase.dollars.toFixed(2)}`);
-        expect(response.conversion.description).toContain(`${testCase.expectedMilliunits} milliunits`);
+        expect(response.conversion.description).toContain(
+          `${testCase.expectedMilliunits} milliunits`,
+        );
       }
     });
 
     it('should convert various milliunit amounts to dollars', async () => {
       const testCases = [
-        { milliunits: 1000, expectedDollars: 1.00 },
+        { milliunits: 1000, expectedDollars: 1.0 },
         { milliunits: 10, expectedDollars: 0.01 },
-        { milliunits: 10500, expectedDollars: 10.50 },
+        { milliunits: 10500, expectedDollars: 10.5 },
         { milliunits: 999990, expectedDollars: 999.99 },
         { milliunits: 0, expectedDollars: 0 },
         { milliunits: -5250, expectedDollars: -5.25 },
@@ -70,7 +72,9 @@ describe('Utility Tools Integration Tests', () => {
         expect(response.conversion.converted_amount).toBe(testCase.expectedDollars);
         expect(response.conversion.to_milliunits).toBe(false);
         expect(response.conversion.description).toContain(`${testCase.milliunits} milliunits`);
-        expect(response.conversion.description).toContain(`$${testCase.expectedDollars.toFixed(2)}`);
+        expect(response.conversion.description).toContain(
+          `$${testCase.expectedDollars.toFixed(2)}`,
+        );
       }
     });
 

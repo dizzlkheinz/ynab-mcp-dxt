@@ -13,10 +13,10 @@ export default defineConfig({
       provider: 'v8',
       include: ['src/**/*.ts'],
       exclude: [
-        'src/**/*.{test,spec}.ts', 
+        'src/**/*.{test,spec}.ts',
         'src/**/*.d.ts',
         'src/index.ts', // Entry point excluded from coverage
-        'src/__tests__/**/*.ts' // Test utilities excluded from coverage
+        'src/__tests__/**/*.ts', // Test utilities excluded from coverage
       ],
       reporter: ['text', 'json', 'html'],
       reportsDirectory: './coverage',
@@ -25,14 +25,14 @@ export default defineConfig({
           branches: 80,
           functions: 80,
           lines: 80,
-          statements: 80
-        }
-      }
+          statements: 80,
+        },
+      },
     },
     reporters: ['verbose', 'json'],
     outputFile: {
-      json: './test-results.json'
-    }
+      json: './test-results.json',
+    },
   },
   resolve: {
     alias: {

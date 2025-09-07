@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
-import { 
-  handleListAccounts, 
-  handleGetAccount, 
+import {
+  handleListAccounts,
+  handleGetAccount,
   handleCreateAccount,
   ListAccountsSchema,
   GetAccountSchema,
-  CreateAccountSchema
+  CreateAccountSchema,
 } from '../accountTools.js';
 
 // Mock the YNAB API
@@ -64,7 +64,7 @@ describe('Account Tools', () => {
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.accounts).toHaveLength(2);
       expect(parsedContent.accounts[0]).toEqual({
@@ -84,9 +84,7 @@ describe('Account Tools', () => {
     });
 
     it('should handle 404 budget not found errors', async () => {
-      (mockYnabAPI.accounts.getAccounts as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.accounts.getAccounts as any).mockRejectedValue(new Error('404 Not Found'));
 
       const result = await handleListAccounts(mockYnabAPI, { budget_id: 'invalid-budget' });
 
@@ -96,9 +94,7 @@ describe('Account Tools', () => {
     });
 
     it('should handle 401 authentication errors', async () => {
-      (mockYnabAPI.accounts.getAccounts as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.accounts.getAccounts as any).mockRejectedValue(new Error('401 Unauthorized'));
 
       const result = await handleListAccounts(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -108,9 +104,7 @@ describe('Account Tools', () => {
     });
 
     it('should handle generic errors', async () => {
-      (mockYnabAPI.accounts.getAccounts as any).mockRejectedValue(
-        new Error('Network error')
-      );
+      (mockYnabAPI.accounts.getAccounts as any).mockRejectedValue(new Error('Network error'));
 
       const result = await handleListAccounts(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -141,14 +135,14 @@ describe('Account Tools', () => {
         data: { account: mockAccount },
       });
 
-      const result = await handleGetAccount(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        account_id: 'account-1' 
+      const result = await handleGetAccount(mockYnabAPI, {
+        budget_id: 'budget-1',
+        account_id: 'account-1',
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.account).toEqual({
         id: 'account-1',
@@ -167,13 +161,11 @@ describe('Account Tools', () => {
     });
 
     it('should handle 404 account not found errors', async () => {
-      (mockYnabAPI.accounts.getAccountById as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.accounts.getAccountById as any).mockRejectedValue(new Error('404 Not Found'));
 
-      const result = await handleGetAccount(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        account_id: 'invalid-account' 
+      const result = await handleGetAccount(mockYnabAPI, {
+        budget_id: 'budget-1',
+        account_id: 'invalid-account',
       });
 
       expect(result.content).toHaveLength(1);
@@ -182,13 +174,11 @@ describe('Account Tools', () => {
     });
 
     it('should handle authentication errors', async () => {
-      (mockYnabAPI.accounts.getAccountById as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.accounts.getAccountById as any).mockRejectedValue(new Error('401 Unauthorized'));
 
-      const result = await handleGetAccount(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        account_id: 'account-1' 
+      const result = await handleGetAccount(mockYnabAPI, {
+        budget_id: 'budget-1',
+        account_id: 'account-1',
       });
 
       expect(result.content).toHaveLength(1);
@@ -200,8 +190,13 @@ describe('Account Tools', () => {
   describe('handleCreateAccount', () => {
     it('should create account with all supported types', async () => {
       const accountTypes = [
-        'checking', 'savings', 'creditCard', 'cash', 
-        'lineOfCredit', 'otherAsset', 'otherLiability'
+        'checking',
+        'savings',
+        'creditCard',
+        'cash',
+        'lineOfCredit',
+        'otherAsset',
+        'otherLiability',
       ];
 
       for (const accountType of accountTypes) {
@@ -267,7 +262,7 @@ describe('Account Tools', () => {
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.account.balance).toBe(0);
-      
+
       // Verify the API was called with balance 0 in milliunits
       expect(mockYnabAPI.accounts.createAccount).toHaveBeenCalledWith('budget-1', {
         account: {
@@ -316,9 +311,7 @@ describe('Account Tools', () => {
     });
 
     it('should handle creation errors', async () => {
-      (mockYnabAPI.accounts.createAccount as any).mockRejectedValue(
-        new Error('400 Bad Request')
-      );
+      (mockYnabAPI.accounts.createAccount as any).mockRejectedValue(new Error('400 Bad Request'));
 
       const result = await handleCreateAccount(mockYnabAPI, {
         budget_id: 'budget-1',
@@ -350,9 +343,9 @@ describe('Account Tools', () => {
 
     describe('GetAccountSchema', () => {
       it('should validate valid parameters', () => {
-        const result = GetAccountSchema.parse({ 
-          budget_id: 'budget-1', 
-          account_id: 'account-1' 
+        const result = GetAccountSchema.parse({
+          budget_id: 'budget-1',
+          account_id: 'account-1',
         });
         expect(result.budget_id).toBe('budget-1');
         expect(result.account_id).toBe('account-1');
@@ -363,10 +356,12 @@ describe('Account Tools', () => {
       });
 
       it('should reject empty account_id', () => {
-        expect(() => GetAccountSchema.parse({ 
-          budget_id: 'budget-1', 
-          account_id: '' 
-        })).toThrow();
+        expect(() =>
+          GetAccountSchema.parse({
+            budget_id: 'budget-1',
+            account_id: '',
+          }),
+        ).toThrow();
       });
     });
 
@@ -395,11 +390,16 @@ describe('Account Tools', () => {
 
       it('should validate all supported account types', () => {
         const validTypes = [
-          'checking', 'savings', 'creditCard', 'cash',
-          'lineOfCredit', 'otherAsset', 'otherLiability'
+          'checking',
+          'savings',
+          'creditCard',
+          'cash',
+          'lineOfCredit',
+          'otherAsset',
+          'otherLiability',
         ];
 
-        validTypes.forEach(type => {
+        validTypes.forEach((type) => {
           const result = CreateAccountSchema.parse({
             budget_id: 'budget-1',
             name: 'Test Account',
@@ -410,25 +410,31 @@ describe('Account Tools', () => {
       });
 
       it('should reject invalid account type', () => {
-        expect(() => CreateAccountSchema.parse({
-          budget_id: 'budget-1',
-          name: 'Test Account',
-          type: 'invalid-type',
-        })).toThrow();
+        expect(() =>
+          CreateAccountSchema.parse({
+            budget_id: 'budget-1',
+            name: 'Test Account',
+            type: 'invalid-type',
+          }),
+        ).toThrow();
       });
 
       it('should reject empty name', () => {
-        expect(() => CreateAccountSchema.parse({
-          budget_id: 'budget-1',
-          name: '',
-          type: 'checking',
-        })).toThrow();
+        expect(() =>
+          CreateAccountSchema.parse({
+            budget_id: 'budget-1',
+            name: '',
+            type: 'checking',
+          }),
+        ).toThrow();
       });
 
       it('should reject missing required fields', () => {
-        expect(() => CreateAccountSchema.parse({
-          budget_id: 'budget-1',
-        })).toThrow();
+        expect(() =>
+          CreateAccountSchema.parse({
+            budget_id: 'budget-1',
+          }),
+        ).toThrow();
       });
     });
   });

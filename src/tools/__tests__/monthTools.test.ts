@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
-import { 
-  handleGetMonth, 
-  handleListMonths, 
-  GetMonthSchema, 
-  ListMonthsSchema 
+import {
+  handleGetMonth,
+  handleListMonths,
+  GetMonthSchema,
+  ListMonthsSchema,
 } from '../monthTools.js';
 
 // Mock the YNAB API
@@ -61,14 +61,14 @@ describe('Month Tools', () => {
         data: { month: mockMonth },
       });
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.month.month).toBe('2024-01-01');
       expect(parsedContent.month.note).toBe('January budget');
@@ -82,13 +82,11 @@ describe('Month Tools', () => {
     });
 
     it('should handle 401 authentication errors', async () => {
-      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(new Error('401 Unauthorized'));
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
@@ -97,13 +95,11 @@ describe('Month Tools', () => {
     });
 
     it('should handle 403 forbidden errors', async () => {
-      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(
-        new Error('403 Forbidden')
-      );
+      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(new Error('403 Forbidden'));
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
@@ -112,13 +108,11 @@ describe('Month Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(new Error('404 Not Found'));
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'invalid-budget', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'invalid-budget',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
@@ -128,12 +122,12 @@ describe('Month Tools', () => {
 
     it('should handle 429 rate limit errors', async () => {
       (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(
-        new Error('429 Too Many Requests')
+        new Error('429 Too Many Requests'),
       );
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
@@ -143,12 +137,12 @@ describe('Month Tools', () => {
 
     it('should handle 500 server errors', async () => {
       (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(
-        new Error('500 Internal Server Error')
+        new Error('500 Internal Server Error'),
       );
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
@@ -157,13 +151,11 @@ describe('Month Tools', () => {
     });
 
     it('should handle generic errors', async () => {
-      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(
-        new Error('Network error')
-      );
+      (mockYnabAPI.months.getBudgetMonth as any).mockRejectedValue(new Error('Network error'));
 
-      const result = await handleGetMonth(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        month: '2024-01-01' 
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
       });
 
       expect(result.content).toHaveLength(1);
@@ -205,7 +197,7 @@ describe('Month Tools', () => {
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.months).toHaveLength(2);
       expect(parsedContent.months[0]).toEqual({
@@ -231,9 +223,7 @@ describe('Month Tools', () => {
     });
 
     it('should handle 401 authentication errors', async () => {
-      (mockYnabAPI.months.getBudgetMonths as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.months.getBudgetMonths as any).mockRejectedValue(new Error('401 Unauthorized'));
 
       const result = await handleListMonths(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -243,9 +233,7 @@ describe('Month Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.months.getBudgetMonths as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.months.getBudgetMonths as any).mockRejectedValue(new Error('404 Not Found'));
 
       const result = await handleListMonths(mockYnabAPI, { budget_id: 'invalid-budget' });
 
@@ -255,9 +243,7 @@ describe('Month Tools', () => {
     });
 
     it('should handle generic errors', async () => {
-      (mockYnabAPI.months.getBudgetMonths as any).mockRejectedValue(
-        new Error('Network error')
-      );
+      (mockYnabAPI.months.getBudgetMonths as any).mockRejectedValue(new Error('Network error'));
 
       const result = await handleListMonths(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -269,45 +255,55 @@ describe('Month Tools', () => {
 
   describe('GetMonthSchema', () => {
     it('should validate valid parameters', () => {
-      const result = GetMonthSchema.parse({ 
-        budget_id: 'valid-budget-id', 
-        month: '2024-01-01' 
+      const result = GetMonthSchema.parse({
+        budget_id: 'valid-budget-id',
+        month: '2024-01-01',
       });
       expect(result.budget_id).toBe('valid-budget-id');
       expect(result.month).toBe('2024-01-01');
     });
 
     it('should reject empty budget_id', () => {
-      expect(() => GetMonthSchema.parse({ 
-        budget_id: '', 
-        month: '2024-01-01' 
-      })).toThrow();
+      expect(() =>
+        GetMonthSchema.parse({
+          budget_id: '',
+          month: '2024-01-01',
+        }),
+      ).toThrow();
     });
 
     it('should reject missing budget_id', () => {
-      expect(() => GetMonthSchema.parse({ 
-        month: '2024-01-01' 
-      })).toThrow();
+      expect(() =>
+        GetMonthSchema.parse({
+          month: '2024-01-01',
+        }),
+      ).toThrow();
     });
 
     it('should reject invalid month format', () => {
-      expect(() => GetMonthSchema.parse({ 
-        budget_id: 'valid-budget-id', 
-        month: '2024-1-1' 
-      })).toThrow();
+      expect(() =>
+        GetMonthSchema.parse({
+          budget_id: 'valid-budget-id',
+          month: '2024-1-1',
+        }),
+      ).toThrow();
     });
 
     it('should reject missing month', () => {
-      expect(() => GetMonthSchema.parse({ 
-        budget_id: 'valid-budget-id' 
-      })).toThrow();
+      expect(() =>
+        GetMonthSchema.parse({
+          budget_id: 'valid-budget-id',
+        }),
+      ).toThrow();
     });
 
     it('should reject non-ISO date format', () => {
-      expect(() => GetMonthSchema.parse({ 
-        budget_id: 'valid-budget-id', 
-        month: '01/01/2024' 
-      })).toThrow();
+      expect(() =>
+        GetMonthSchema.parse({
+          budget_id: 'valid-budget-id',
+          month: '01/01/2024',
+        }),
+      ).toThrow();
     });
   });
 

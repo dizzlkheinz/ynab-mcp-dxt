@@ -39,11 +39,7 @@ describe('SecurityMiddleware', () => {
         content: [{ type: 'text', text: 'Success' }],
       });
 
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        testSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
       expect(mockOperation).toHaveBeenCalledWith({
         budget_id: 'test-budget',
@@ -65,11 +61,7 @@ describe('SecurityMiddleware', () => {
 
       const mockOperation = vi.fn();
 
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        testSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
       expect(mockOperation).not.toHaveBeenCalled();
       const responseText = JSON.parse(result.content[0].text);
@@ -182,9 +174,9 @@ describe('SecurityMiddleware', () => {
         startTime: Date.now(),
       };
 
-      const mockOperation = vi.fn().mockRejectedValue(
-        new RateLimitError('Rate limit exceeded', new Date(), 0)
-      );
+      const mockOperation = vi
+        .fn()
+        .mockRejectedValue(new RateLimitError('Rate limit exceeded', new Date(), 0));
 
       const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
@@ -229,11 +221,7 @@ describe('SecurityMiddleware', () => {
 
       const mockOperation = vi.fn();
 
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        testSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
       expect(mockOperation).not.toHaveBeenCalled();
       const responseText = JSON.parse(result.content[0].text);
@@ -252,11 +240,7 @@ describe('SecurityMiddleware', () => {
 
       const mockOperation = vi.fn();
 
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        testSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
       expect(mockOperation).not.toHaveBeenCalled();
       const responseText = JSON.parse(result.content[0].text);
@@ -404,11 +388,7 @@ describe('SecurityMiddleware', () => {
 
   describe('withSecurityWrapper', () => {
     it('should create a properly configured wrapper function', async () => {
-      const wrapper = withSecurityWrapper(
-        'ynab:test',
-        'test operation',
-        testSchema
-      );
+      const wrapper = withSecurityWrapper('ynab:test', 'test operation', testSchema);
 
       const tokenWrapper = wrapper(testAccessToken);
       const paramWrapper = tokenWrapper({ budget_id: 'test-budget' });
@@ -442,11 +422,7 @@ describe('SecurityMiddleware', () => {
 
       const mockOperation = vi.fn();
 
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        invalidSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, invalidSchema, mockOperation);
 
       expect(mockOperation).not.toHaveBeenCalled();
       const responseText = JSON.parse(result.content[0].text);
@@ -467,7 +443,7 @@ describe('SecurityMiddleware', () => {
       const mockOperation = vi.fn().mockRejectedValue(testError);
 
       await expect(
-        SecurityMiddleware.withSecurity(context, testSchema, mockOperation)
+        SecurityMiddleware.withSecurity(context, testSchema, mockOperation),
       ).rejects.toThrow('Operation failed');
     });
   });

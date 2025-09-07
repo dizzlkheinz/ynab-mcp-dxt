@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
-import { 
-  ErrorHandler, 
-  YNABAPIError, 
-  ValidationError, 
+import {
+  ErrorHandler,
+  YNABAPIError,
+  ValidationError,
   YNABErrorCode,
   handleToolError,
-  withToolErrorHandling
+  withToolErrorHandling,
 } from '../errorHandler.js';
 
 describe('ErrorHandler', () => {
@@ -166,7 +166,7 @@ describe('ErrorHandler', () => {
       const error = ErrorHandler.createYNABError(
         YNABErrorCode.NOT_FOUND,
         'finding resource',
-        originalError
+        originalError,
       );
 
       expect(error).toBeInstanceOf(YNABAPIError);

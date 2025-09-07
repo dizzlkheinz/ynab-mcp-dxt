@@ -24,7 +24,7 @@ describe('RateLimiter', () => {
   describe('isAllowed', () => {
     it('should allow requests within the limit', () => {
       const result = rateLimiter.isAllowed(testIdentifier);
-      
+
       expect(result.isLimited).toBe(false);
       expect(result.remaining).toBe(5);
       expect(result.resetTime).toBeInstanceOf(Date);
@@ -37,7 +37,7 @@ describe('RateLimiter', () => {
       rateLimiter.recordRequest(testIdentifier);
 
       const result = rateLimiter.isAllowed(testIdentifier);
-      
+
       expect(result.isLimited).toBe(false);
       expect(result.remaining).toBe(2);
     });
@@ -49,7 +49,7 @@ describe('RateLimiter', () => {
       }
 
       const result = rateLimiter.isAllowed(testIdentifier);
-      
+
       expect(result.isLimited).toBe(true);
       expect(result.remaining).toBe(0);
     });
@@ -87,7 +87,7 @@ describe('RateLimiter', () => {
       expect(shortWindowLimiter.isAllowed(testIdentifier).isLimited).toBe(true);
 
       // Wait for window to expire
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 60));
 
       // Should be allowed again
       const result = shortWindowLimiter.isAllowed(testIdentifier);
@@ -120,7 +120,7 @@ describe('RateLimiter', () => {
   describe('getStatus', () => {
     it('should return current status without modifying state', () => {
       rateLimiter.recordRequest(testIdentifier);
-      
+
       const status1 = rateLimiter.getStatus(testIdentifier);
       const status2 = rateLimiter.getStatus(testIdentifier);
 
@@ -184,7 +184,7 @@ describe('RateLimiter', () => {
       expect(shortWindowLimiter.getStatus(testIdentifier).remaining).toBe(3);
 
       // Wait for requests to expire
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 60));
 
       // Cleanup
       shortWindowLimiter.cleanup();
@@ -198,7 +198,7 @@ describe('RateLimiter', () => {
   describe('logging', () => {
     it('should log when logging is enabled', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const loggingLimiter = new RateLimiter({
         maxRequests: 2,
         windowMs: 1000,
@@ -208,19 +208,15 @@ describe('RateLimiter', () => {
       loggingLimiter.isAllowed(testIdentifier);
       loggingLimiter.recordRequest(testIdentifier);
 
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Rate limit check')
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Recorded request')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Rate limit check'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Recorded request'));
 
       consoleSpy.mockRestore();
     });
 
     it('should not log when logging is disabled', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       rateLimiter.isAllowed(testIdentifier);
       rateLimiter.recordRequest(testIdentifier);
 
@@ -245,7 +241,7 @@ describe('RateLimiter', () => {
   describe('YNAB API compliance', () => {
     it('should use YNAB API limits by default', () => {
       const defaultLimiter = new RateLimiter();
-      
+
       // YNAB allows 200 requests per hour
       const status = defaultLimiter.getStatus(testIdentifier);
       expect(status.remaining).toBe(200);
@@ -281,7 +277,7 @@ describe('RateLimiter', () => {
   describe('security considerations', () => {
     it('should hash identifiers in logs to avoid token exposure', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const loggingLimiter = new RateLimiter({
         maxRequests: 2,
         windowMs: 1000,
@@ -293,17 +289,17 @@ describe('RateLimiter', () => {
 
       // Check that the actual token is not in the log
       const logCalls = consoleSpy.mock.calls.flat();
-      const hasActualToken = logCalls.some(call => 
-        typeof call === 'string' && call.includes(sensitiveToken)
+      const hasActualToken = logCalls.some(
+        (call) => typeof call === 'string' && call.includes(sensitiveToken),
       );
-      
+
       expect(hasActualToken).toBe(false);
 
       // Check that a hashed version is used
-      const hasHashedToken = logCalls.some(call => 
-        typeof call === 'string' && call.includes('token_')
+      const hasHashedToken = logCalls.some(
+        (call) => typeof call === 'string' && call.includes('token_'),
       );
-      
+
       expect(hasHashedToken).toBe(true);
 
       consoleSpy.mockRestore();

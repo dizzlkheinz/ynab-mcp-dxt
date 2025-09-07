@@ -1,9 +1,9 @@
 /**
  * Unified date utilities for YNAB MCP Server
- * 
+ *
  * All date formatting should use these utilities to ensure consistency
  * and prevent bugs like the duplicate month issue.
- * 
+ *
  * Uses date-fns internally for robust date operations while providing
  * YNAB-specific business logic.
  */
@@ -52,7 +52,7 @@ export function getToday(): string {
  */
 export function getHistoricalMonths(monthCount: number, startDate?: Date): string[] {
   const baseDate = startDate || new Date();
-  
+
   return Array.from({ length: monthCount }, (_, i) => {
     const date = subMonths(baseDate, i);
     return formatYNABMonth(date);
@@ -84,7 +84,7 @@ export function isValidISODate(dateString: string): boolean {
 
 /**
  * Validates if a string is in YYYY-MM-01 format (YNAB month format)
- * @param monthString The string to validate  
+ * @param monthString The string to validate
  * @returns True if valid YNAB month format
  */
 export function isValidYNABMonth(monthString: string): boolean {

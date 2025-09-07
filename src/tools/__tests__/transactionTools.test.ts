@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
-import { 
-  handleListTransactions, 
+import {
+  handleListTransactions,
   handleGetTransaction,
   handleCreateTransaction,
   handleUpdateTransaction,
@@ -10,7 +10,7 @@ import {
   GetTransactionSchema,
   CreateTransactionSchema,
   UpdateTransactionSchema,
-  DeleteTransactionSchema
+  DeleteTransactionSchema,
 } from '../transactionTools.js';
 
 // Mock the YNAB API
@@ -125,7 +125,7 @@ describe('transactionTools', () => {
       expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
         'budget-123',
         undefined,
-        undefined
+        undefined,
       );
       expect(result.content[0].text).toContain('transaction-123');
       expect(result.content[0].text).toContain('-50000');
@@ -149,7 +149,7 @@ describe('transactionTools', () => {
       expect(mockYnabAPI.transactions.getTransactionsByAccount).toHaveBeenCalledWith(
         'budget-123',
         'account-456',
-        undefined
+        undefined,
       );
       expect(result.content[0].text).toContain('transaction-123');
     });
@@ -172,7 +172,7 @@ describe('transactionTools', () => {
       expect(mockYnabAPI.transactions.getTransactionsByCategory).toHaveBeenCalledWith(
         'budget-123',
         'category-789',
-        undefined
+        undefined,
       );
       expect(result.content[0].text).toContain('transaction-123');
     });
@@ -196,7 +196,7 @@ describe('transactionTools', () => {
       expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
         'budget-123',
         '2024-01-01',
-        'uncategorized'
+        'uncategorized',
       );
     });
 
@@ -332,9 +332,9 @@ describe('transactionTools', () => {
 
       expect(mockYnabAPI.transactions.getTransactionById).toHaveBeenCalledWith(
         'budget-123',
-        'transaction-456'
+        'transaction-456',
       );
-      
+
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('transaction-123');
       expect(response.transaction.amount).toBe(-50000);
@@ -444,7 +444,7 @@ describe('transactionTools', () => {
       const invalidParams = {
         budget_id: 'budget-123',
         account_id: 'account-456',
-        amount: -500.50, // Decimal not allowed
+        amount: -500.5, // Decimal not allowed
         date: '2024-01-01',
       };
 
@@ -533,24 +533,21 @@ describe('transactionTools', () => {
       };
       const result = await handleCreateTransaction(mockYnabAPI, params);
 
-      expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalledWith(
-        'budget-123',
-        {
-          transaction: {
-            account_id: 'account-456',
-            amount: -50000,
-            date: '2024-01-01',
-            payee_name: undefined,
-            payee_id: undefined,
-            category_id: undefined,
-            memo: undefined,
-            cleared: undefined,
-            approved: undefined,
-            flag_color: undefined,
-          },
-        }
-      );
-      
+      expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalledWith('budget-123', {
+        transaction: {
+          account_id: 'account-456',
+          amount: -50000,
+          date: '2024-01-01',
+          payee_name: undefined,
+          payee_id: undefined,
+          category_id: undefined,
+          memo: undefined,
+          cleared: undefined,
+          approved: undefined,
+          flag_color: undefined,
+        },
+      });
+
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('new-transaction-123');
       expect(response.transaction.amount).toBe(-50000);
@@ -580,24 +577,21 @@ describe('transactionTools', () => {
       };
       const result = await handleCreateTransaction(mockYnabAPI, params);
 
-      expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalledWith(
-        'budget-123',
-        {
-          transaction: {
-            account_id: 'account-456',
-            amount: -50000,
-            date: '2024-01-01',
-            payee_name: 'Test Payee',
-            payee_id: 'payee-789',
-            category_id: 'category-101',
-            memo: 'Test memo',
-            cleared: 'cleared',
-            approved: true,
-            flag_color: 'red',
-          },
-        }
-      );
-      
+      expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalledWith('budget-123', {
+        transaction: {
+          account_id: 'account-456',
+          amount: -50000,
+          date: '2024-01-01',
+          payee_name: 'Test Payee',
+          payee_id: 'payee-789',
+          category_id: 'category-101',
+          memo: 'Test memo',
+          cleared: 'cleared',
+          approved: true,
+          flag_color: 'red',
+        },
+      });
+
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('new-transaction-123');
     });
@@ -707,7 +701,7 @@ describe('transactionTools', () => {
       const invalidParams = {
         budget_id: 'budget-123',
         transaction_id: 'transaction-456',
-        amount: -600.50, // Decimal not allowed
+        amount: -600.5, // Decimal not allowed
       };
 
       const result = UpdateTransactionSchema.safeParse(invalidParams);
@@ -796,9 +790,9 @@ describe('transactionTools', () => {
           transaction: {
             amount: -60000,
           },
-        }
+        },
       );
-      
+
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('transaction-456');
       expect(response.transaction.amount).toBe(-60000);
@@ -839,9 +833,9 @@ describe('transactionTools', () => {
             approved: false,
             flag_color: 'blue',
           },
-        }
+        },
       );
-      
+
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('transaction-456');
     });
@@ -963,9 +957,9 @@ describe('transactionTools', () => {
 
       expect(mockYnabAPI.transactions.deleteTransaction).toHaveBeenCalledWith(
         'budget-123',
-        'transaction-456'
+        'transaction-456',
       );
-      
+
       const response = JSON.parse(result.content[0].text);
       expect(response.message).toBe('Transaction deleted successfully');
       expect(response.transaction.id).toBe('transaction-456');

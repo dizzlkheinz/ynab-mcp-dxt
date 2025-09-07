@@ -34,7 +34,7 @@ const REQUIRED_FILES = [
   'tools/utilityTools.js',
   'tools/utilityTools.d.ts',
   'types/index.js',
-  'types/index.d.ts'
+  'types/index.d.ts',
 ];
 
 function verifyBuild() {
@@ -74,7 +74,7 @@ function verifyBuild() {
   }
 
   // Check TypeScript declarations
-  const hasDeclarations = foundFiles.some(file => file.endsWith('.d.ts'));
+  const hasDeclarations = foundFiles.some((file) => file.endsWith('.d.ts'));
   if (hasDeclarations) {
     console.log('✅ TypeScript declarations generated');
   } else {
@@ -89,7 +89,7 @@ function verifyBuild() {
   if (missingFiles.length > 0) {
     console.error('\n❌ Build verification failed!');
     console.error('Missing files:');
-    missingFiles.forEach(file => console.error(`   - ${file}`));
+    missingFiles.forEach((file) => console.error(`   - ${file}`));
     process.exit(1);
   } else {
     console.log('\n✅ Build verification passed!');

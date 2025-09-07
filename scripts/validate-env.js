@@ -24,8 +24,8 @@ const requiredEnvVars = [
       if (typeof value !== 'string') return 'YNAB_ACCESS_TOKEN must be a string';
       if (value.length < 10) return 'YNAB_ACCESS_TOKEN appears to be too short';
       return null;
-    }
-  }
+    },
+  },
 ];
 
 const optionalEnvVars = [
@@ -39,7 +39,7 @@ const optionalEnvVars = [
         return `NODE_ENV must be one of: ${validEnvs.join(', ')}`;
       }
       return null;
-    }
+    },
   },
   {
     name: 'LOG_LEVEL',
@@ -51,13 +51,13 @@ const optionalEnvVars = [
         return `LOG_LEVEL must be one of: ${validLevels.join(', ')}`;
       }
       return null;
-    }
-  }
+    },
+  },
 ];
 
 function validateEnvironment() {
   console.log('🔍 Validating environment variables...\n');
-  
+
   let hasErrors = false;
   const warnings = [];
 
@@ -65,7 +65,7 @@ function validateEnvironment() {
   for (const envVar of requiredEnvVars) {
     const value = process.env[envVar.name];
     const error = envVar.validation(value);
-    
+
     if (error) {
       console.error(`❌ ${envVar.name}: ${error}`);
       console.error(`   Description: ${envVar.description}\n`);
@@ -78,7 +78,7 @@ function validateEnvironment() {
   // Validate optional environment variables
   for (const envVar of optionalEnvVars) {
     const value = process.env[envVar.name];
-    
+
     if (!value) {
       warnings.push(`⚠️  ${envVar.name}: Not set (using default: ${envVar.default})`);
       warnings.push(`   Description: ${envVar.description}`);
@@ -97,7 +97,7 @@ function validateEnvironment() {
   // Display warnings
   if (warnings.length > 0) {
     console.log('\nWarnings:');
-    warnings.forEach(warning => console.log(warning));
+    warnings.forEach((warning) => console.log(warning));
   }
 
   if (hasErrors) {

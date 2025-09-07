@@ -18,7 +18,7 @@ describe('Category Tools Integration', () => {
     try {
       const apiKeyFile = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8');
       const lines = apiKeyFile.split('\n');
-      
+
       let accessToken = '';
       for (const line of lines) {
         const [key, value] = line.split('=');
@@ -27,11 +27,11 @@ describe('Category Tools Integration', () => {
           break;
         }
       }
-      
+
       if (!accessToken) {
         throw new Error('YNAB_API_KEY not found in api_key.txt');
       }
-      
+
       ynabAPI = new ynab.API(accessToken);
       console.log('✅ Loaded YNAB API key for integration tests');
 
@@ -47,19 +47,19 @@ describe('Category Tools Integration', () => {
   describe('handleListCategories', () => {
     it('should successfully list categories from real API', async () => {
       const result = await handleListCategories(ynabAPI, { budget_id: testBudgetId });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.categories).toBeDefined();
       expect(Array.isArray(parsedContent.categories)).toBe(true);
-      
+
       // The test budget might not have categories, so we'll check if groups exist instead
       expect(parsedContent.category_groups).toBeDefined();
       expect(Array.isArray(parsedContent.category_groups)).toBe(true);
       expect(parsedContent.category_groups.length).toBeGreaterThan(0);
-      
+
       // Store first non-hidden category ID for next tests (if any exist)
       if (parsedContent.categories.length > 0) {
         const availableCategory = parsedContent.categories.find((cat: any) => !cat.hidden);
@@ -67,7 +67,7 @@ describe('Category Tools Integration', () => {
           testCategoryId = availableCategory.id;
           originalBudgetedAmount = availableCategory.budgeted;
         }
-        
+
         // Verify category structure
         const firstCategory = parsedContent.categories[0];
         expect(firstCategory.id).toBeDefined();
@@ -78,16 +78,18 @@ describe('Category Tools Integration', () => {
         expect(typeof firstCategory.activity).toBe('number');
         expect(typeof firstCategory.balance).toBe('number');
       }
-      
+
       // Verify category group structure
       const firstGroup = parsedContent.category_groups[0];
       expect(firstGroup.id).toBeDefined();
       expect(firstGroup.name).toBeDefined();
       expect(typeof firstGroup.hidden).toBe('boolean');
       expect(typeof firstGroup.deleted).toBe('boolean');
-      
-      console.log(`✅ Successfully listed ${parsedContent.categories.length} categories in ${parsedContent.category_groups.length} groups`);
-      
+
+      console.log(
+        `✅ Successfully listed ${parsedContent.categories.length} categories in ${parsedContent.category_groups.length} groups`,
+      );
+
       if (parsedContent.categories.length === 0) {
         console.log('ℹ️ No categories found in this budget - this is normal for new/empty budgets');
       }
@@ -95,14 +97,14 @@ describe('Category Tools Integration', () => {
 
     it('should handle invalid budget ID gracefully', async () => {
       const result = await handleListCategories(ynabAPI, { budget_id: 'invalid-budget-id' });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
-      
+
       console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
   });
@@ -114,17 +116,17 @@ describe('Category Tools Integration', () => {
         return;
       }
 
-      const result = await handleGetCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
-        category_id: testCategoryId 
+      const result = await handleGetCategory(ynabAPI, {
+        budget_id: testBudgetId,
+        category_id: testCategoryId,
       });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.category).toBeDefined();
-      
+
       const category = parsedContent.category;
       expect(category.id).toBe(testCategoryId);
       expect(category.name).toBeDefined();
@@ -133,7 +135,7 @@ describe('Category Tools Integration', () => {
       expect(typeof category.activity).toBe('number');
       expect(typeof category.balance).toBe('number');
       expect(typeof category.hidden).toBe('boolean');
-      
+
       console.log(`✅ Successfully retrieved category: ${category.name}`);
       console.log(`   - Budgeted: ${category.budgeted} milliunits`);
       console.log(`   - Activity: ${category.activity} milliunits`);
@@ -141,18 +143,18 @@ describe('Category Tools Integration', () => {
     });
 
     it('should handle invalid category ID gracefully', async () => {
-      const result = await handleGetCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
-        category_id: 'invalid-category-id' 
+      const result = await handleGetCategory(ynabAPI, {
+        budget_id: testBudgetId,
+        category_id: 'invalid-category-id',
       });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
-      
+
       console.log(`✅ Correctly handled invalid category ID: ${parsedContent.error.message}`);
     });
   });
@@ -166,18 +168,18 @@ describe('Category Tools Integration', () => {
 
       // Update with a test amount (add 1000 milliunits = $1.00)
       const testBudgetedAmount = originalBudgetedAmount + 1000;
-      
-      const result = await handleUpdateCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
+
+      const result = await handleUpdateCategory(ynabAPI, {
+        budget_id: testBudgetId,
         category_id: testCategoryId,
-        budgeted: testBudgetedAmount
+        budgeted: testBudgetedAmount,
       });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
-      
+
       // Debug: Log the actual response if it's an error
       if (parsedContent.error) {
         console.log('❌ Category update failed:', parsedContent.error.message);
@@ -187,44 +189,44 @@ describe('Category Tools Integration', () => {
         // Skip the test if we get an error - this indicates API permissions or data issues
         return;
       }
-      
+
       expect(parsedContent.category).toBeDefined();
       expect(parsedContent.updated_month).toBeDefined();
-      
+
       const category = parsedContent.category;
       expect(category.id).toBe(testCategoryId);
       expect(category.budgeted).toBe(testBudgetedAmount);
-      
+
       // Verify month format
       expect(parsedContent.updated_month).toMatch(/^\d{4}-\d{2}-01$/);
-      
+
       console.log(`✅ Successfully updated category budget to ${testBudgetedAmount} milliunits`);
       console.log(`   - Updated month: ${parsedContent.updated_month}`);
-      
+
       // Restore original amount
-      await handleUpdateCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
+      await handleUpdateCategory(ynabAPI, {
+        budget_id: testBudgetId,
         category_id: testCategoryId,
-        budgeted: originalBudgetedAmount
+        budgeted: originalBudgetedAmount,
       });
-      
+
       console.log(`✅ Restored original budget amount: ${originalBudgetedAmount} milliunits`);
     });
 
     it('should handle invalid category ID gracefully', async () => {
-      const result = await handleUpdateCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
+      const result = await handleUpdateCategory(ynabAPI, {
+        budget_id: testBudgetId,
         category_id: 'invalid-category-id',
-        budgeted: 50000
+        budgeted: 50000,
       });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
-      
+
       console.log(`✅ Correctly handled invalid category ID: ${parsedContent.error.message}`);
     });
 
@@ -236,18 +238,18 @@ describe('Category Tools Integration', () => {
 
       // Test with negative amount (removing money from category)
       const negativeBudgetedAmount = -5000;
-      
-      const result = await handleUpdateCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
+
+      const result = await handleUpdateCategory(ynabAPI, {
+        budget_id: testBudgetId,
         category_id: testCategoryId,
-        budgeted: negativeBudgetedAmount
+        budgeted: negativeBudgetedAmount,
       });
-      
+
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
-      
+
       // Debug: Log the actual response if it's an error
       if (parsedContent.error) {
         console.log('❌ Category update with negative amount failed:', parsedContent.error.message);
@@ -257,21 +259,23 @@ describe('Category Tools Integration', () => {
         // Skip the test if we get an error - this indicates API permissions or data issues
         return;
       }
-      
+
       expect(parsedContent.category).toBeDefined();
-      
+
       const category = parsedContent.category;
       expect(category.budgeted).toBe(negativeBudgetedAmount);
-      
-      console.log(`✅ Successfully set negative budget amount: ${negativeBudgetedAmount} milliunits`);
-      
+
+      console.log(
+        `✅ Successfully set negative budget amount: ${negativeBudgetedAmount} milliunits`,
+      );
+
       // Restore original amount
-      await handleUpdateCategory(ynabAPI, { 
-        budget_id: testBudgetId, 
+      await handleUpdateCategory(ynabAPI, {
+        budget_id: testBudgetId,
         category_id: testCategoryId,
-        budgeted: originalBudgetedAmount
+        budgeted: originalBudgetedAmount,
       });
-      
+
       console.log(`✅ Restored original budget amount: ${originalBudgetedAmount} milliunits`);
     });
   });

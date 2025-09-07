@@ -10,12 +10,12 @@ import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 beforeAll(async () => {
   // Set test environment variables
   process.env['NODE_ENV'] = 'test';
-  
+
   // Set default test token if not provided
   if (!process.env['YNAB_ACCESS_TOKEN']) {
     process.env['YNAB_ACCESS_TOKEN'] = 'test-token-for-mocked-tests';
   }
-  
+
   // Disable console.error for cleaner test output (except for specific tests)
   if (!process.env['VERBOSE_TESTS']) {
     const originalConsoleError = console.error;
@@ -26,7 +26,7 @@ beforeAll(async () => {
       }
     };
   }
-  
+
   console.log('🧪 Test environment initialized');
 });
 
@@ -44,7 +44,7 @@ afterAll(async () => {
 beforeEach(async () => {
   // Reset environment for each test
   process.env['NODE_ENV'] = 'test';
-  
+
   // Clear any cached modules that might interfere (only if they exist)
   try {
     delete require.cache[require.resolve('../server/YNABMCPServer.js')];
@@ -66,7 +66,7 @@ afterEach(async () => {
  */
 export class TestEnvironment {
   private originalEnv: Record<string, string | undefined> = {};
-  
+
   /**
    * Set environment variables for a test
    */
@@ -76,7 +76,7 @@ export class TestEnvironment {
       process.env[key] = value;
     }
   }
-  
+
   /**
    * Restore original environment variables
    */
@@ -90,21 +90,23 @@ export class TestEnvironment {
     }
     this.originalEnv = {};
   }
-  
+
   /**
    * Check if running in CI environment
    */
   isCI(): boolean {
     return !!(process.env['CI'] || process.env['GITHUB_ACTIONS'] || process.env['TRAVIS']);
   }
-  
+
   /**
    * Check if E2E tests should be skipped
    */
   shouldSkipE2E(): boolean {
-    return process.env['SKIP_E2E_TESTS'] === 'true' || !process.env['YNAB_ACCESS_TOKEN'] || this.isCI();
+    return (
+      process.env['SKIP_E2E_TESTS'] === 'true' || !process.env['YNAB_ACCESS_TOKEN'] || this.isCI()
+    );
   }
-  
+
   /**
    * Get test timeout based on environment
    */
@@ -122,7 +124,7 @@ export class TestEnvironment {
 export class MockConsole {
   private originalMethods: Record<string, Function> = {};
   private logs: Array<{ method: string; args: any[] }> = [];
-  
+
   /**
    * Start mocking console methods
    */
@@ -134,7 +136,7 @@ export class MockConsole {
       };
     }
   }
-  
+
   /**
    * Restore original console methods
    */
@@ -145,30 +147,29 @@ export class MockConsole {
     this.originalMethods = {};
     this.logs = [];
   }
-  
+
   /**
    * Get captured logs
    */
   getLogs(): Array<{ method: string; args: any[] }> {
     return [...this.logs];
   }
-  
+
   /**
    * Get logs for a specific method
    */
   getLogsFor(method: string): any[][] {
-    return this.logs.filter(log => log.method === method).map(log => log.args);
+    return this.logs.filter((log) => log.method === method).map((log) => log.args);
   }
-  
+
   /**
    * Check if a specific message was logged
    */
   hasLog(method: string, message: string): boolean {
-    return this.logs.some(log => 
-      log.method === method && 
-      log.args.some(arg => 
-        typeof arg === 'string' && arg.includes(message)
-      )
+    return this.logs.some(
+      (log) =>
+        log.method === method &&
+        log.args.some((arg) => typeof arg === 'string' && arg.includes(message)),
     );
   }
 }
@@ -189,10 +190,10 @@ export class TestDataFactory {
       last_month: '2024-12-01',
       date_format: { format: 'MM/DD/YYYY' },
       currency_format: { iso_code: 'USD', example_format: '$123.45' },
-      ...overrides
+      ...overrides,
     };
   }
-  
+
   /**
    * Create mock account data
    */
@@ -207,10 +208,10 @@ export class TestDataFactory {
       balance: 100000, // $100.00
       cleared_balance: 95000,
       uncleared_balance: 5000,
-      ...overrides
+      ...overrides,
     };
   }
-  
+
   /**
    * Create mock transaction data
    */
@@ -227,10 +228,10 @@ export class TestDataFactory {
       payee_id: 'test-payee-id',
       category_id: 'test-category-id',
       transfer_account_id: null,
-      ...overrides
+      ...overrides,
     };
   }
-  
+
   /**
    * Create mock category data
    */
@@ -245,10 +246,10 @@ export class TestDataFactory {
       activity: -5000,
       balance: 5000,
       goal_type: null,
-      ...overrides
+      ...overrides,
     };
   }
-  
+
   /**
    * Create mock payee data
    */
@@ -257,10 +258,10 @@ export class TestDataFactory {
       id: 'test-payee-id',
       name: 'Test Payee',
       transfer_account_id: null,
-      ...overrides
+      ...overrides,
     };
   }
-  
+
   /**
    * Create mock user data
    */
@@ -268,7 +269,7 @@ export class TestDataFactory {
     return {
       id: 'test-user-id',
       email: 'test@example.com',
-      ...overrides
+      ...overrides,
     };
   }
 }
@@ -278,14 +279,14 @@ export class TestDataFactory {
  */
 export class PerformanceTracker {
   private measurements: Map<string, number> = new Map();
-  
+
   /**
    * Start measuring performance
    */
   start(label: string): void {
     this.measurements.set(label, Date.now());
   }
-  
+
   /**
    * End measurement and return duration
    */
@@ -294,12 +295,12 @@ export class PerformanceTracker {
     if (!startTime) {
       throw new Error(`No measurement started for label: ${label}`);
     }
-    
+
     const duration = Date.now() - startTime;
     this.measurements.delete(label);
     return duration;
   }
-  
+
   /**
    * Measure a function execution
    */
@@ -309,7 +310,7 @@ export class PerformanceTracker {
     const duration = this.end(label);
     return { result, duration };
   }
-  
+
   /**
    * Assert performance threshold
    */
@@ -317,7 +318,7 @@ export class PerformanceTracker {
     if (duration > maxDuration) {
       throw new Error(
         `Performance assertion failed${label ? ` for ${label}` : ''}: ` +
-        `${duration}ms > ${maxDuration}ms`
+          `${duration}ms > ${maxDuration}ms`,
       );
     }
   }

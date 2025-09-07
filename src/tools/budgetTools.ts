@@ -18,61 +18,73 @@ export type GetBudgetParams = z.infer<typeof GetBudgetSchema>;
  * Lists all budgets associated with the user's account
  */
 export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResult> {
-  return await withToolErrorHandling(async () => {
-    const cacheKey = 'budgets:list';
-    
-    // Check cache first
-    const cached = cacheManager.get<ynab.BudgetSummary[]>(cacheKey);
-    if (cached) {
+  return await withToolErrorHandling(
+    async () => {
+      const cacheKey = 'budgets:list';
+
+      // Check cache first
+      const cached = cacheManager.get<ynab.BudgetSummary[]>(cacheKey);
+      if (cached) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(
+                {
+                  budgets: cached.map((budget) => ({
+                    id: budget.id,
+                    name: budget.name,
+                    last_modified_on: budget.last_modified_on,
+                    first_month: budget.first_month,
+                    last_month: budget.last_month,
+                    currency_format: budget.currency_format,
+                  })),
+                  cached: true,
+                  cache_info: 'Data retrieved from cache for improved performance',
+                },
+                null,
+                2,
+              ),
+            },
+          ],
+        };
+      }
+
+      // Fetch from API and cache
+      const response = await ynabAPI.budgets.getBudgets();
+      const budgets = response.data.budgets;
+
+      // Cache the result
+      cacheManager.set(cacheKey, budgets, CACHE_TTLS.BUDGETS);
+
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              budgets: cached.map(budget => ({
-                id: budget.id,
-                name: budget.name,
-                last_modified_on: budget.last_modified_on,
-                first_month: budget.first_month,
-                last_month: budget.last_month,
-                currency_format: budget.currency_format
-              })),
-              cached: true,
-              cache_info: 'Data retrieved from cache for improved performance'
-            }, null, 2)
-          }
-        ]
+            text: JSON.stringify(
+              {
+                budgets: budgets.map((budget) => ({
+                  id: budget.id,
+                  name: budget.name,
+                  last_modified_on: budget.last_modified_on,
+                  first_month: budget.first_month,
+                  last_month: budget.last_month,
+                  date_format: budget.date_format,
+                  currency_format: budget.currency_format,
+                })),
+                cached: false,
+                cache_info: 'Fresh data retrieved from YNAB API',
+              },
+              null,
+              2,
+            ),
+          },
+        ],
       };
-    }
-    
-    // Fetch from API and cache
-    const response = await ynabAPI.budgets.getBudgets();
-    const budgets = response.data.budgets;
-    
-    // Cache the result
-    cacheManager.set(cacheKey, budgets, CACHE_TTLS.BUDGETS);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            budgets: budgets.map(budget => ({
-              id: budget.id,
-              name: budget.name,
-              last_modified_on: budget.last_modified_on,
-              first_month: budget.first_month,
-              last_month: budget.last_month,
-              date_format: budget.date_format,
-              currency_format: budget.currency_format,
-            })),
-            cached: false,
-            cache_info: 'Fresh data retrieved from YNAB API'
-          }, null, 2),
-        },
-      ],
-    };
-  }, 'ynab:list_budgets', 'listing budgets');
+    },
+    'ynab:list_budgets',
+    'listing budgets',
+  );
 }
 
 /**
@@ -81,62 +93,69 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
  */
 export async function handleGetBudget(
   ynabAPI: ynab.API,
-  params: GetBudgetParams
+  params: GetBudgetParams,
 ): Promise<CallToolResult> {
-  return await withToolErrorHandling(async () => {
-    const response = await ynabAPI.budgets.getBudgetById(params.budget_id);
-    const budget = response.data.budget;
+  return await withToolErrorHandling(
+    async () => {
+      const response = await ynabAPI.budgets.getBudgetById(params.budget_id);
+      const budget = response.data.budget;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            budget: {
-              id: budget.id,
-              name: budget.name,
-              last_modified_on: budget.last_modified_on,
-              first_month: budget.first_month,
-              last_month: budget.last_month,
-              date_format: budget.date_format,
-              currency_format: budget.currency_format,
-              accounts: budget.accounts?.map(account => ({
-                id: account.id,
-                name: account.name,
-                type: account.type,
-                on_budget: account.on_budget,
-                closed: account.closed,
-                balance: account.balance,
-                cleared_balance: account.cleared_balance,
-                uncleared_balance: account.uncleared_balance,
-              })),
-              categories: budget.categories?.map(category => ({
-                id: category.id,
-                category_group_id: category.category_group_id,
-                name: category.name,
-                hidden: category.hidden,
-                budgeted: category.budgeted,
-                activity: category.activity,
-                balance: category.balance,
-              })),
-              payees: budget.payees?.map(payee => ({
-                id: payee.id,
-                name: payee.name,
-                transfer_account_id: payee.transfer_account_id,
-              })),
-              months: budget.months?.map(month => ({
-                month: month.month,
-                note: month.note,
-                income: month.income,
-                budgeted: month.budgeted,
-                activity: month.activity,
-                to_be_budgeted: month.to_be_budgeted,
-              })),
-            },
-          }, null, 2),
-        },
-      ],
-    };
-  }, 'ynab:get_budget', 'getting budget details');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                budget: {
+                  id: budget.id,
+                  name: budget.name,
+                  last_modified_on: budget.last_modified_on,
+                  first_month: budget.first_month,
+                  last_month: budget.last_month,
+                  date_format: budget.date_format,
+                  currency_format: budget.currency_format,
+                  accounts: budget.accounts?.map((account) => ({
+                    id: account.id,
+                    name: account.name,
+                    type: account.type,
+                    on_budget: account.on_budget,
+                    closed: account.closed,
+                    balance: account.balance,
+                    cleared_balance: account.cleared_balance,
+                    uncleared_balance: account.uncleared_balance,
+                  })),
+                  categories: budget.categories?.map((category) => ({
+                    id: category.id,
+                    category_group_id: category.category_group_id,
+                    name: category.name,
+                    hidden: category.hidden,
+                    budgeted: category.budgeted,
+                    activity: category.activity,
+                    balance: category.balance,
+                  })),
+                  payees: budget.payees?.map((payee) => ({
+                    id: payee.id,
+                    name: payee.name,
+                    transfer_account_id: payee.transfer_account_id,
+                  })),
+                  months: budget.months?.map((month) => ({
+                    month: month.month,
+                    note: month.note,
+                    income: month.income,
+                    budgeted: month.budgeted,
+                    activity: month.activity,
+                    to_be_budgeted: month.to_be_budgeted,
+                  })),
+                },
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+    'ynab:get_budget',
+    'getting budget details',
+  );
 }
-

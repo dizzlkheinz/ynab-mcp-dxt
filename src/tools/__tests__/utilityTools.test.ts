@@ -83,12 +83,12 @@ describe('Utility Tools', () => {
 
   describe('handleConvertAmount', () => {
     it('should convert dollars to milliunits correctly', async () => {
-      const params = { amount: 10.50, to_milliunits: true };
-      
+      const params = { amount: 10.5, to_milliunits: true };
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
-      expect(response.conversion.original_amount).toBe(10.50);
+      expect(response.conversion.original_amount).toBe(10.5);
       expect(response.conversion.converted_amount).toBe(10500);
       expect(response.conversion.to_milliunits).toBe(true);
       expect(response.conversion.description).toBe('$10.50 = 10500 milliunits');
@@ -96,19 +96,19 @@ describe('Utility Tools', () => {
 
     it('should convert milliunits to dollars correctly', async () => {
       const params = { amount: 10500, to_milliunits: false };
-      
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
       expect(response.conversion.original_amount).toBe(10500);
-      expect(response.conversion.converted_amount).toBe(10.50);
+      expect(response.conversion.converted_amount).toBe(10.5);
       expect(response.conversion.to_milliunits).toBe(false);
       expect(response.conversion.description).toBe('10500 milliunits = $10.50');
     });
 
     it('should handle zero amounts', async () => {
       const params = { amount: 0, to_milliunits: true };
-      
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
@@ -119,7 +119,7 @@ describe('Utility Tools', () => {
 
     it('should handle negative amounts', async () => {
       const params = { amount: -5.25, to_milliunits: true };
-      
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
@@ -130,7 +130,7 @@ describe('Utility Tools', () => {
 
     it('should handle floating-point precision correctly', async () => {
       const params = { amount: 0.01, to_milliunits: true };
-      
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
@@ -139,7 +139,7 @@ describe('Utility Tools', () => {
 
     it('should handle large amounts', async () => {
       const params = { amount: 999999.99, to_milliunits: true };
-      
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
@@ -148,7 +148,7 @@ describe('Utility Tools', () => {
 
     it('should round to nearest milliunit when converting from dollars', async () => {
       const params = { amount: 10.5555, to_milliunits: true };
-      
+
       const result = await handleConvertAmount(params);
       const response = JSON.parse(result.content[0].text);
 
@@ -158,9 +158,9 @@ describe('Utility Tools', () => {
 
   describe('ConvertAmountSchema validation', () => {
     it('should validate correct parameters', () => {
-      const validParams = { amount: 10.50, to_milliunits: true };
+      const validParams = { amount: 10.5, to_milliunits: true };
       const result = ConvertAmountSchema.safeParse(validParams);
-      
+
       expect(result.success).toBe(true);
       if (result.success) {
         expect(result.data).toEqual(validParams);
@@ -170,35 +170,35 @@ describe('Utility Tools', () => {
     it('should reject non-finite numbers', () => {
       const invalidParams = { amount: Infinity, to_milliunits: true };
       const result = ConvertAmountSchema.safeParse(invalidParams);
-      
+
       expect(result.success).toBe(false);
     });
 
     it('should reject NaN values', () => {
       const invalidParams = { amount: NaN, to_milliunits: true };
       const result = ConvertAmountSchema.safeParse(invalidParams);
-      
+
       expect(result.success).toBe(false);
     });
 
     it('should reject missing amount parameter', () => {
       const invalidParams = { to_milliunits: true };
       const result = ConvertAmountSchema.safeParse(invalidParams);
-      
+
       expect(result.success).toBe(false);
     });
 
     it('should reject missing to_milliunits parameter', () => {
-      const invalidParams = { amount: 10.50 };
+      const invalidParams = { amount: 10.5 };
       const result = ConvertAmountSchema.safeParse(invalidParams);
-      
+
       expect(result.success).toBe(false);
     });
 
     it('should reject non-boolean to_milliunits parameter', () => {
-      const invalidParams = { amount: 10.50, to_milliunits: 'true' };
+      const invalidParams = { amount: 10.5, to_milliunits: 'true' };
       const result = ConvertAmountSchema.safeParse(invalidParams);
-      
+
       expect(result.success).toBe(false);
     });
   });

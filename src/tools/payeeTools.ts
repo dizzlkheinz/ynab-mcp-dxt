@@ -28,28 +28,36 @@ export type GetPayeeParams = z.infer<typeof GetPayeeSchema>;
  */
 export async function handleListPayees(
   ynabAPI: ynab.API,
-  params: ListPayeesParams
+  params: ListPayeesParams,
 ): Promise<CallToolResult> {
-  return await withToolErrorHandling(async () => {
-    const response = await ynabAPI.payees.getPayees(params.budget_id);
-    const payees = response.data.payees;
+  return await withToolErrorHandling(
+    async () => {
+      const response = await ynabAPI.payees.getPayees(params.budget_id);
+      const payees = response.data.payees;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            payees: payees.map(payee => ({
-              id: payee.id,
-              name: payee.name,
-              transfer_account_id: payee.transfer_account_id,
-              deleted: payee.deleted,
-            })),
-          }, null, 2),
-        },
-      ],
-    };
-  }, 'ynab:list_payees', 'listing payees');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                payees: payees.map((payee) => ({
+                  id: payee.id,
+                  name: payee.name,
+                  transfer_account_id: payee.transfer_account_id,
+                  deleted: payee.deleted,
+                })),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+    'ynab:list_payees',
+    'listing payees',
+  );
 }
 
 /**
@@ -58,27 +66,34 @@ export async function handleListPayees(
  */
 export async function handleGetPayee(
   ynabAPI: ynab.API,
-  params: GetPayeeParams
+  params: GetPayeeParams,
 ): Promise<CallToolResult> {
-  return await withToolErrorHandling(async () => {
-    const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
-    const payee = response.data.payee;
+  return await withToolErrorHandling(
+    async () => {
+      const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
+      const payee = response.data.payee;
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            payee: {
-              id: payee.id,
-              name: payee.name,
-              transfer_account_id: payee.transfer_account_id,
-              deleted: payee.deleted,
-            },
-          }, null, 2),
-        },
-      ],
-    };
-  }, 'ynab:get_payee', 'getting payee details');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                payee: {
+                  id: payee.id,
+                  name: payee.name,
+                  transfer_account_id: payee.transfer_account_id,
+                  deleted: payee.deleted,
+                },
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+    'ynab:get_payee',
+    'getting payee details',
+  );
 }
-

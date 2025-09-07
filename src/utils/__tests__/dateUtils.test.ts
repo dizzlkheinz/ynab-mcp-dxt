@@ -8,7 +8,7 @@ import {
   subtractMonths,
   isValidISODate,
   isValidYNABMonth,
-  yearMonthToYNABMonth
+  yearMonthToYNABMonth,
 } from '../dateUtils.js';
 
 describe('dateUtils', () => {
@@ -49,7 +49,7 @@ describe('dateUtils', () => {
     it('should generate correct number of historical months', () => {
       const baseDate = new Date('2024-03-15');
       const months = getHistoricalMonths(3, baseDate);
-      
+
       expect(months).toHaveLength(3);
       expect(months[0]).toBe('2024-03-01'); // Current month (i=0)
       expect(months[1]).toBe('2024-02-01'); // 1 month back
@@ -59,7 +59,7 @@ describe('dateUtils', () => {
     it('should handle year boundary correctly', () => {
       const baseDate = new Date('2024-01-15');
       const months = getHistoricalMonths(3, baseDate);
-      
+
       expect(months).toHaveLength(3);
       expect(months[0]).toBe('2024-01-01');
       expect(months[1]).toBe('2023-12-01');
@@ -76,16 +76,16 @@ describe('dateUtils', () => {
     it('should generate 6 months correctly (bug test case)', () => {
       const baseDate = new Date('2025-08-15');
       const months = getHistoricalMonths(6, baseDate);
-      
+
       expect(months).toEqual([
         '2025-08-01',
-        '2025-07-01', 
+        '2025-07-01',
         '2025-06-01',
         '2025-05-01',
         '2025-04-01',
-        '2025-03-01'
+        '2025-03-01',
       ]);
-      
+
       // Ensure no duplicates (the original bug)
       const uniqueMonths = new Set(months);
       expect(uniqueMonths.size).toBe(6);
@@ -96,7 +96,7 @@ describe('dateUtils', () => {
     it('should subtract months correctly', () => {
       const baseDate = new Date('2024-03-15');
       const result = subtractMonths(baseDate, 2);
-      
+
       expect(result.getFullYear()).toBe(2024);
       expect(result.getMonth()).toBe(0); // January (0-indexed)
       // Note: When subtracting months, if the target month doesn't have enough days,
@@ -108,7 +108,7 @@ describe('dateUtils', () => {
     it('should handle year boundary', () => {
       const baseDate = new Date('2024-01-15');
       const result = subtractMonths(baseDate, 2);
-      
+
       expect(result.getFullYear()).toBe(2023);
       expect(result.getMonth()).toBe(10); // November (0-indexed)
     });

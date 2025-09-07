@@ -21,7 +21,10 @@ export const ListTransactionsSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   account_id: z.string().optional(),
   category_id: z.string().optional(),
-  since_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)').optional(),
+  since_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
+    .optional(),
   type: z.enum(['uncategorized', 'unapproved']).optional(),
 });
 
@@ -64,7 +67,10 @@ export const UpdateTransactionSchema = z.object({
   transaction_id: z.string().min(1, 'Transaction ID is required'),
   account_id: z.string().optional(),
   amount: z.number().int('Amount must be an integer in milliunits').optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)').optional(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
+    .optional(),
   payee_name: z.string().optional(),
   payee_id: z.string().optional(),
   category_id: z.string().optional(),
@@ -92,64 +98,72 @@ export type DeleteTransactionParams = z.infer<typeof DeleteTransactionSchema>;
  */
 export async function handleListTransactions(
   ynabAPI: ynab.API,
-  params: ListTransactionsParams
+  params: ListTransactionsParams,
 ): Promise<CallToolResult> {
-  return await withToolErrorHandling(async () => {
-    let response;
-    
-    // Use conditional API calls based on filter parameters
-    if (params.account_id) {
-      // Get transactions for specific account
-      response = await ynabAPI.transactions.getTransactionsByAccount(
-        params.budget_id,
-        params.account_id,
-        params.since_date
-      );
-    } else if (params.category_id) {
-      // Get transactions for specific category
-      response = await ynabAPI.transactions.getTransactionsByCategory(
-        params.budget_id,
-        params.category_id,
-        params.since_date
-      );
-    } else {
-      // Get all transactions for budget
-      response = await ynabAPI.transactions.getTransactions(
-        params.budget_id,
-        params.since_date,
-        params.type
-      );
-    }
+  return await withToolErrorHandling(
+    async () => {
+      let response;
 
-    const transactions = response.data.transactions;
+      // Use conditional API calls based on filter parameters
+      if (params.account_id) {
+        // Get transactions for specific account
+        response = await ynabAPI.transactions.getTransactionsByAccount(
+          params.budget_id,
+          params.account_id,
+          params.since_date,
+        );
+      } else if (params.category_id) {
+        // Get transactions for specific category
+        response = await ynabAPI.transactions.getTransactionsByCategory(
+          params.budget_id,
+          params.category_id,
+          params.since_date,
+        );
+      } else {
+        // Get all transactions for budget
+        response = await ynabAPI.transactions.getTransactions(
+          params.budget_id,
+          params.since_date,
+          params.type,
+        );
+      }
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            transactions: transactions.map(transaction => ({
-              id: transaction.id,
-              date: transaction.date,
-              amount: transaction.amount,
-              memo: transaction.memo,
-              cleared: transaction.cleared,
-              approved: transaction.approved,
-              flag_color: transaction.flag_color,
-              account_id: transaction.account_id,
-              payee_id: transaction.payee_id,
-              category_id: transaction.category_id,
-              transfer_account_id: transaction.transfer_account_id,
-              transfer_transaction_id: transaction.transfer_transaction_id,
-              matched_transaction_id: transaction.matched_transaction_id,
-              import_id: transaction.import_id,
-              deleted: transaction.deleted,
-            })),
-          }, null, 2),
-        },
-      ],
-    };
-  }, 'ynab:list_transactions', 'listing transactions');
+      const transactions = response.data.transactions;
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                transactions: transactions.map((transaction) => ({
+                  id: transaction.id,
+                  date: transaction.date,
+                  amount: transaction.amount,
+                  memo: transaction.memo,
+                  cleared: transaction.cleared,
+                  approved: transaction.approved,
+                  flag_color: transaction.flag_color,
+                  account_id: transaction.account_id,
+                  payee_id: transaction.payee_id,
+                  category_id: transaction.category_id,
+                  transfer_account_id: transaction.transfer_account_id,
+                  transfer_transaction_id: transaction.transfer_transaction_id,
+                  matched_transaction_id: transaction.matched_transaction_id,
+                  import_id: transaction.import_id,
+                  deleted: transaction.deleted,
+                })),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+    'ynab:list_transactions',
+    'listing transactions',
+  );
 }
 
 /**
@@ -158,42 +172,46 @@ export async function handleListTransactions(
  */
 export async function handleGetTransaction(
   ynabAPI: ynab.API,
-  params: GetTransactionParams
+  params: GetTransactionParams,
 ): Promise<CallToolResult> {
   try {
     const response = await ynabAPI.transactions.getTransactionById(
       params.budget_id,
-      params.transaction_id
+      params.transaction_id,
     );
-    
+
     const transaction = ensureTransaction(response.data.transaction, 'Transaction not found');
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            transaction: {
-              id: transaction.id,
-              date: transaction.date,
-              amount: transaction.amount,
-              memo: transaction.memo,
-              cleared: transaction.cleared,
-              approved: transaction.approved,
-              flag_color: transaction.flag_color,
-              account_id: transaction.account_id,
-              payee_id: transaction.payee_id,
-              category_id: transaction.category_id,
-              transfer_account_id: transaction.transfer_account_id,
-              transfer_transaction_id: transaction.transfer_transaction_id,
-              matched_transaction_id: transaction.matched_transaction_id,
-              import_id: transaction.import_id,
-              deleted: transaction.deleted,
-              account_name: transaction.account_name,
-              payee_name: transaction.payee_name,
-              category_name: transaction.category_name,
+          text: JSON.stringify(
+            {
+              transaction: {
+                id: transaction.id,
+                date: transaction.date,
+                amount: transaction.amount,
+                memo: transaction.memo,
+                cleared: transaction.cleared,
+                approved: transaction.approved,
+                flag_color: transaction.flag_color,
+                account_id: transaction.account_id,
+                payee_id: transaction.payee_id,
+                category_id: transaction.category_id,
+                transfer_account_id: transaction.transfer_account_id,
+                transfer_transaction_id: transaction.transfer_transaction_id,
+                matched_transaction_id: transaction.matched_transaction_id,
+                import_id: transaction.import_id,
+                deleted: transaction.deleted,
+                account_name: transaction.account_name,
+                payee_name: transaction.payee_name,
+                category_name: transaction.category_name,
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -208,7 +226,7 @@ export async function handleGetTransaction(
  */
 export async function handleCreateTransaction(
   ynabAPI: ynab.API,
-  params: CreateTransactionParams
+  params: CreateTransactionParams,
 ): Promise<CallToolResult> {
   try {
     // Prepare transaction data
@@ -225,38 +243,39 @@ export async function handleCreateTransaction(
       flag_color: params.flag_color as ynab.TransactionFlagColor,
     };
 
-    const response = await ynabAPI.transactions.createTransaction(
-      params.budget_id,
-      {
-        transaction: transactionData,
-      }
-    );
-    
+    const response = await ynabAPI.transactions.createTransaction(params.budget_id, {
+      transaction: transactionData,
+    });
+
     const transaction = ensureTransaction(response.data.transaction, 'Transaction creation failed');
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            transaction: {
-              id: transaction.id,
-              date: transaction.date,
-              amount: transaction.amount,
-              memo: transaction.memo,
-              cleared: transaction.cleared,
-              approved: transaction.approved,
-              flag_color: transaction.flag_color,
-              account_id: transaction.account_id,
-              payee_id: transaction.payee_id,
-              category_id: transaction.category_id,
-              transfer_account_id: transaction.transfer_account_id,
-              transfer_transaction_id: transaction.transfer_transaction_id,
-              matched_transaction_id: transaction.matched_transaction_id,
-              import_id: transaction.import_id,
-              deleted: transaction.deleted,
+          text: JSON.stringify(
+            {
+              transaction: {
+                id: transaction.id,
+                date: transaction.date,
+                amount: transaction.amount,
+                memo: transaction.memo,
+                cleared: transaction.cleared,
+                approved: transaction.approved,
+                flag_color: transaction.flag_color,
+                account_id: transaction.account_id,
+                payee_id: transaction.payee_id,
+                category_id: transaction.category_id,
+                transfer_account_id: transaction.transfer_account_id,
+                transfer_transaction_id: transaction.transfer_transaction_id,
+                matched_transaction_id: transaction.matched_transaction_id,
+                import_id: transaction.import_id,
+                deleted: transaction.deleted,
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -271,7 +290,7 @@ export async function handleCreateTransaction(
  */
 export async function handleUpdateTransaction(
   ynabAPI: ynab.API,
-  params: UpdateTransactionParams
+  params: UpdateTransactionParams,
 ): Promise<CallToolResult> {
   try {
     // Prepare transaction update data - only include fields that are provided
@@ -314,34 +333,38 @@ export async function handleUpdateTransaction(
       params.transaction_id,
       {
         transaction: transactionData,
-      }
+      },
     );
-    
+
     const transaction = ensureTransaction(response.data.transaction, 'Transaction update failed');
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            transaction: {
-              id: transaction.id,
-              date: transaction.date,
-              amount: transaction.amount,
-              memo: transaction.memo,
-              cleared: transaction.cleared,
-              approved: transaction.approved,
-              flag_color: transaction.flag_color,
-              account_id: transaction.account_id,
-              payee_id: transaction.payee_id,
-              category_id: transaction.category_id,
-              transfer_account_id: transaction.transfer_account_id,
-              transfer_transaction_id: transaction.transfer_transaction_id,
-              matched_transaction_id: transaction.matched_transaction_id,
-              import_id: transaction.import_id,
-              deleted: transaction.deleted,
+          text: JSON.stringify(
+            {
+              transaction: {
+                id: transaction.id,
+                date: transaction.date,
+                amount: transaction.amount,
+                memo: transaction.memo,
+                cleared: transaction.cleared,
+                approved: transaction.approved,
+                flag_color: transaction.flag_color,
+                account_id: transaction.account_id,
+                payee_id: transaction.payee_id,
+                category_id: transaction.category_id,
+                transfer_account_id: transaction.transfer_account_id,
+                transfer_transaction_id: transaction.transfer_transaction_id,
+                matched_transaction_id: transaction.matched_transaction_id,
+                import_id: transaction.import_id,
+                deleted: transaction.deleted,
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -356,27 +379,31 @@ export async function handleUpdateTransaction(
  */
 export async function handleDeleteTransaction(
   ynabAPI: ynab.API,
-  params: DeleteTransactionParams
+  params: DeleteTransactionParams,
 ): Promise<CallToolResult> {
   try {
     const response = await ynabAPI.transactions.deleteTransaction(
       params.budget_id,
-      params.transaction_id
+      params.transaction_id,
     );
-    
+
     const transaction = ensureTransaction(response.data.transaction, 'Transaction deletion failed');
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            message: 'Transaction deleted successfully',
-            transaction: {
-              id: transaction.id,
-              deleted: transaction.deleted,
+          text: JSON.stringify(
+            {
+              message: 'Transaction deleted successfully',
+              transaction: {
+                id: transaction.id,
+                deleted: transaction.deleted,
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -390,7 +417,7 @@ export async function handleDeleteTransaction(
  */
 function handleTransactionError(error: unknown, defaultMessage: string): CallToolResult {
   let errorMessage = defaultMessage;
-  
+
   if (error instanceof Error) {
     if (error.message.includes('401') || error.message.includes('Unauthorized')) {
       errorMessage = 'Invalid or expired YNAB access token';
@@ -409,11 +436,15 @@ function handleTransactionError(error: unknown, defaultMessage: string): CallToo
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          error: {
-            message: errorMessage,
+        text: JSON.stringify(
+          {
+            error: {
+              message: errorMessage,
+            },
           },
-        }, null, 2),
+          null,
+          2,
+        ),
       },
     ],
   };

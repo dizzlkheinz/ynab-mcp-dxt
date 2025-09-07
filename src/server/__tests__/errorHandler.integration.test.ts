@@ -186,11 +186,11 @@ describe('Error Handler Integration Tests', () => {
 
       for (const tool of tools) {
         const result = await tool();
-        
+
         expect(result).toHaveProperty('content');
         expect(result.content).toHaveLength(1);
         expect(result.content[0]).toHaveProperty('type', 'text');
-        
+
         const parsed = JSON.parse(result.content[0].text);
         expect(parsed).toHaveProperty('error');
         expect(parsed.error).toHaveProperty('code');
@@ -202,11 +202,13 @@ describe('Error Handler Integration Tests', () => {
   describe('Sensitive Data Sanitization', () => {
     it('should sanitize sensitive data in error messages across all tools', async () => {
       // Create a YNABAPIError with sensitive data in the original error
-      const originalError = new Error('Authentication failed with token: abc123xyz and key: secret456');
+      const originalError = new Error(
+        'Authentication failed with token: abc123xyz and key: secret456',
+      );
       const ynabError = new (await import('../../server/errorHandler.js')).YNABAPIError(
         401,
         'Test error',
-        originalError
+        originalError,
       );
       mockYnabAPI.budgets.getBudgets.mockRejectedValue(ynabError);
 
@@ -216,7 +218,7 @@ describe('Error Handler Integration Tests', () => {
       // Should not contain the actual sensitive values
       expect(result.content[0].text).not.toContain('abc123xyz');
       expect(result.content[0].text).not.toContain('secret456');
-      
+
       // Should contain sanitized versions if details are present
       if (parsed.error.details) {
         expect(parsed.error.details).toContain('token=***');

@@ -26,15 +26,15 @@ export class ConfigurationError extends Error {
 }
 
 // Re-export error handling types for convenience
-export { 
-  ErrorHandler, 
-  YNABAPIError, 
-  ValidationError, 
+export {
+  ErrorHandler,
+  YNABAPIError,
+  ValidationError,
   YNABErrorCode,
   SecurityErrorCode,
   type ErrorResponse,
   handleToolError,
-  withToolErrorHandling
+  withToolErrorHandling,
 } from '../server/errorHandler.js';
 
 // Re-export security modules
@@ -43,18 +43,18 @@ export {
   RateLimitError,
   globalRateLimiter,
   type RateLimitConfig,
-  type RateLimitInfo
+  type RateLimitInfo,
 } from '../server/rateLimiter.js';
 
 export {
   RequestLogger,
   globalRequestLogger,
   type LogEntry,
-  type LoggerConfig
+  type LoggerConfig,
 } from '../server/requestLogger.js';
 
 export {
   SecurityMiddleware,
   withSecurityWrapper,
-  type SecurityContext
+  type SecurityContext,
 } from '../server/securityMiddleware.js';

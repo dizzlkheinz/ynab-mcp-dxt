@@ -46,7 +46,7 @@ describe('Budget Tools', () => {
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.budgets).toHaveLength(2);
       expect(parsedContent.budgets[0]).toEqual({
@@ -61,9 +61,7 @@ describe('Budget Tools', () => {
     });
 
     it('should handle 401 authentication errors', async () => {
-      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(new Error('401 Unauthorized'));
 
       const result = await handleListBudgets(mockYnabAPI);
 
@@ -73,9 +71,7 @@ describe('Budget Tools', () => {
     });
 
     it('should handle 403 forbidden errors', async () => {
-      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(
-        new Error('403 Forbidden')
-      );
+      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(new Error('403 Forbidden'));
 
       const result = await handleListBudgets(mockYnabAPI);
 
@@ -85,9 +81,7 @@ describe('Budget Tools', () => {
     });
 
     it('should handle 429 rate limit errors', async () => {
-      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(
-        new Error('429 Too Many Requests')
-      );
+      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(new Error('429 Too Many Requests'));
 
       const result = await handleListBudgets(mockYnabAPI);
 
@@ -98,7 +92,7 @@ describe('Budget Tools', () => {
 
     it('should handle 500 server errors', async () => {
       (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(
-        new Error('500 Internal Server Error')
+        new Error('500 Internal Server Error'),
       );
 
       const result = await handleListBudgets(mockYnabAPI);
@@ -109,9 +103,7 @@ describe('Budget Tools', () => {
     });
 
     it('should handle generic errors', async () => {
-      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(
-        new Error('Network error')
-      );
+      (mockYnabAPI.budgets.getBudgets as any).mockRejectedValue(new Error('Network error'));
 
       const result = await handleListBudgets(mockYnabAPI);
 
@@ -181,7 +173,7 @@ describe('Budget Tools', () => {
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.budget.id).toBe('budget-1');
       expect(parsedContent.budget.name).toBe('My Budget');
@@ -192,9 +184,7 @@ describe('Budget Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.budgets.getBudgetById as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.budgets.getBudgetById as any).mockRejectedValue(new Error('404 Not Found'));
 
       const result = await handleGetBudget(mockYnabAPI, { budget_id: 'invalid-budget' });
 
@@ -204,9 +194,7 @@ describe('Budget Tools', () => {
     });
 
     it('should handle authentication errors', async () => {
-      (mockYnabAPI.budgets.getBudgetById as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.budgets.getBudgetById as any).mockRejectedValue(new Error('401 Unauthorized'));
 
       const result = await handleGetBudget(mockYnabAPI, { budget_id: 'budget-1' });
 

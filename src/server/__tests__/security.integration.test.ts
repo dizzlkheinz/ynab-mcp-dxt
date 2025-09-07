@@ -18,7 +18,7 @@ describe('Security Integration', () => {
   beforeEach(() => {
     // Reset all security components
     SecurityMiddleware.reset();
-    
+
     // Configure rate limiter for testing
     globalRateLimiter.config = {
       maxRequests: 3,
@@ -34,7 +34,7 @@ describe('Security Integration', () => {
   describe('end-to-end security flow', () => {
     it('should handle a complete successful request flow', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const context = {
         accessToken: testAccessToken,
         toolName: 'ynab:create_transaction',
@@ -48,11 +48,7 @@ describe('Security Integration', () => {
       });
 
       // Execute the operation
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        testSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
       // Verify operation was called with validated parameters
       expect(mockOperation).toHaveBeenCalledWith({
@@ -75,11 +71,9 @@ describe('Security Integration', () => {
       expect(logs[0].rateLimitInfo.remaining).toBe(2); // Started with 3, used 1
 
       // Verify console logging (should show success)
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[INFO]'));
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[INFO]')
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('ynab:create_transaction:creating transaction | SUCCESS')
+        expect.stringContaining('ynab:create_transaction:creating transaction | SUCCESS'),
       );
 
       consoleSpy.mockRestore();
@@ -87,7 +81,7 @@ describe('Security Integration', () => {
 
     it('should handle validation failures with proper logging', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const context = {
         accessToken: testAccessToken,
         toolName: 'ynab:create_transaction',
@@ -98,11 +92,7 @@ describe('Security Integration', () => {
 
       const mockOperation = vi.fn();
 
-      const result = await SecurityMiddleware.withSecurity(
-        context,
-        testSchema,
-        mockOperation
-      );
+      const result = await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
 
       // Verify operation was not called
       expect(mockOperation).not.toHaveBeenCalled();
@@ -119,16 +109,14 @@ describe('Security Integration', () => {
       expect(logs[0].error).toContain('Validation failed');
 
       // Verify console error logging
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[ERROR]')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('[ERROR]'));
 
       consoleSpy.mockRestore();
     });
 
     it('should handle rate limiting with proper responses and logging', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+
       const context = {
         accessToken: testAccessToken,
         toolName: 'ynab:list_budgets',
@@ -245,18 +233,26 @@ describe('Security Integration', () => {
       await SecurityMiddleware.withSecurity(context1, testSchema, mockOperation);
 
       // User 1 should be rate limited
-      const user1Result = await SecurityMiddleware.withSecurity(context1, testSchema, mockOperation);
+      const user1Result = await SecurityMiddleware.withSecurity(
+        context1,
+        testSchema,
+        mockOperation,
+      );
       const user1Response = JSON.parse(user1Result.content[0].text);
       expect(user1Response.error.code).toBe('RATE_LIMIT_EXCEEDED');
 
       // User 2 should still be allowed
-      const user2Result = await SecurityMiddleware.withSecurity(context2, testSchema, mockOperation);
+      const user2Result = await SecurityMiddleware.withSecurity(
+        context2,
+        testSchema,
+        mockOperation,
+      );
       expect(user2Result.content[0].text).toBe('Success');
 
       // Verify independent tracking in logs
       const logs = globalRequestLogger.getRecentLogs(5);
-      const user1Logs = logs.filter(log => log.parameters.budget_id === 'budget-1');
-      const user2Logs = logs.filter(log => log.parameters.budget_id === 'budget-2');
+      const user1Logs = logs.filter((log) => log.parameters.budget_id === 'budget-1');
+      const user2Logs = logs.filter((log) => log.parameters.budget_id === 'budget-2');
 
       expect(user1Logs).toHaveLength(4); // 3 successful + 1 rate limited
       expect(user2Logs).toHaveLength(1); // 1 successful
@@ -322,9 +318,7 @@ describe('Security Integration', () => {
       // Make multiple rapid requests (within rate limit)
       const promises = [];
       for (let i = 0; i < 3; i++) {
-        promises.push(
-          SecurityMiddleware.withSecurity(context, testSchema, mockOperation)
-        );
+        promises.push(SecurityMiddleware.withSecurity(context, testSchema, mockOperation));
       }
 
       await Promise.all(promises);
@@ -340,7 +334,7 @@ describe('Security Integration', () => {
 
       const logs = globalRequestLogger.getRecentLogs(3);
       expect(logs).toHaveLength(3);
-      expect(logs.every(log => log.success)).toBe(true);
+      expect(logs.every((log) => log.success)).toBe(true);
     });
   });
 
@@ -362,7 +356,7 @@ describe('Security Integration', () => {
       expect(testLimiter.getStatus(testToken).remaining).toBe(3);
 
       // Wait for window to expire
-      await new Promise(resolve => setTimeout(resolve, 60));
+      await new Promise((resolve) => setTimeout(resolve, 60));
 
       // Cleanup
       testLimiter.cleanup();

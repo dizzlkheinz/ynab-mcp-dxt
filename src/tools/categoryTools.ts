@@ -39,50 +39,58 @@ export type UpdateCategoryParams = z.infer<typeof UpdateCategorySchema>;
  */
 export async function handleListCategories(
   ynabAPI: ynab.API,
-  params: ListCategoriesParams
+  params: ListCategoriesParams,
 ): Promise<CallToolResult> {
-  return await withToolErrorHandling(async () => {
-    const response = await ynabAPI.categories.getCategories(params.budget_id);
-    const categoryGroups = response.data.category_groups;
+  return await withToolErrorHandling(
+    async () => {
+      const response = await ynabAPI.categories.getCategories(params.budget_id);
+      const categoryGroups = response.data.category_groups;
 
-    // Flatten categories from all category groups
-    const allCategories = categoryGroups.flatMap(group => 
-      group.categories.map(category => ({
-        id: category.id,
-        category_group_id: category.category_group_id,
-        category_group_name: group.name,
-        name: category.name,
-        hidden: category.hidden,
-        original_category_group_id: category.original_category_group_id,
-        note: category.note,
-        budgeted: category.budgeted,
-        activity: category.activity,
-        balance: category.balance,
-        goal_type: category.goal_type,
-        goal_creation_month: category.goal_creation_month,
-        goal_target: category.goal_target,
-        goal_target_month: category.goal_target_month,
-        goal_percentage_complete: category.goal_percentage_complete,
-      }))
-    );
+      // Flatten categories from all category groups
+      const allCategories = categoryGroups.flatMap((group) =>
+        group.categories.map((category) => ({
+          id: category.id,
+          category_group_id: category.category_group_id,
+          category_group_name: group.name,
+          name: category.name,
+          hidden: category.hidden,
+          original_category_group_id: category.original_category_group_id,
+          note: category.note,
+          budgeted: category.budgeted,
+          activity: category.activity,
+          balance: category.balance,
+          goal_type: category.goal_type,
+          goal_creation_month: category.goal_creation_month,
+          goal_target: category.goal_target,
+          goal_target_month: category.goal_target_month,
+          goal_percentage_complete: category.goal_percentage_complete,
+        })),
+      );
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            categories: allCategories,
-            category_groups: categoryGroups.map(group => ({
-              id: group.id,
-              name: group.name,
-              hidden: group.hidden,
-              deleted: group.deleted,
-            })),
-          }, null, 2),
-        },
-      ],
-    };
-  }, 'ynab:list_categories', 'listing categories');
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                categories: allCategories,
+                category_groups: categoryGroups.map((group) => ({
+                  id: group.id,
+                  name: group.name,
+                  hidden: group.hidden,
+                  deleted: group.deleted,
+                })),
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      };
+    },
+    'ynab:list_categories',
+    'listing categories',
+  );
 }
 
 /**
@@ -91,7 +99,7 @@ export async function handleListCategories(
  */
 export async function handleGetCategory(
   ynabAPI: ynab.API,
-  params: GetCategoryParams
+  params: GetCategoryParams,
 ): Promise<CallToolResult> {
   try {
     const response = await ynabAPI.categories.getCategoryById(params.budget_id, params.category_id);
@@ -101,24 +109,28 @@ export async function handleGetCategory(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            category: {
-              id: category.id,
-              category_group_id: category.category_group_id,
-              name: category.name,
-              hidden: category.hidden,
-              original_category_group_id: category.original_category_group_id,
-              note: category.note,
-              budgeted: category.budgeted,
-              activity: category.activity,
-              balance: category.balance,
-              goal_type: category.goal_type,
-              goal_creation_month: category.goal_creation_month,
-              goal_target: category.goal_target,
-              goal_target_month: category.goal_target_month,
-              goal_percentage_complete: category.goal_percentage_complete,
+          text: JSON.stringify(
+            {
+              category: {
+                id: category.id,
+                category_group_id: category.category_group_id,
+                name: category.name,
+                hidden: category.hidden,
+                original_category_group_id: category.original_category_group_id,
+                note: category.note,
+                budgeted: category.budgeted,
+                activity: category.activity,
+                balance: category.balance,
+                goal_type: category.goal_type,
+                goal_creation_month: category.goal_creation_month,
+                goal_target: category.goal_target,
+                goal_target_month: category.goal_target_month,
+                goal_percentage_complete: category.goal_percentage_complete,
+              },
             },
-          }, null, 2),
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -133,7 +145,7 @@ export async function handleGetCategory(
  */
 export async function handleUpdateCategory(
   ynabAPI: ynab.API,
-  params: UpdateCategoryParams
+  params: UpdateCategoryParams,
 ): Promise<CallToolResult> {
   try {
     // Get current month in YNAB format (YYYY-MM-01)
@@ -147,8 +159,8 @@ export async function handleUpdateCategory(
       {
         category: {
           budgeted: params.budgeted * 1000, // Convert to milliunits
-        }
-      }
+        },
+      },
     );
 
     const category = response.data.category;
@@ -157,25 +169,29 @@ export async function handleUpdateCategory(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
-            category: {
-              id: category.id,
-              category_group_id: category.category_group_id,
-              name: category.name,
-              hidden: category.hidden,
-              original_category_group_id: category.original_category_group_id,
-              note: category.note,
-              budgeted: category.budgeted,
-              activity: category.activity,
-              balance: category.balance,
-              goal_type: category.goal_type,
-              goal_creation_month: category.goal_creation_month,
-              goal_target: category.goal_target,
-              goal_target_month: category.goal_target_month,
-              goal_percentage_complete: category.goal_percentage_complete,
+          text: JSON.stringify(
+            {
+              category: {
+                id: category.id,
+                category_group_id: category.category_group_id,
+                name: category.name,
+                hidden: category.hidden,
+                original_category_group_id: category.original_category_group_id,
+                note: category.note,
+                budgeted: category.budgeted,
+                activity: category.activity,
+                balance: category.balance,
+                goal_type: category.goal_type,
+                goal_creation_month: category.goal_creation_month,
+                goal_target: category.goal_target,
+                goal_target_month: category.goal_target_month,
+                goal_percentage_complete: category.goal_percentage_complete,
+              },
+              updated_month: currentMonth,
             },
-            updated_month: currentMonth,
-          }, null, 2),
+            null,
+            2,
+          ),
         },
       ],
     };
@@ -189,7 +205,7 @@ export async function handleUpdateCategory(
  */
 function handleCategoryError(error: unknown, defaultMessage: string): CallToolResult {
   let errorMessage = defaultMessage;
-  
+
   if (error instanceof Error) {
     if (error.message.includes('401') || error.message.includes('Unauthorized')) {
       errorMessage = 'Invalid or expired YNAB access token';
@@ -208,11 +224,15 @@ function handleCategoryError(error: unknown, defaultMessage: string): CallToolRe
     content: [
       {
         type: 'text',
-        text: JSON.stringify({
-          error: {
-            message: errorMessage,
+        text: JSON.stringify(
+          {
+            error: {
+              message: errorMessage,
+            },
           },
-        }, null, 2),
+          null,
+          2,
+        ),
       },
     ],
   };

@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
-import { 
-  handleListPayees, 
-  handleGetPayee, 
-  ListPayeesSchema, 
-  GetPayeeSchema 
+import {
+  handleListPayees,
+  handleGetPayee,
+  ListPayeesSchema,
+  GetPayeeSchema,
 } from '../payeeTools.js';
 
 // Mock the YNAB API
@@ -51,7 +51,7 @@ describe('Payee Tools', () => {
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.payees).toHaveLength(3);
       expect(parsedContent.payees[0]).toEqual({
@@ -69,9 +69,7 @@ describe('Payee Tools', () => {
     });
 
     it('should handle 401 authentication errors', async () => {
-      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(new Error('401 Unauthorized'));
 
       const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -81,9 +79,7 @@ describe('Payee Tools', () => {
     });
 
     it('should handle 403 forbidden errors', async () => {
-      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(
-        new Error('403 Forbidden')
-      );
+      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(new Error('403 Forbidden'));
 
       const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -93,9 +89,7 @@ describe('Payee Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(new Error('404 Not Found'));
 
       const result = await handleListPayees(mockYnabAPI, { budget_id: 'invalid-budget' });
 
@@ -105,9 +99,7 @@ describe('Payee Tools', () => {
     });
 
     it('should handle 429 rate limit errors', async () => {
-      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(
-        new Error('429 Too Many Requests')
-      );
+      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(new Error('429 Too Many Requests'));
 
       const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -118,7 +110,7 @@ describe('Payee Tools', () => {
 
     it('should handle 500 server errors', async () => {
       (mockYnabAPI.payees.getPayees as any).mockRejectedValue(
-        new Error('500 Internal Server Error')
+        new Error('500 Internal Server Error'),
       );
 
       const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
@@ -129,9 +121,7 @@ describe('Payee Tools', () => {
     });
 
     it('should handle generic errors', async () => {
-      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(
-        new Error('Network error')
-      );
+      (mockYnabAPI.payees.getPayees as any).mockRejectedValue(new Error('Network error'));
 
       const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
 
@@ -154,14 +144,14 @@ describe('Payee Tools', () => {
         data: { payee: mockPayee },
       });
 
-      const result = await handleGetPayee(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        payee_id: 'payee-1' 
+      const result = await handleGetPayee(mockYnabAPI, {
+        budget_id: 'budget-1',
+        payee_id: 'payee-1',
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.payee).toEqual({
         id: 'payee-1',
@@ -183,9 +173,9 @@ describe('Payee Tools', () => {
         data: { payee: mockPayee },
       });
 
-      const result = await handleGetPayee(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        payee_id: 'payee-2' 
+      const result = await handleGetPayee(mockYnabAPI, {
+        budget_id: 'budget-1',
+        payee_id: 'payee-2',
       });
 
       expect(result.content).toHaveLength(1);
@@ -194,13 +184,11 @@ describe('Payee Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.payees.getPayeeById as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.payees.getPayeeById as any).mockRejectedValue(new Error('404 Not Found'));
 
-      const result = await handleGetPayee(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        payee_id: 'invalid-payee' 
+      const result = await handleGetPayee(mockYnabAPI, {
+        budget_id: 'budget-1',
+        payee_id: 'invalid-payee',
       });
 
       expect(result.content).toHaveLength(1);
@@ -209,13 +197,11 @@ describe('Payee Tools', () => {
     });
 
     it('should handle authentication errors', async () => {
-      (mockYnabAPI.payees.getPayeeById as any).mockRejectedValue(
-        new Error('401 Unauthorized')
-      );
+      (mockYnabAPI.payees.getPayeeById as any).mockRejectedValue(new Error('401 Unauthorized'));
 
-      const result = await handleGetPayee(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        payee_id: 'payee-1' 
+      const result = await handleGetPayee(mockYnabAPI, {
+        budget_id: 'budget-1',
+        payee_id: 'payee-1',
       });
 
       expect(result.content).toHaveLength(1);
@@ -245,45 +231,55 @@ describe('Payee Tools', () => {
 
   describe('GetPayeeSchema', () => {
     it('should validate valid parameters', () => {
-      const result = GetPayeeSchema.parse({ 
+      const result = GetPayeeSchema.parse({
         budget_id: 'valid-budget-id',
-        payee_id: 'valid-payee-id'
+        payee_id: 'valid-payee-id',
       });
       expect(result.budget_id).toBe('valid-budget-id');
       expect(result.payee_id).toBe('valid-payee-id');
     });
 
     it('should reject empty budget_id', () => {
-      expect(() => GetPayeeSchema.parse({ 
-        budget_id: '', 
-        payee_id: 'valid-payee-id' 
-      })).toThrow();
+      expect(() =>
+        GetPayeeSchema.parse({
+          budget_id: '',
+          payee_id: 'valid-payee-id',
+        }),
+      ).toThrow();
     });
 
     it('should reject empty payee_id', () => {
-      expect(() => GetPayeeSchema.parse({ 
-        budget_id: 'valid-budget-id', 
-        payee_id: '' 
-      })).toThrow();
+      expect(() =>
+        GetPayeeSchema.parse({
+          budget_id: 'valid-budget-id',
+          payee_id: '',
+        }),
+      ).toThrow();
     });
 
     it('should reject missing budget_id', () => {
-      expect(() => GetPayeeSchema.parse({ 
-        payee_id: 'valid-payee-id' 
-      })).toThrow();
+      expect(() =>
+        GetPayeeSchema.parse({
+          payee_id: 'valid-payee-id',
+        }),
+      ).toThrow();
     });
 
     it('should reject missing payee_id', () => {
-      expect(() => GetPayeeSchema.parse({ 
-        budget_id: 'valid-budget-id' 
-      })).toThrow();
+      expect(() =>
+        GetPayeeSchema.parse({
+          budget_id: 'valid-budget-id',
+        }),
+      ).toThrow();
     });
 
     it('should reject non-string parameters', () => {
-      expect(() => GetPayeeSchema.parse({ 
-        budget_id: 123, 
-        payee_id: 456 
-      })).toThrow();
+      expect(() =>
+        GetPayeeSchema.parse({
+          budget_id: 123,
+          payee_id: 456,
+        }),
+      ).toThrow();
     });
   });
 });

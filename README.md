@@ -59,15 +59,18 @@ npm start
 The server provides 18 MCP tools organized into categories:
 
 ### Budget Management
+
 - `list_budgets` - List all user budgets
 - `get_budget` - Get detailed budget information
 
 ### Account Management
+
 - `list_accounts` - List accounts for a budget
 - `get_account` - Get specific account details
 - `create_account` - Create new account
 
 ### Transaction Management
+
 - `list_transactions` - List transactions with filtering options
 - `get_transaction` - Get specific transaction details
 - `create_transaction` - Create new transaction
@@ -75,25 +78,29 @@ The server provides 18 MCP tools organized into categories:
 - `delete_transaction` - Delete transaction
 
 ### Category Management
+
 - `list_categories` - List budget categories
 - `get_category` - Get specific category details
 - `update_category` - Update category budget allocation
 
 ### Payee Management
+
 - `list_payees` - List payees for a budget
 - `get_payee` - Get specific payee details
 
 ### Monthly Data
+
 - `get_month` - Get monthly budget data
 - `list_months` - List all months summary
 
 ### Financial Analysis & Insights
+
 - `financial_overview` - Comprehensive multi-month financial analysis with trends and AI insights
 - `spending_analysis` - Detailed spending analysis with category breakdowns and trends
 - `budget_health_check` - Budget health assessment with scoring and actionable recommendations
 
-
 ### Utilities
+
 - `get_user` - Get authenticated user information
 - `convert_amount` - Convert between dollars and milliunits
 

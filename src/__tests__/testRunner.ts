@@ -90,10 +90,10 @@ export class ComprehensiveTestRunner {
    */
   private async runTestSuite(suite: string): Promise<TestSuiteResult> {
     const startTime = Date.now();
-    
+
     try {
       let command: string;
-      
+
       switch (suite) {
         case 'unit':
           command = 'npm run test:unit';
@@ -111,30 +111,34 @@ export class ComprehensiveTestRunner {
           throw new Error(`Unknown test suite: ${suite}`);
       }
 
-      const output = execSync(command, { 
+      const output = execSync(command, {
         encoding: 'utf8',
-        stdio: 'pipe'
+        stdio: 'pipe',
       });
 
       const duration = Date.now() - startTime;
       const result = this.parseTestOutput(output, duration);
-      
-      console.log(`✅ ${suite} tests completed: ${result.passed} passed, ${result.failed} failed, ${result.skipped} skipped (${duration}ms)\n`);
-      
+
+      console.log(
+        `✅ ${suite} tests completed: ${result.passed} passed, ${result.failed} failed, ${result.skipped} skipped (${duration}ms)\n`,
+      );
+
       return result;
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      
+
       // Parse error output for test results
       const output = error.stdout || error.stderr || '';
       const result = this.parseTestOutput(output, duration);
-      
+
       if (suite === 'e2e' && output.includes('Skipping E2E tests')) {
         console.log(`⏭️  E2E tests skipped (no API key or SKIP_E2E_TESTS=true)\n`);
         return { ...result, success: true }; // Don't fail overall suite for skipped E2E
       }
-      
-      console.log(`❌ ${suite} tests failed: ${result.passed} passed, ${result.failed} failed, ${result.skipped} skipped (${duration}ms)\n`);
+
+      console.log(
+        `❌ ${suite} tests failed: ${result.passed} passed, ${result.failed} failed, ${result.skipped} skipped (${duration}ms)\n`,
+      );
       return result;
     }
   }
@@ -159,7 +163,7 @@ export class ComprehensiveTestRunner {
       if (passedMatch) passed = parseInt(passedMatch[1]!);
       if (failedMatch) failed = parseInt(failedMatch[1]!);
       if (skippedMatch) skipped = parseInt(skippedMatch[1]!);
-      
+
       success = successMatch && failed === 0;
     } catch (error) {
       console.warn('Failed to parse test output:', error);
@@ -170,7 +174,7 @@ export class ComprehensiveTestRunner {
       failed,
       skipped,
       duration,
-      success
+      success,
     };
   }
 
@@ -180,14 +184,14 @@ export class ComprehensiveTestRunner {
   private async generateCoverageReport(): Promise<CoverageResult> {
     try {
       // Run coverage
-      execSync('npm run test:coverage', { 
+      execSync('npm run test:coverage', {
         encoding: 'utf8',
-        stdio: 'pipe'
+        stdio: 'pipe',
       });
 
       // Read coverage report
       const coverageFile = join(process.cwd(), 'coverage', 'coverage-summary.json');
-      
+
       if (!existsSync(coverageFile)) {
         throw new Error('Coverage report not found');
       }
@@ -199,24 +203,26 @@ export class ComprehensiveTestRunner {
         lines: {
           total: total.lines.total,
           covered: total.lines.covered,
-          percentage: total.lines.pct
+          percentage: total.lines.pct,
         },
         functions: {
           total: total.functions.total,
           covered: total.functions.covered,
-          percentage: total.functions.pct
+          percentage: total.functions.pct,
         },
         branches: {
           total: total.branches.total,
           covered: total.branches.covered,
-          percentage: total.branches.pct
+          percentage: total.branches.pct,
         },
         statements: {
           total: total.statements.total,
           covered: total.statements.covered,
-          percentage: total.statements.pct
+          percentage: total.statements.pct,
         },
-        overall: Math.round((total.lines.pct + total.functions.pct + total.branches.pct + total.statements.pct) / 4)
+        overall: Math.round(
+          (total.lines.pct + total.functions.pct + total.branches.pct + total.statements.pct) / 4,
+        ),
       };
     } catch (error) {
       console.warn('Failed to generate coverage report:', error);
@@ -225,7 +231,7 @@ export class ComprehensiveTestRunner {
         functions: { total: 0, covered: 0, percentage: 0 },
         branches: { total: 0, covered: 0, percentage: 0 },
         statements: { total: 0, covered: 0, percentage: 0 },
-        overall: 0
+        overall: 0,
       };
     }
   }
@@ -235,19 +241,33 @@ export class ComprehensiveTestRunner {
    */
   private async generateComprehensiveReport(results: TestResults): Promise<void> {
     const totalDuration = this.endTime - this.startTime;
-    const totalTests = results.unit.passed + results.unit.failed + 
-                      results.integration.passed + results.integration.failed +
-                      results.e2e.passed + results.e2e.failed +
-                      results.performance.passed + results.performance.failed;
-    
-    const totalPassed = results.unit.passed + results.integration.passed + 
-                       results.e2e.passed + results.performance.passed;
-    
-    const totalFailed = results.unit.failed + results.integration.failed + 
-                       results.e2e.failed + results.performance.failed;
+    const totalTests =
+      results.unit.passed +
+      results.unit.failed +
+      results.integration.passed +
+      results.integration.failed +
+      results.e2e.passed +
+      results.e2e.failed +
+      results.performance.passed +
+      results.performance.failed;
 
-    const overallSuccess = results.unit.success && results.integration.success && 
-                          results.e2e.success && results.performance.success;
+    const totalPassed =
+      results.unit.passed +
+      results.integration.passed +
+      results.e2e.passed +
+      results.performance.passed;
+
+    const totalFailed =
+      results.unit.failed +
+      results.integration.failed +
+      results.e2e.failed +
+      results.performance.failed;
+
+    const overallSuccess =
+      results.unit.success &&
+      results.integration.success &&
+      results.e2e.success &&
+      results.performance.success;
 
     const report = `
 # YNAB MCP Server - Comprehensive Test Report
@@ -366,14 +386,16 @@ This comprehensive test suite validates all requirements from the YNAB MCP Serve
 
 ## Recommendations
 
-${overallSuccess ? 
-  '🎉 All tests passing! The YNAB MCP Server is ready for deployment.' : 
-  '⚠️  Some tests are failing. Please review the failed tests and fix issues before deployment.'
+${
+  overallSuccess
+    ? '🎉 All tests passing! The YNAB MCP Server is ready for deployment.'
+    : '⚠️  Some tests are failing. Please review the failed tests and fix issues before deployment.'
 }
 
-${results.coverage.overall < 80 ? 
-  '📈 Consider adding more tests to improve code coverage above 80%.' : 
-  '✅ Code coverage meets the target threshold.'
+${
+  results.coverage.overall < 80
+    ? '📈 Consider adding more tests to improve code coverage above 80%.'
+    : '✅ Code coverage meets the target threshold.'
 }
 
 ---
@@ -383,7 +405,7 @@ For detailed test results, check the individual test output files and coverage r
 
     // Write report to file
     writeFileSync('test-report.md', report);
-    
+
     // Console output
     console.log('\n' + '='.repeat(80));
     console.log('📊 COMPREHENSIVE TEST REPORT');
@@ -403,12 +425,16 @@ For detailed test results, check the individual test output files and coverage r
  */
 if (require.main === module) {
   const runner = new ComprehensiveTestRunner();
-  
-  runner.runAllTests()
+
+  runner
+    .runAllTests()
     .then((results) => {
-      const allPassed = results.unit.success && results.integration.success && 
-                       results.e2e.success && results.performance.success;
-      
+      const allPassed =
+        results.unit.success &&
+        results.integration.success &&
+        results.e2e.success &&
+        results.performance.success;
+
       process.exit(allPassed ? 0 : 1);
     })
     .catch((error) => {

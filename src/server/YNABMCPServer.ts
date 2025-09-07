@@ -9,15 +9,20 @@ import {
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
-import { AuthenticationError, ConfigurationError, ServerConfig, ErrorHandler } from '../types/index.js';
+import {
+  AuthenticationError,
+  ConfigurationError,
+  ServerConfig,
+  ErrorHandler,
+} from '../types/index.js';
 import { handleListBudgets, handleGetBudget, GetBudgetSchema } from '../tools/budgetTools.js';
-import { 
-  handleListAccounts, 
-  handleGetAccount, 
+import {
+  handleListAccounts,
+  handleGetAccount,
   handleCreateAccount,
   ListAccountsSchema,
   GetAccountSchema,
-  CreateAccountSchema
+  CreateAccountSchema,
 } from '../tools/accountTools.js';
 import {
   handleListTransactions,
@@ -29,7 +34,7 @@ import {
   GetTransactionSchema,
   CreateTransactionSchema,
   UpdateTransactionSchema,
-  DeleteTransactionSchema
+  DeleteTransactionSchema,
 } from '../tools/transactionTools.js';
 import {
   handleListCategories,
@@ -37,32 +42,28 @@ import {
   handleUpdateCategory,
   ListCategoriesSchema,
   GetCategorySchema,
-  UpdateCategorySchema
+  UpdateCategorySchema,
 } from '../tools/categoryTools.js';
 import {
   handleListPayees,
   handleGetPayee,
   ListPayeesSchema,
-  GetPayeeSchema
+  GetPayeeSchema,
 } from '../tools/payeeTools.js';
 import {
   handleGetMonth,
   handleListMonths,
   GetMonthSchema,
-  ListMonthsSchema
+  ListMonthsSchema,
 } from '../tools/monthTools.js';
-import {
-  handleGetUser,
-  handleConvertAmount,
-  ConvertAmountSchema
-} from '../tools/utilityTools.js';
+import { handleGetUser, handleConvertAmount, ConvertAmountSchema } from '../tools/utilityTools.js';
 import {
   handleFinancialOverview,
   handleSpendingAnalysis,
   handleBudgetHealthCheck,
   FinancialOverviewSchema,
   SpendingAnalysisSchema,
-  BudgetHealthSchema
+  BudgetHealthSchema,
 } from '../tools/financialOverviewTools.js';
 import { cacheManager } from './cacheManager.js';
 
@@ -80,10 +81,10 @@ export class YNABMCPServer {
     this.exitOnError = exitOnError;
     // Validate environment variables
     this.config = this.validateEnvironment();
-    
+
     // Initialize YNAB API
     this.ynabAPI = new ynab.API(this.config.accessToken);
-    
+
     // Initialize MCP Server
     this.server = new Server(
       {
@@ -96,7 +97,7 @@ export class YNABMCPServer {
           resources: {},
           prompts: {},
         },
-      }
+      },
     );
 
     this.setupHandlers();
@@ -107,17 +108,15 @@ export class YNABMCPServer {
    */
   private validateEnvironment(): ServerConfig {
     const accessToken = process.env['YNAB_ACCESS_TOKEN'];
-    
+
     if (accessToken === undefined) {
       throw new ConfigurationError(
-        'YNAB_ACCESS_TOKEN environment variable is required but not set'
+        'YNAB_ACCESS_TOKEN environment variable is required but not set',
       );
     }
 
     if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
-      throw new ConfigurationError(
-        'YNAB_ACCESS_TOKEN must be a non-empty string'
-      );
+      throw new ConfigurationError('YNAB_ACCESS_TOKEN must be a non-empty string');
     }
 
     return {
@@ -158,68 +157,68 @@ export class YNABMCPServer {
             uri: 'ynab://budgets',
             name: 'YNAB Budgets',
             description: 'List of all available budgets',
-            mimeType: 'application/json'
+            mimeType: 'application/json',
           },
           {
             uri: 'ynab://user',
             name: 'YNAB User Info',
             description: 'Current user information and subscription details',
-            mimeType: 'application/json'
-          }
-        ]
+            mimeType: 'application/json',
+          },
+        ],
       };
     });
 
     // Handle read resource requests
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
-      
+
       switch (uri) {
         case 'ynab://budgets':
           try {
             const response = await this.ynabAPI.budgets.getBudgets();
-            const budgets = response.data.budgets.map(budget => ({
+            const budgets = response.data.budgets.map((budget) => ({
               id: budget.id,
               name: budget.name,
               last_modified_on: budget.last_modified_on,
               first_month: budget.first_month,
               last_month: budget.last_month,
-              currency_format: budget.currency_format
+              currency_format: budget.currency_format,
             }));
-            
+
             return {
               contents: [
                 {
                   uri: uri,
                   mimeType: 'application/json',
-                  text: JSON.stringify({ budgets }, null, 2)
-                }
-              ]
+                  text: JSON.stringify({ budgets }, null, 2),
+                },
+              ],
             };
           } catch (error) {
             throw new Error(`Failed to fetch budgets: ${error}`);
           }
-          
+
         case 'ynab://user':
           try {
             const response = await this.ynabAPI.user.getUser();
             const user = {
-              id: response.data.user.id
+              id: response.data.user.id,
             };
-            
+
             return {
               contents: [
                 {
                   uri: uri,
                   mimeType: 'application/json',
-                  text: JSON.stringify({ user }, null, 2)
-                }
-              ]
+                  text: JSON.stringify({ user }, null, 2),
+                },
+              ],
             };
           } catch (error) {
             throw new Error(`Failed to fetch user info: ${error}`);
           }
-          
+
         default:
           throw new Error(`Unknown resource: ${uri}`);
       }
@@ -236,34 +235,34 @@ export class YNABMCPServer {
               {
                 name: 'budget_name',
                 description: 'Name of the budget (optional, uses first budget if not specified)',
-                required: false
+                required: false,
               },
               {
                 name: 'account_name',
                 description: 'Name of the account',
-                required: true
+                required: true,
               },
               {
                 name: 'amount',
                 description: 'Transaction amount (negative for expenses, positive for income)',
-                required: true
+                required: true,
               },
               {
                 name: 'payee',
                 description: 'Who you paid or received money from',
-                required: true
+                required: true,
               },
               {
                 name: 'category',
                 description: 'Budget category (optional)',
-                required: false
+                required: false,
               },
               {
                 name: 'memo',
                 description: 'Additional notes (optional)',
-                required: false
-              }
-            ]
+                required: false,
+              },
+            ],
           },
           {
             name: 'budget-summary',
@@ -272,14 +271,15 @@ export class YNABMCPServer {
               {
                 name: 'budget_name',
                 description: 'Name of the budget (optional, uses first budget if not specified)',
-                required: false
+                required: false,
               },
               {
                 name: 'month',
-                description: 'Month to analyze (YYYY-MM format, optional, uses current month if not specified)',
-                required: false
-              }
-            ]
+                description:
+                  'Month to analyze (YYYY-MM format, optional, uses current month if not specified)',
+                required: false,
+              },
+            ],
           },
           {
             name: 'account-balances',
@@ -288,23 +288,23 @@ export class YNABMCPServer {
               {
                 name: 'budget_name',
                 description: 'Name of the budget (optional, uses first budget if not specified)',
-                required: false
+                required: false,
               },
               {
                 name: 'account_type',
                 description: 'Filter by account type (checking, savings, creditCard, etc.)',
-                required: false
-              }
-            ]
-          }
-        ]
+                required: false,
+              },
+            ],
+          },
+        ],
       };
     });
 
     // Handle get prompt requests
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      
+
       switch (name) {
         case 'create-transaction': {
           const budgetName = args?.['budget_name'] || 'first available budget';
@@ -313,7 +313,7 @@ export class YNABMCPServer {
           const payee = args?.['payee'] || '[PAYEE]';
           const category = args?.['category'] || '[CATEGORY]';
           const memo = args?.['memo'] || '';
-          
+
           return {
             description: `Create a transaction for ${payee} in ${accountName}`,
             messages: [
@@ -334,17 +334,17 @@ Use the appropriate YNAB MCP tools to:
 2. List accounts for that budget to find the account ID
 3. If a category is specified, list categories to find the category ID
 4. Create the transaction with the correct amount in milliunits (multiply by 1000)
-5. Confirm the transaction was created successfully`
-                }
-              }
-            ]
+5. Confirm the transaction was created successfully`,
+                },
+              },
+            ],
           };
         }
-          
+
         case 'budget-summary': {
           const summaryBudget = args?.['budget_name'] || 'first available budget';
           const month = args?.['month'] || 'current month';
-          
+
           return {
             description: `Get budget summary for ${summaryBudget}`,
             messages: [
@@ -382,17 +382,17 @@ Distinguish between current-month patterns vs historical trends when presenting 
    - Available money to budget
    - Any true overspending where categories went into the red (negative Available balance)
 
-Format the response in a clear, easy-to-read summary.`
-                }
-              }
-            ]
+Format the response in a clear, easy-to-read summary.`,
+                },
+              },
+            ],
           };
         }
-          
+
         case 'account-balances': {
           const balanceBudget = args?.['budget_name'] || 'first available budget';
           const accountType = args?.['account_type'] || 'all accounts';
-          
+
           return {
             description: `Check account balances for ${accountType}`,
             messages: [
@@ -412,13 +412,13 @@ Format the response in a clear, easy-to-read summary.`
    - Total by account type
    - Net worth summary (assets - liabilities)
 
-Convert milliunits to dollars for easy reading.`
-                }
-              }
-            ]
+Convert milliunits to dollars for easy reading.`,
+                },
+              },
+            ],
           };
         }
-          
+
         default:
           throw new Error(`Unknown prompt: ${name}`);
       }
@@ -430,7 +430,7 @@ Convert milliunits to dollars for easy reading.`
         tools: [
           {
             name: 'list_budgets',
-            description: 'List all budgets associated with the user\'s account',
+            description: "List all budgets associated with the user's account",
             inputSchema: {
               type: 'object',
               properties: {},
@@ -476,13 +476,15 @@ Convert milliunits to dollars for easy reading.`
           },
           {
             name: 'list_accounts',
-            description: 'List all accounts for a specific budget (uses default budget if not specified)',
+            description:
+              'List all accounts for a specific budget (uses default budget if not specified)',
             inputSchema: {
               type: 'object',
               properties: {
                 budget_id: {
                   type: 'string',
-                  description: 'The ID of the budget to list accounts for (optional, uses default budget if not provided)',
+                  description:
+                    'The ID of the budget to list accounts for (optional, uses default budget if not provided)',
                 },
               },
               required: [],
@@ -522,7 +524,15 @@ Convert milliunits to dollars for easy reading.`
                 },
                 type: {
                   type: 'string',
-                  enum: ['checking', 'savings', 'creditCard', 'cash', 'lineOfCredit', 'otherAsset', 'otherLiability'],
+                  enum: [
+                    'checking',
+                    'savings',
+                    'creditCard',
+                    'cash',
+                    'lineOfCredit',
+                    'otherAsset',
+                    'otherLiability',
+                  ],
                   description: 'The type of account to create',
                 },
                 balance: {
@@ -554,7 +564,8 @@ Convert milliunits to dollars for easy reading.`
                 since_date: {
                   type: 'string',
                   pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-                  description: 'Optional: Only return transactions on or after this date (ISO format: YYYY-MM-DD)',
+                  description:
+                    'Optional: Only return transactions on or after this date (ISO format: YYYY-MM-DD)',
                 },
                 type: {
                   type: 'string',
@@ -849,7 +860,8 @@ Convert milliunits to dollars for easy reading.`
           },
           {
             name: 'convert_amount',
-            description: 'Convert between dollars and milliunits with integer arithmetic for precision',
+            description:
+              'Convert between dollars and milliunits with integer arithmetic for precision',
             inputSchema: {
               type: 'object',
               properties: {
@@ -859,7 +871,8 @@ Convert milliunits to dollars for easy reading.`
                 },
                 to_milliunits: {
                   type: 'boolean',
-                  description: 'If true, convert from dollars to milliunits. If false, convert from milliunits to dollars',
+                  description:
+                    'If true, convert from dollars to milliunits. If false, convert from milliunits to dollars',
                 },
               },
               required: ['amount', 'to_milliunits'],
@@ -977,7 +990,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:get_budget',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -987,23 +1000,27 @@ Convert milliunits to dollars for easy reading.`
             if (!budget_id) {
               throw new Error('budget_id is required');
             }
-            
+
             // Validate that the budget exists
             try {
               await this.ynabAPI.budgets.getBudgetById(budget_id);
               this.setDefaultBudget(budget_id);
-              
+
               return {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      success: true,
-                      message: `Default budget set to: ${budget_id}`,
-                      default_budget_id: budget_id
-                    }, null, 2)
-                  }
-                ]
+                    text: JSON.stringify(
+                      {
+                        success: true,
+                        message: `Default budget set to: ${budget_id}`,
+                        default_budget_id: budget_id,
+                      },
+                      null,
+                      2,
+                    ),
+                  },
+                ],
               };
             } catch {
               throw new Error(`Invalid budget ID: ${budget_id}. Budget not found.`);
@@ -1011,32 +1028,36 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:set_default_budget',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
         case 'get_default_budget':
           try {
             const defaultBudget = this.getDefaultBudget();
-            
+
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    default_budget_id: defaultBudget || null,
-                    has_default: !!defaultBudget,
-                    message: defaultBudget 
-                      ? `Default budget is set to: ${defaultBudget}`
-                      : 'No default budget is currently set'
-                  }, null, 2)
-                }
-              ]
+                  text: JSON.stringify(
+                    {
+                      default_budget_id: defaultBudget || null,
+                      has_default: !!defaultBudget,
+                      message: defaultBudget
+                        ? `Default budget is set to: ${defaultBudget}`
+                        : 'No default budget is currently set',
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
             };
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Error getting default budget',
-              error instanceof Error ? error.message : 'Unknown error'
+              error instanceof Error ? error.message : 'Unknown error',
             );
           }
 
@@ -1049,7 +1070,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:list_accounts',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1060,7 +1081,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:get_account',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1071,7 +1092,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:create_account',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1082,7 +1103,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:list_transactions',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1093,7 +1114,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:get_transaction',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1104,7 +1125,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:create_transaction',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1115,7 +1136,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:update_transaction',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1126,7 +1147,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:delete_transaction',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1137,7 +1158,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:list_categories',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1148,7 +1169,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:get_category',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1159,7 +1180,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:update_category',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1170,7 +1191,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:list_payees',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1181,7 +1202,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:get_payee',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1192,7 +1213,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:get_month',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1203,7 +1224,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:list_months',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
 
@@ -1217,10 +1238,9 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             return ErrorHandler.createValidationError(
               'Invalid parameters for ynab:convert_amount',
-              error instanceof Error ? error.message : 'Unknown validation error'
+              error instanceof Error ? error.message : 'Unknown validation error',
             );
           }
-
 
         case 'financial_overview':
           try {
@@ -1230,7 +1250,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:financial_overview: ' +
-              (error instanceof Error ? error.message : 'Unknown validation error')
+                (error instanceof Error ? error.message : 'Unknown validation error'),
             );
           }
 
@@ -1242,10 +1262,9 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:spending_analysis: ' +
-              (error instanceof Error ? error.message : 'Unknown validation error')
+                (error instanceof Error ? error.message : 'Unknown validation error'),
             );
           }
-
 
         case 'budget_health_check':
           try {
@@ -1255,7 +1274,7 @@ Convert milliunits to dollars for easy reading.`
           } catch (error) {
             throw new Error(
               'Invalid parameters for ynab:budget_health_check: ' +
-              (error instanceof Error ? error.message : 'Unknown validation error')
+                (error instanceof Error ? error.message : 'Unknown validation error'),
             );
           }
 
@@ -1264,14 +1283,15 @@ Convert milliunits to dollars for easy reading.`
 
         case 'get_env_status': {
           const token = process.env['YNAB_ACCESS_TOKEN'];
-          const masked = token && token.length >= 8
-            ? `${token.slice(0, 4)}...${token.slice(-4)}`
-            : token
-              ? `${token[0]}***` // very short token, still mask
-              : null;
+          const masked =
+            token && token.length >= 8
+              ? `${token.slice(0, 4)}...${token.slice(-4)}`
+              : token
+                ? `${token[0]}***` // very short token, still mask
+                : null;
 
           const envKeys = Object.keys(process.env || {});
-          const ynabEnvKeys = envKeys.filter(k => k.toUpperCase().includes('YNAB'));
+          const ynabEnvKeys = envKeys.filter((k) => k.toUpperCase().includes('YNAB'));
 
           const payload = {
             token_present: !!token,
@@ -1288,9 +1308,9 @@ Convert milliunits to dollars for easy reading.`
             content: [
               {
                 type: 'text',
-                text: JSON.stringify(payload, null, 2)
-              }
-            ]
+                text: JSON.stringify(payload, null, 2),
+              },
+            ],
           };
         }
 
@@ -1307,10 +1327,10 @@ Convert milliunits to dollars for easy reading.`
     try {
       // Validate token before starting server
       await this.validateToken();
-      
+
       const transport = new StdioServerTransport();
       await this.server.connect(transport);
-      
+
       console.error('YNAB MCP Server started successfully');
     } catch (error) {
       if (error instanceof AuthenticationError || error instanceof ConfigurationError) {
@@ -1363,7 +1383,9 @@ Convert milliunits to dollars for easy reading.`
     if (this.defaultBudgetId) {
       return this.defaultBudgetId;
     }
-    throw new Error('No budget ID provided and no default budget set. Use set_default_budget first.');
+    throw new Error(
+      'No budget ID provided and no default budget set. Use set_default_budget first.',
+    );
   }
 
   /**
@@ -1373,10 +1395,10 @@ Convert milliunits to dollars for easy reading.`
     const memUsage = process.memoryUsage();
     const uptimeMs = process.uptime() * 1000;
     const cacheStats = cacheManager.getStats();
-    
+
     // Convert bytes to MB for readability
-    const formatBytes = (bytes: number) => Math.round(bytes / 1024 / 1024 * 100) / 100;
-    
+    const formatBytes = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
+
     // Estimate cache memory usage by serializing and measuring size
     const estimateCacheSize = () => {
       try {
@@ -1386,7 +1408,7 @@ Convert milliunits to dollars for easy reading.`
         return 0;
       }
     };
-    
+
     const stats = {
       pid: process.pid,
       uptime_ms: Math.round(uptimeMs),
@@ -1396,32 +1418,32 @@ Convert milliunits to dollars for easy reading.`
         heap_used: formatBytes(memUsage.heapUsed),
         heap_total: formatBytes(memUsage.heapTotal),
         external: formatBytes(memUsage.external),
-        array_buffers: formatBytes(memUsage.arrayBuffers || 0)
+        array_buffers: formatBytes(memUsage.arrayBuffers || 0),
       },
       cache: {
         entries: cacheStats.size,
         estimated_size_kb: estimateCacheSize(),
-        keys: cacheStats.keys
+        keys: cacheStats.keys,
       },
       memory_description: {
-        rss: "Resident Set Size - total memory allocated for the process",
-        heap_used: "Used heap memory (objects, closures, etc.)",
-        heap_total: "Total heap memory allocated",
-        external: "Memory used by C++ objects bound to JavaScript objects",
-        array_buffers: "Memory allocated for ArrayBuffer and SharedArrayBuffer"
+        rss: 'Resident Set Size - total memory allocated for the process',
+        heap_used: 'Used heap memory (objects, closures, etc.)',
+        heap_total: 'Total heap memory allocated',
+        external: 'Memory used by C++ objects bound to JavaScript objects',
+        array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
       },
       node_version: process.version,
       platform: process.platform,
-      arch: process.arch
+      arch: process.arch,
     };
 
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(stats, null, 2)
-        }
-      ]
+          text: JSON.stringify(stats, null, 2),
+        },
+      ],
     };
   }
 

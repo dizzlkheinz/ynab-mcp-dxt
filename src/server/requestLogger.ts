@@ -50,7 +50,7 @@ export class RequestLogger {
     success: boolean,
     duration?: number,
     error?: string,
-    rateLimitInfo?: { remaining: number; isLimited: boolean }
+    rateLimitInfo?: { remaining: number; isLimited: boolean },
   ): void {
     if (!this.config.enabled) return;
 
@@ -58,9 +58,7 @@ export class RequestLogger {
       timestamp: new Date(),
       toolName,
       operation,
-      parameters: this.config.sanitizeParameters 
-        ? this.sanitizeParameters(parameters) 
-        : parameters,
+      parameters: this.config.sanitizeParameters ? this.sanitizeParameters(parameters) : parameters,
       success,
       ...(duration !== undefined && { duration }),
       ...(error && { error: this.sanitizeError(error) }),
@@ -86,7 +84,7 @@ export class RequestLogger {
     operation: string,
     parameters: Record<string, unknown>,
     duration?: number,
-    rateLimitInfo?: { remaining: number; isLimited: boolean }
+    rateLimitInfo?: { remaining: number; isLimited: boolean },
   ): void {
     this.logRequest(toolName, operation, parameters, true, duration, undefined, rateLimitInfo);
   }
@@ -100,7 +98,7 @@ export class RequestLogger {
     parameters: Record<string, unknown>,
     error: string,
     duration?: number,
-    rateLimitInfo?: { remaining: number; isLimited: boolean }
+    rateLimitInfo?: { remaining: number; isLimited: boolean },
   ): void {
     this.logRequest(toolName, operation, parameters, false, duration, error, rateLimitInfo);
   }
@@ -124,15 +122,15 @@ export class RequestLogger {
     let filtered = this.logs;
 
     if (filter.toolName) {
-      filtered = filtered.filter(log => log.toolName === filter.toolName);
+      filtered = filtered.filter((log) => log.toolName === filter.toolName);
     }
 
     if (filter.success !== undefined) {
-      filtered = filtered.filter(log => log.success === filter.success);
+      filtered = filtered.filter((log) => log.success === filter.success);
     }
 
     if (filter.since) {
-      filtered = filtered.filter(log => log.timestamp >= filter.since!);
+      filtered = filtered.filter((log) => log.timestamp >= filter.since!);
     }
 
     if (filter.limit) {
@@ -161,23 +159,23 @@ export class RequestLogger {
     toolUsage: Record<string, number>;
   } {
     const totalRequests = this.logs.length;
-    const successfulRequests = this.logs.filter(log => log.success).length;
+    const successfulRequests = this.logs.filter((log) => log.success).length;
     const failedRequests = totalRequests - successfulRequests;
-    
-    const durationsWithValues = this.logs
-      .filter(log => log.duration !== undefined)
-      .map(log => log.duration!);
-    
-    const averageDuration = durationsWithValues.length > 0
-      ? durationsWithValues.reduce((sum, duration) => sum + duration, 0) / durationsWithValues.length
-      : 0;
 
-    const rateLimitedRequests = this.logs.filter(
-      log => log.rateLimitInfo?.isLimited
-    ).length;
+    const durationsWithValues = this.logs
+      .filter((log) => log.duration !== undefined)
+      .map((log) => log.duration!);
+
+    const averageDuration =
+      durationsWithValues.length > 0
+        ? durationsWithValues.reduce((sum, duration) => sum + duration, 0) /
+          durationsWithValues.length
+        : 0;
+
+    const rateLimitedRequests = this.logs.filter((log) => log.rateLimitInfo?.isLimited).length;
 
     const toolUsage: Record<string, number> = {};
-    this.logs.forEach(log => {
+    this.logs.forEach((log) => {
       toolUsage[log.toolName] = (toolUsage[log.toolName] || 0) + 1;
     });
 
@@ -218,13 +216,18 @@ export class RequestLogger {
    */
   private isSensitiveParameter(key: string): boolean {
     const sensitiveKeys = [
-      'token', 'access_token', 'api_key', 'password', 'secret',
-      'authorization', 'auth', 'key', 'credential'
+      'token',
+      'access_token',
+      'api_key',
+      'password',
+      'secret',
+      'authorization',
+      'auth',
+      'key',
+      'credential',
     ];
-    
-    return sensitiveKeys.some(sensitiveKey => 
-      key.toLowerCase().includes(sensitiveKey)
-    );
+
+    return sensitiveKeys.some((sensitiveKey) => key.toLowerCase().includes(sensitiveKey));
   }
 
   /**
@@ -244,10 +247,8 @@ export class RequestLogger {
    */
   private sanitizeObject(obj: unknown): unknown {
     if (Array.isArray(obj)) {
-      return obj.map(item => 
-        typeof item === 'object' && item !== null 
-          ? this.sanitizeObject(item) 
-          : item
+      return obj.map((item) =>
+        typeof item === 'object' && item !== null ? this.sanitizeObject(item) : item,
       );
     }
 
@@ -306,7 +307,7 @@ export class RequestLogger {
     const levels = ['error', 'warn', 'info', 'debug'];
     const currentLevelIndex = levels.indexOf(this.config.logLevel);
     const requestedLevelIndex = levels.indexOf(level);
-    
+
     return requestedLevelIndex <= currentLevelIndex;
   }
 

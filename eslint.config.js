@@ -14,18 +14,18 @@ export default [
       parser: tsparser,
       parserOptions: {
         ecmaVersion: 2020,
-        sourceType: 'module'
+        sourceType: 'module',
       },
       globals: {
         console: 'readonly',
         process: 'readonly',
         Buffer: 'readonly',
         __dirname: 'readonly',
-        __filename: 'readonly'
-      }
+        __filename: 'readonly',
+      },
     },
     plugins: {
-      '@typescript-eslint': tseslint
+      '@typescript-eslint': tseslint,
     },
     rules: {
       '@typescript-eslint/no-inferrable-types': 'off',
@@ -36,8 +36,8 @@ export default [
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
-      'no-var': 'error'
-    }
+      'no-var': 'error',
+    },
   },
   // Turn off formatting-related rules to defer to Prettier
   eslintConfigPrettier,
@@ -50,7 +50,7 @@ export default [
       '**/*.test.ts',
       '**/*.test.js',
       '*.js',
-      'eslint.config.js'
-    ]
-  }
+      'eslint.config.js',
+    ],
+  },
 ];

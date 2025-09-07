@@ -12,44 +12,44 @@ vi.mock('ynab', () => {
   const mockAPI = {
     budgets: {
       getBudgets: vi.fn(),
-      getBudgetById: vi.fn()
+      getBudgetById: vi.fn(),
     },
     accounts: {
       getAccounts: vi.fn(),
       getAccountById: vi.fn(),
-      createAccount: vi.fn()
+      createAccount: vi.fn(),
     },
     transactions: {
       getTransactions: vi.fn(),
       getTransactionById: vi.fn(),
       createTransaction: vi.fn(),
       updateTransaction: vi.fn(),
-      deleteTransaction: vi.fn()
+      deleteTransaction: vi.fn(),
     },
     categories: {
       getCategories: vi.fn(),
       getCategoryById: vi.fn(),
-      updateMonthCategory: vi.fn()
+      updateMonthCategory: vi.fn(),
     },
     payees: {
       getPayees: vi.fn(),
-      getPayeeById: vi.fn()
+      getPayeeById: vi.fn(),
     },
     months: {
       getBudgetMonth: vi.fn(),
-      getBudgetMonths: vi.fn()
+      getBudgetMonths: vi.fn(),
     },
     user: {
-      getUser: vi.fn()
-    }
+      getUser: vi.fn(),
+    },
   };
 
   return {
     API: vi.fn(() => mockAPI),
     utils: {
       convertMilliUnitsToCurrencyAmount: vi.fn((milliunits: number) => milliunits / 1000),
-      convertCurrencyAmountToMilliUnits: vi.fn((amount: number) => Math.round(amount * 1000))
-    }
+      convertCurrencyAmountToMilliUnits: vi.fn((amount: number) => Math.round(amount * 1000)),
+    },
   };
 });
 
@@ -60,14 +60,14 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
   beforeEach(async () => {
     // Set up environment
     process.env['YNAB_ACCESS_TOKEN'] = 'test-token';
-    
+
     // Create server instance
     server = new YNABMCPServer();
-    
+
     // Get the mocked YNAB API instance
     const { API } = await import('ynab');
     mockYnabAPI = new (API as any)();
-    
+
     // Reset all mocks
     vi.clearAllMocks();
   });
@@ -85,7 +85,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               first_month: '2024-01-01',
               last_month: '2024-12-01',
               date_format: { format: 'MM/DD/YYYY' },
-              currency_format: { iso_code: 'USD', example_format: '$123.45' }
+              currency_format: { iso_code: 'USD', example_format: '$123.45' },
             },
             {
               id: 'budget-2',
@@ -94,10 +94,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               first_month: '2024-01-01',
               last_month: '2024-12-01',
               date_format: { format: 'MM/DD/YYYY' },
-              currency_format: { iso_code: 'USD', example_format: '$123.45' }
-            }
-          ]
-        }
+              currency_format: { iso_code: 'USD', example_format: '$123.45' },
+            },
+          ],
+        },
       };
 
       mockYnabAPI.budgets.getBudgets.mockResolvedValue(mockBudgets);
@@ -105,7 +105,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test budget listing
       const listResult = await executeToolCall(server, 'ynab:list_budgets');
       validateToolResult(listResult);
-      
+
       const budgets = parseToolResult(listResult);
       expect(budgets.data.budgets).toHaveLength(2);
       expect(budgets.data.budgets[0].name).toBe('Test Budget 1');
@@ -125,19 +125,19 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
             accounts: [],
             payees: [],
             category_groups: [],
-            months: []
-          }
-        }
+            months: [],
+          },
+        },
       };
 
       mockYnabAPI.budgets.getBudgetById.mockResolvedValue(mockBudget);
 
       // Test specific budget retrieval
       const getResult = await executeToolCall(server, 'ynab:get_budget', {
-        budget_id: 'budget-1'
+        budget_id: 'budget-1',
       });
       validateToolResult(getResult);
-      
+
       const budget = parseToolResult(getResult);
       expect(budget.data.budget.id).toBe('budget-1');
       expect(budget.data.budget.name).toBe('Test Budget 1');
@@ -156,7 +156,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test error handling
       try {
         await executeToolCall(server, 'ynab:get_budget', {
-          budget_id: 'invalid-budget'
+          budget_id: 'invalid-budget',
         });
         expect.fail('Should have thrown an error');
       } catch (error) {
@@ -170,7 +170,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
   describe('Complete Account Management Integration', () => {
     it('should handle complete account workflow', async () => {
       const budgetId = 'test-budget';
-      
+
       // Mock accounts list
       const mockAccounts = {
         data: {
@@ -184,7 +184,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               note: null,
               balance: 100000, // $100.00
               cleared_balance: 95000,
-              uncleared_balance: 5000
+              uncleared_balance: 5000,
             },
             {
               id: 'account-2',
@@ -195,20 +195,20 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               note: 'Emergency fund',
               balance: 500000, // $500.00
               cleared_balance: 500000,
-              uncleared_balance: 0
-            }
-          ]
-        }
+              uncleared_balance: 0,
+            },
+          ],
+        },
       };
 
       mockYnabAPI.accounts.getAccounts.mockResolvedValue(mockAccounts);
 
       // Test account listing
       const listResult = await executeToolCall(server, 'ynab:list_accounts', {
-        budget_id: budgetId
+        budget_id: budgetId,
       });
       validateToolResult(listResult);
-      
+
       const accounts = parseToolResult(listResult);
       expect(accounts.data.accounts).toHaveLength(2);
       expect(accounts.data.accounts[0].name).toBe('Checking Account');
@@ -217,8 +217,8 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Mock specific account response
       const mockAccount = {
         data: {
-          account: mockAccounts.data.accounts[0]
-        }
+          account: mockAccounts.data.accounts[0],
+        },
       };
 
       mockYnabAPI.accounts.getAccountById.mockResolvedValue(mockAccount);
@@ -226,10 +226,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test specific account retrieval
       const getResult = await executeToolCall(server, 'ynab:get_account', {
         budget_id: budgetId,
-        account_id: 'account-1'
+        account_id: 'account-1',
       });
       validateToolResult(getResult);
-      
+
       const account = parseToolResult(getResult);
       expect(account.data.account.id).toBe('account-1');
       expect(account.data.account.name).toBe('Checking Account');
@@ -245,13 +245,13 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         note: null,
         balance: 0,
         cleared_balance: 0,
-        uncleared_balance: 0
+        uncleared_balance: 0,
       };
 
       const mockCreateResponse = {
         data: {
-          account: newAccount
-        }
+          account: newAccount,
+        },
       };
 
       mockYnabAPI.accounts.createAccount.mockResolvedValue(mockCreateResponse);
@@ -261,10 +261,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         budget_id: budgetId,
         name: 'New Test Account',
         type: 'checking',
-        balance: 0
+        balance: 0,
       });
       validateToolResult(createResult);
-      
+
       const createdAccount = parseToolResult(createResult);
       expect(createdAccount.data.account.name).toBe('New Test Account');
       expect(createdAccount.data.account.type).toBe('checking');
@@ -276,8 +276,8 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         account: {
           name: 'New Test Account',
           type: 'checking',
-          balance: 0
-        }
+          balance: 0,
+        },
       });
     });
   });
@@ -303,7 +303,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               account_id: accountId,
               payee_id: 'payee-1',
               category_id: 'category-1',
-              transfer_account_id: null
+              transfer_account_id: null,
             },
             {
               id: 'transaction-2',
@@ -316,10 +316,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               account_id: accountId,
               payee_id: 'payee-2',
               category_id: null,
-              transfer_account_id: null
-            }
-          ]
-        }
+              transfer_account_id: null,
+            },
+          ],
+        },
       };
 
       mockYnabAPI.transactions.getTransactions.mockResolvedValue(mockTransactions);
@@ -327,10 +327,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test transaction listing
       const listResult = await executeToolCall(server, 'ynab:list_transactions', {
         budget_id: budgetId,
-        account_id: accountId
+        account_id: accountId,
       });
       validateToolResult(listResult);
-      
+
       const transactions = parseToolResult(listResult);
       expect(transactions.data.transactions).toHaveLength(2);
       expect(transactions.data.transactions[0].memo).toBe('Coffee shop');
@@ -339,8 +339,8 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Mock specific transaction response
       const mockTransaction = {
         data: {
-          transaction: mockTransactions.data.transactions[0]
-        }
+          transaction: mockTransactions.data.transactions[0],
+        },
       };
 
       mockYnabAPI.transactions.getTransactionById.mockResolvedValue(mockTransaction);
@@ -348,10 +348,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test specific transaction retrieval
       const getResult = await executeToolCall(server, 'ynab:get_transaction', {
         budget_id: budgetId,
-        transaction_id: 'transaction-1'
+        transaction_id: 'transaction-1',
       });
       validateToolResult(getResult);
-      
+
       const transaction = parseToolResult(getResult);
       expect(transaction.data.transaction.id).toBe('transaction-1');
       expect(transaction.data.transaction.memo).toBe('Coffee shop');
@@ -369,13 +369,13 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         account_id: accountId,
         payee_id: null,
         category_id: 'category-1',
-        transfer_account_id: null
+        transfer_account_id: null,
       };
 
       const mockCreateResponse = {
         data: {
-          transaction: newTransaction
-        }
+          transaction: newTransaction,
+        },
       };
 
       mockYnabAPI.transactions.createTransaction.mockResolvedValue(mockCreateResponse);
@@ -389,10 +389,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         amount: -2500,
         memo: 'Test transaction',
         date: '2024-01-17',
-        cleared: 'uncleared'
+        cleared: 'uncleared',
       });
       validateToolResult(createResult);
-      
+
       const createdTransaction = parseToolResult(createResult);
       expect(createdTransaction.data.transaction.memo).toBe('Test transaction');
       expect(createdTransaction.data.transaction.amount).toBe(-2500);
@@ -401,8 +401,8 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       const updatedTransaction = { ...newTransaction, memo: 'Updated memo' };
       const mockUpdateResponse = {
         data: {
-          transaction: updatedTransaction
-        }
+          transaction: updatedTransaction,
+        },
       };
 
       mockYnabAPI.transactions.updateTransaction.mockResolvedValue(mockUpdateResponse);
@@ -411,38 +411,48 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       const updateResult = await executeToolCall(server, 'ynab:update_transaction', {
         budget_id: budgetId,
         transaction_id: 'transaction-3',
-        memo: 'Updated memo'
+        memo: 'Updated memo',
       });
       validateToolResult(updateResult);
-      
+
       const updated = parseToolResult(updateResult);
       expect(updated.data.transaction.memo).toBe('Updated memo');
 
       // Mock transaction deletion
       mockYnabAPI.transactions.deleteTransaction.mockResolvedValue({
         data: {
-          transaction: { ...updatedTransaction, deleted: true }
-        }
+          transaction: { ...updatedTransaction, deleted: true },
+        },
       });
 
       // Test transaction deletion
       const deleteResult = await executeToolCall(server, 'ynab:delete_transaction', {
         budget_id: budgetId,
-        transaction_id: 'transaction-3'
+        transaction_id: 'transaction-3',
       });
       validateToolResult(deleteResult);
 
       // Verify API calls
-      expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(budgetId, accountId, undefined);
-      expect(mockYnabAPI.transactions.getTransactionById).toHaveBeenCalledWith(budgetId, 'transaction-1');
+      expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
+        budgetId,
+        accountId,
+        undefined,
+      );
+      expect(mockYnabAPI.transactions.getTransactionById).toHaveBeenCalledWith(
+        budgetId,
+        'transaction-1',
+      );
       expect(mockYnabAPI.transactions.createTransaction).toHaveBeenCalled();
       expect(mockYnabAPI.transactions.updateTransaction).toHaveBeenCalled();
-      expect(mockYnabAPI.transactions.deleteTransaction).toHaveBeenCalledWith(budgetId, 'transaction-3');
+      expect(mockYnabAPI.transactions.deleteTransaction).toHaveBeenCalledWith(
+        budgetId,
+        'transaction-3',
+      );
     });
 
     it('should handle transaction filtering', async () => {
       const budgetId = 'test-budget';
-      
+
       // Mock filtered transactions
       mockYnabAPI.transactions.getTransactions.mockResolvedValue({
         data: {
@@ -455,30 +465,30 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
               cleared: 'cleared',
               approved: true,
               account_id: 'account-1',
-              category_id: 'category-1'
-            }
-          ]
-        }
+              category_id: 'category-1',
+            },
+          ],
+        },
       });
 
       // Test filtering by date
       const dateFilterResult = await executeToolCall(server, 'ynab:list_transactions', {
         budget_id: budgetId,
-        since_date: '2024-01-01'
+        since_date: '2024-01-01',
       });
       validateToolResult(dateFilterResult);
 
       // Test filtering by account
       const accountFilterResult = await executeToolCall(server, 'ynab:list_transactions', {
         budget_id: budgetId,
-        account_id: 'account-1'
+        account_id: 'account-1',
       });
       validateToolResult(accountFilterResult);
 
       // Test filtering by category
       const categoryFilterResult = await executeToolCall(server, 'ynab:list_transactions', {
         budget_id: budgetId,
-        category_id: 'category-1'
+        category_id: 'category-1',
       });
       validateToolResult(categoryFilterResult);
 
@@ -490,7 +500,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
   describe('Complete Category Management Integration', () => {
     it('should handle complete category workflow', async () => {
       const budgetId = 'test-budget';
-      
+
       // Mock categories response
       const mockCategories = {
         data: {
@@ -508,7 +518,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
                   budgeted: 150000, // $150.00
                   activity: -150000,
                   balance: 0,
-                  goal_type: null
+                  goal_type: null,
                 },
                 {
                   id: 'category-2',
@@ -518,22 +528,22 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
                   budgeted: 10000, // $10.00
                   activity: -8500,
                   balance: 1500,
-                  goal_type: null
-                }
-              ]
-            }
-          ]
-        }
+                  goal_type: null,
+                },
+              ],
+            },
+          ],
+        },
       };
 
       mockYnabAPI.categories.getCategories.mockResolvedValue(mockCategories);
 
       // Test category listing
       const listResult = await executeToolCall(server, 'ynab:list_categories', {
-        budget_id: budgetId
+        budget_id: budgetId,
       });
       validateToolResult(listResult);
-      
+
       const categories = parseToolResult(listResult);
       expect(categories.data.category_groups).toHaveLength(1);
       expect(categories.data.category_groups[0].categories).toHaveLength(2);
@@ -542,8 +552,8 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Mock specific category response
       const mockCategory = {
         data: {
-          category: mockCategories.data.category_groups[0].categories[0]
-        }
+          category: mockCategories.data.category_groups[0].categories[0],
+        },
       };
 
       mockYnabAPI.categories.getCategoryById.mockResolvedValue(mockCategory);
@@ -551,10 +561,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test specific category retrieval
       const getResult = await executeToolCall(server, 'ynab:get_category', {
         budget_id: budgetId,
-        category_id: 'category-1'
+        category_id: 'category-1',
       });
       validateToolResult(getResult);
-      
+
       const category = parseToolResult(getResult);
       expect(category.data.category.id).toBe('category-1');
       expect(category.data.category.name).toBe('Rent/Mortgage');
@@ -563,13 +573,13 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Mock category update
       const updatedCategory = {
         ...mockCategories.data.category_groups[0].categories[0],
-        budgeted: 160000 // $160.00
+        budgeted: 160000, // $160.00
       };
 
       const mockUpdateResponse = {
         data: {
-          category: updatedCategory
-        }
+          category: updatedCategory,
+        },
       };
 
       mockYnabAPI.categories.updateMonthCategory.mockResolvedValue(mockUpdateResponse);
@@ -578,10 +588,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       const updateResult = await executeToolCall(server, 'ynab:update_category', {
         budget_id: budgetId,
         category_id: 'category-1',
-        budgeted: 160000
+        budgeted: 160000,
       });
       validateToolResult(updateResult);
-      
+
       const updated = parseToolResult(updateResult);
       expect(updated.data.category.budgeted).toBe(160000);
 
@@ -599,9 +609,9 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         data: {
           user: {
             id: 'user-123',
-            email: 'test@example.com'
-          }
-        }
+            email: 'test@example.com',
+          },
+        },
       };
 
       mockYnabAPI.user.getUser.mockResolvedValue(mockUser);
@@ -609,7 +619,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test user retrieval
       const userResult = await executeToolCall(server, 'ynab:get_user');
       validateToolResult(userResult);
-      
+
       const user = parseToolResult(userResult);
       expect(user.data.user.id).toBe('user-123');
       expect(user.data.user.email).toBe('test@example.com');
@@ -621,10 +631,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test dollar to milliunits conversion
       const toMilliunitsResult = await executeToolCall(server, 'ynab:convert_amount', {
         amount: 25.75,
-        to_milliunits: true
+        to_milliunits: true,
       });
       validateToolResult(toMilliunitsResult);
-      
+
       const milliunits = parseToolResult(toMilliunitsResult);
       expect(milliunits.milliunits).toBe(25750);
       expect(milliunits.formatted).toBe('25750 milliunits');
@@ -632,10 +642,10 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       // Test milliunits to dollar conversion
       const toDollarsResult = await executeToolCall(server, 'ynab:convert_amount', {
         amount: 25750,
-        to_milliunits: false
+        to_milliunits: false,
       });
       validateToolResult(toDollarsResult);
-      
+
       const dollars = parseToolResult(toDollarsResult);
       expect(dollars.dollars).toBe(25.75);
       expect(dollars.formatted).toBe('$25.75');
@@ -658,7 +668,11 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
 
       // Test 404 Not Found
       const notFoundError = new Error('Not Found');
-      (notFoundError as any).error = { id: '404.2', name: 'not_found', description: 'Budget not found' };
+      (notFoundError as any).error = {
+        id: '404.2',
+        name: 'not_found',
+        description: 'Budget not found',
+      };
       mockYnabAPI.budgets.getBudgetById.mockRejectedValue(notFoundError);
 
       try {
@@ -670,7 +684,11 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
 
       // Test 429 Rate Limit
       const rateLimitError = new Error('Too Many Requests');
-      (rateLimitError as any).error = { id: '429', name: 'rate_limit', description: 'Rate limit exceeded' };
+      (rateLimitError as any).error = {
+        id: '429',
+        name: 'rate_limit',
+        description: 'Rate limit exceeded',
+      };
       mockYnabAPI.accounts.getAccounts.mockRejectedValue(rateLimitError);
 
       try {
@@ -696,7 +714,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
           budget_id: 'test',
           account_id: 'test',
           amount: 'invalid-amount', // Should be number
-          date: '2024-01-01'
+          date: '2024-01-01',
         });
         expect.fail('Should have thrown validation error');
       } catch (error) {

@@ -18,7 +18,7 @@ export class CacheManager {
    */
   get<T>(key: string): T | null {
     const entry = this.cache.get(key);
-    
+
     if (!entry) {
       return null;
     }
@@ -39,9 +39,9 @@ export class CacheManager {
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
-      ttl: ttl || this.defaultTTL
+      ttl: ttl || this.defaultTTL,
     };
-    
+
     this.cache.set(key, entry);
   }
 
@@ -65,7 +65,7 @@ export class CacheManager {
   getStats(): { size: number; keys: string[] } {
     return {
       size: this.cache.size,
-      keys: Array.from(this.cache.keys())
+      keys: Array.from(this.cache.keys()),
     };
   }
 
@@ -75,14 +75,14 @@ export class CacheManager {
   cleanup(): number {
     const now = Date.now();
     let cleaned = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp > entry.ttl) {
         this.cache.delete(key);
         cleaned++;
       }
     }
-    
+
     return cleaned;
   }
 
@@ -91,23 +91,23 @@ export class CacheManager {
    */
   static generateKey(prefix: string, ...params: (string | number | boolean | undefined)[]): string {
     const cleanParams = params
-      .filter(p => p !== undefined)
-      .map(p => String(p))
+      .filter((p) => p !== undefined)
+      .map((p) => String(p))
       .join(':');
-    
+
     return `${prefix}:${cleanParams}`;
   }
 }
 
 // Cache TTL configurations for different data types
 export const CACHE_TTLS = {
-  BUDGETS: 10 * 60 * 1000,        // 10 minutes - budgets don't change often
-  ACCOUNTS: 5 * 60 * 1000,        // 5 minutes - account info is fairly static
-  CATEGORIES: 5 * 60 * 1000,      // 5 minutes - categories change infrequently  
-  PAYEES: 10 * 60 * 1000,         // 10 minutes - payees are relatively stable
-  TRANSACTIONS: 2 * 60 * 1000,    // 2 minutes - transactions change more frequently
-  USER_INFO: 30 * 60 * 1000,      // 30 minutes - user info rarely changes
-  MONTHS: 5 * 60 * 1000,          // 5 minutes - month data changes with new transactions
+  BUDGETS: 10 * 60 * 1000, // 10 minutes - budgets don't change often
+  ACCOUNTS: 5 * 60 * 1000, // 5 minutes - account info is fairly static
+  CATEGORIES: 5 * 60 * 1000, // 5 minutes - categories change infrequently
+  PAYEES: 10 * 60 * 1000, // 10 minutes - payees are relatively stable
+  TRANSACTIONS: 2 * 60 * 1000, // 2 minutes - transactions change more frequently
+  USER_INFO: 30 * 60 * 1000, // 30 minutes - user info rarely changes
+  MONTHS: 5 * 60 * 1000, // 5 minutes - month data changes with new transactions
 } as const;
 
 // Singleton cache manager instance

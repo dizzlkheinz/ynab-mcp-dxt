@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
 import { readFileSync } from 'fs';
-import { 
+import {
   handleListTransactions,
   handleGetTransaction,
   handleCreateTransaction,
   handleUpdateTransaction,
-  handleDeleteTransaction
+  handleDeleteTransaction,
 } from '../transactionTools.js';
 
 describe('Transaction Tools Integration', () => {
@@ -19,13 +19,13 @@ describe('Transaction Tools Integration', () => {
       const apiKeyFile = readFileSync('api_key.txt', 'utf-8').trim();
       const apiKey = apiKeyFile.split('\n')[0].split('=')[1];
       console.log('✅ Loaded YNAB API key for integration tests');
-      
+
       ynabAPI = new ynab.API(apiKey);
-      
+
       // Get the first budget for testing
       const budgetsResponse = await ynabAPI.budgets.getBudgets();
       testBudgetId = budgetsResponse.data.budgets[0].id;
-      
+
       // Get the first account for testing
       const accountsResponse = await ynabAPI.accounts.getAccounts(testBudgetId);
       testAccountId = accountsResponse.data.accounts[0].id;
@@ -45,7 +45,7 @@ describe('Transaction Tools Integration', () => {
 
     expect(response.transactions).toBeDefined();
     expect(Array.isArray(response.transactions)).toBe(true);
-    
+
     console.log(`✅ Successfully listed ${response.transactions.length} transactions`);
   });
 
@@ -60,12 +60,12 @@ describe('Transaction Tools Integration', () => {
 
     expect(response.transactions).toBeDefined();
     expect(Array.isArray(response.transactions)).toBe(true);
-    
+
     // All transactions should be from the specified account
     response.transactions.forEach((transaction: any) => {
       expect(transaction.account_id).toBe(testAccountId);
     });
-    
+
     console.log(`✅ Successfully listed ${response.transactions.length} transactions for account`);
   });
 
@@ -80,8 +80,10 @@ describe('Transaction Tools Integration', () => {
 
     expect(response.transactions).toBeDefined();
     expect(Array.isArray(response.transactions)).toBe(true);
-    
-    console.log(`✅ Successfully listed ${response.transactions.length} transactions since 2024-01-01`);
+
+    console.log(
+      `✅ Successfully listed ${response.transactions.length} transactions since 2024-01-01`,
+    );
   });
 
   it('should get transaction details if transactions exist', async () => {
@@ -106,7 +108,7 @@ describe('Transaction Tools Integration', () => {
 
       expect(response.transaction).toBeDefined();
       expect(response.transaction.id).toBe(testTransactionId);
-      
+
       console.log(`✅ Successfully retrieved transaction: ${response.transaction.id}`);
     } else {
       console.log('⚠️ No transactions found to test get transaction');
@@ -123,7 +125,7 @@ describe('Transaction Tools Integration', () => {
 
     expect(response.error).toBeDefined();
     expect(response.error.message).toBeDefined();
-    
+
     console.log(`✅ Correctly handled invalid budget ID: ${response.error.message}`);
   });
 
@@ -138,7 +140,7 @@ describe('Transaction Tools Integration', () => {
 
     expect(response.error).toBeDefined();
     expect(response.error.message).toBeDefined();
-    
+
     console.log(`✅ Correctly handled invalid transaction ID: ${response.error.message}`);
   });
 

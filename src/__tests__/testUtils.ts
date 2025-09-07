@@ -22,12 +22,12 @@ export interface TestConfig {
 export function getTestConfig(): TestConfig {
   const hasRealApiKey = !!process.env['YNAB_ACCESS_TOKEN'];
   const skipE2ETests = process.env['SKIP_E2E_TESTS'] === 'true' || !hasRealApiKey;
-  
+
   return {
     hasRealApiKey,
     testBudgetId: process.env['TEST_BUDGET_ID'],
     testAccountId: process.env['TEST_ACCOUNT_ID'],
-    skipE2ETests
+    skipE2ETests,
   };
 }
 
@@ -38,7 +38,7 @@ export async function createTestServer(): Promise<YNABMCPServer> {
   if (!process.env['YNAB_ACCESS_TOKEN']) {
     throw new Error('YNAB_ACCESS_TOKEN is required for testing');
   }
-  
+
   return new YNABMCPServer();
 }
 
@@ -48,11 +48,11 @@ export async function createTestServer(): Promise<YNABMCPServer> {
 export async function executeToolCall(
   server: YNABMCPServer,
   toolName: string,
-  args: Record<string, any> = {}
+  args: Record<string, any> = {},
 ): Promise<CallToolResult> {
   // Import the tool handlers directly for testing
   const ynabAPI = server.getYNABAPI();
-  
+
   // Route to the appropriate tool handler based on tool name
   switch (toolName) {
     case 'ynab:list_budgets': {
@@ -80,32 +80,44 @@ export async function executeToolCall(
       return await handleCreateAccount(ynabAPI, params);
     }
     case 'ynab:list_transactions': {
-      const { handleListTransactions, ListTransactionsSchema } = await import('../tools/transactionTools.js');
+      const { handleListTransactions, ListTransactionsSchema } = await import(
+        '../tools/transactionTools.js'
+      );
       const params = ListTransactionsSchema.parse(args);
       return await handleListTransactions(ynabAPI, params);
     }
     case 'ynab:get_transaction': {
-      const { handleGetTransaction, GetTransactionSchema } = await import('../tools/transactionTools.js');
+      const { handleGetTransaction, GetTransactionSchema } = await import(
+        '../tools/transactionTools.js'
+      );
       const params = GetTransactionSchema.parse(args);
       return await handleGetTransaction(ynabAPI, params);
     }
     case 'ynab:create_transaction': {
-      const { handleCreateTransaction, CreateTransactionSchema } = await import('../tools/transactionTools.js');
+      const { handleCreateTransaction, CreateTransactionSchema } = await import(
+        '../tools/transactionTools.js'
+      );
       const params = CreateTransactionSchema.parse(args);
       return await handleCreateTransaction(ynabAPI, params);
     }
     case 'ynab:update_transaction': {
-      const { handleUpdateTransaction, UpdateTransactionSchema } = await import('../tools/transactionTools.js');
+      const { handleUpdateTransaction, UpdateTransactionSchema } = await import(
+        '../tools/transactionTools.js'
+      );
       const params = UpdateTransactionSchema.parse(args);
       return await handleUpdateTransaction(ynabAPI, params);
     }
     case 'ynab:delete_transaction': {
-      const { handleDeleteTransaction, DeleteTransactionSchema } = await import('../tools/transactionTools.js');
+      const { handleDeleteTransaction, DeleteTransactionSchema } = await import(
+        '../tools/transactionTools.js'
+      );
       const params = DeleteTransactionSchema.parse(args);
       return await handleDeleteTransaction(ynabAPI, params);
     }
     case 'ynab:list_categories': {
-      const { handleListCategories, ListCategoriesSchema } = await import('../tools/categoryTools.js');
+      const { handleListCategories, ListCategoriesSchema } = await import(
+        '../tools/categoryTools.js'
+      );
       const params = ListCategoriesSchema.parse(args);
       return await handleListCategories(ynabAPI, params);
     }
@@ -115,7 +127,9 @@ export async function executeToolCall(
       return await handleGetCategory(ynabAPI, params);
     }
     case 'ynab:update_category': {
-      const { handleUpdateCategory, UpdateCategorySchema } = await import('../tools/categoryTools.js');
+      const { handleUpdateCategory, UpdateCategorySchema } = await import(
+        '../tools/categoryTools.js'
+      );
       const params = UpdateCategorySchema.parse(args);
       return await handleUpdateCategory(ynabAPI, params);
     }
@@ -161,7 +175,7 @@ export function validateToolResult(result: CallToolResult): void {
   expect(result.content).toBeDefined();
   expect(Array.isArray(result.content)).toBe(true);
   expect(result.content.length).toBeGreaterThan(0);
-  
+
   for (const content of result.content) {
     expect(content.type).toBe('text');
     expect(typeof content.text).toBe('string');
@@ -177,12 +191,12 @@ export function parseToolResult<T = any>(result: CallToolResult): T {
   if (!content || content.type !== 'text') {
     throw new Error('No text content in tool result');
   }
-  
+
   const text = content.text;
   if (typeof text !== 'string') {
     throw new Error('Tool result text is not a string');
   }
-  
+
   try {
     return JSON.parse(text) as T;
   } catch (error) {
@@ -196,17 +210,17 @@ export function parseToolResult<T = any>(result: CallToolResult): T {
 export async function waitFor(
   condition: () => boolean | Promise<boolean>,
   timeout: number = 5000,
-  interval: number = 100
+  interval: number = 100,
 ): Promise<void> {
   const start = Date.now();
-  
+
   while (Date.now() - start < timeout) {
     if (await condition()) {
       return;
     }
-    await new Promise(resolve => setTimeout(resolve, interval));
+    await new Promise((resolve) => setTimeout(resolve, interval));
   }
-  
+
   throw new Error(`Condition not met within ${timeout}ms`);
 }
 
@@ -220,7 +234,7 @@ export const TestData = {
   generateAccountName(): string {
     return `Test Account ${Date.now()}`;
   },
-  
+
   /**
    * Generate a test transaction
    */
@@ -232,16 +246,16 @@ export const TestData = {
       amount: -5000, // $5.00 outflow
       memo: `Test transaction ${Date.now()}`,
       date: new Date().toISOString().split('T')[0], // Today's date
-      cleared: 'uncleared' as const
+      cleared: 'uncleared' as const,
     };
   },
-  
+
   /**
    * Generate test amounts in milliunits
    */
   generateAmount(dollars: number): number {
     return Math.round(dollars * 1000);
-  }
+  },
 };
 
 /**
@@ -250,21 +264,21 @@ export const TestData = {
 export class TestDataCleanup {
   private createdAccountIds: string[] = [];
   private createdTransactionIds: string[] = [];
-  
+
   /**
    * Track created account for cleanup
    */
   trackAccount(accountId: string): void {
     this.createdAccountIds.push(accountId);
   }
-  
+
   /**
    * Track created transaction for cleanup
    */
   trackTransaction(transactionId: string): void {
     this.createdTransactionIds.push(transactionId);
   }
-  
+
   /**
    * Clean up all tracked test data
    */
@@ -274,19 +288,22 @@ export class TestDataCleanup {
       try {
         await executeToolCall(server, 'ynab:delete_transaction', {
           budget_id: budgetId,
-          transaction_id: transactionId
+          transaction_id: transactionId,
         });
       } catch (error) {
         console.warn(`Failed to cleanup transaction ${transactionId}:`, error);
       }
     }
-    
+
     // Note: YNAB API doesn't support deleting accounts via API
     // Accounts created during testing will need manual cleanup
     if (this.createdAccountIds.length > 0) {
-      console.warn(`Created ${this.createdAccountIds.length} test accounts that need manual cleanup:`, this.createdAccountIds);
+      console.warn(
+        `Created ${this.createdAccountIds.length} test accounts that need manual cleanup:`,
+        this.createdAccountIds,
+      );
     }
-    
+
     this.createdAccountIds = [];
     this.createdTransactionIds = [];
   }
@@ -305,7 +322,7 @@ export const YNABAssertions = {
     expect(typeof budget.name).toBe('string');
     expect(typeof budget.last_modified_on).toBe('string');
   },
-  
+
   /**
    * Assert account structure
    */
@@ -318,7 +335,7 @@ export const YNABAssertions = {
     expect(typeof account.closed).toBe('boolean');
     expect(typeof account.balance).toBe('number');
   },
-  
+
   /**
    * Assert transaction structure
    */
@@ -330,7 +347,7 @@ export const YNABAssertions = {
     expect(typeof transaction.account_id).toBe('string');
     expect(['cleared', 'uncleared', 'reconciled']).toContain(transaction.cleared);
   },
-  
+
   /**
    * Assert category structure
    */
@@ -343,7 +360,7 @@ export const YNABAssertions = {
     expect(typeof category.activity).toBe('number');
     expect(typeof category.balance).toBe('number');
   },
-  
+
   /**
    * Assert payee structure
    */
@@ -351,5 +368,5 @@ export const YNABAssertions = {
     expect(payee).toBeDefined();
     expect(typeof payee.id).toBe('string');
     expect(typeof payee.name).toBe('string');
-  }
+  },
 };

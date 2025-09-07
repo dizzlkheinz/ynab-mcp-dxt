@@ -16,14 +16,14 @@ let serverInstance: YNABMCPServer | null = null;
  */
 async function gracefulShutdown(signal: string): Promise<void> {
   console.error(`Received ${signal}, initiating graceful shutdown...`);
-  
+
   try {
     if (serverInstance) {
       console.error('Cleaning up server resources...');
       // The MCP server will handle its own cleanup when the process exits
       serverInstance = null;
     }
-    
+
     console.error('Shutdown complete');
     process.exit(0);
   } catch (error) {
@@ -63,20 +63,20 @@ function validateStartupEnvironment(): void {
   // Check Node.js version
   const nodeVersion = process.version;
   const majorVersion = parseInt(nodeVersion.slice(1).split('.')[0] || '0');
-  
+
   if (majorVersion < 18) {
     console.error('❌ Node.js version 18 or higher is required');
     console.error(`Current version: ${nodeVersion}`);
     process.exit(1);
   }
-  
+
   // Validate environment
   if (!process.env['YNAB_ACCESS_TOKEN']) {
     console.error('❌ YNAB_ACCESS_TOKEN environment variable is required');
     console.error('Please set your YNAB Personal Access Token and try again.');
     process.exit(1);
   }
-  
+
   console.error('✅ Environment validation passed');
 }
 
@@ -86,17 +86,16 @@ function validateStartupEnvironment(): void {
 async function main(): Promise<void> {
   try {
     console.error('🚀 Starting YNAB MCP Server...');
-    
+
     // Validate startup environment
     validateStartupEnvironment();
-    
+
     // Create and start server
     serverInstance = new YNABMCPServer();
     console.error('✅ Server instance created successfully');
-    
+
     await serverInstance.run();
     console.error('✅ YNAB MCP Server started successfully');
-    
   } catch (error) {
     reportError(error);
   }

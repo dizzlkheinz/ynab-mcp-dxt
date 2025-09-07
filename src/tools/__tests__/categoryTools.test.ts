@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
-import { 
-  handleListCategories, 
-  handleGetCategory, 
+import {
+  handleListCategories,
+  handleGetCategory,
   handleUpdateCategory,
   ListCategoriesSchema,
   GetCategorySchema,
-  UpdateCategorySchema
+  UpdateCategorySchema,
 } from '../categoryTools.js';
 
 // Mock the YNAB API
@@ -100,11 +100,11 @@ describe('Category Tools', () => {
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.categories).toHaveLength(3);
       expect(parsedContent.category_groups).toHaveLength(2);
-      
+
       // Check first category
       expect(parsedContent.categories[0]).toEqual({
         id: 'category-1',
@@ -135,7 +135,7 @@ describe('Category Tools', () => {
 
     it('should handle 401 authentication errors', async () => {
       (mockYnabAPI.categories.getCategories as any).mockRejectedValue(
-        new Error('401 Unauthorized')
+        new Error('401 Unauthorized'),
       );
 
       const result = await handleListCategories(mockYnabAPI, { budget_id: 'budget-1' });
@@ -146,9 +146,7 @@ describe('Category Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.categories.getCategories as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.categories.getCategories as any).mockRejectedValue(new Error('404 Not Found'));
 
       const result = await handleListCategories(mockYnabAPI, { budget_id: 'invalid-budget' });
 
@@ -181,14 +179,14 @@ describe('Category Tools', () => {
         data: { category: mockCategory },
       });
 
-      const result = await handleGetCategory(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        category_id: 'category-1' 
+      const result = await handleGetCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
+        category_id: 'category-1',
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.category).toEqual({
         id: 'category-1',
@@ -209,13 +207,11 @@ describe('Category Tools', () => {
     });
 
     it('should handle 404 not found errors', async () => {
-      (mockYnabAPI.categories.getCategoryById as any).mockRejectedValue(
-        new Error('404 Not Found')
-      );
+      (mockYnabAPI.categories.getCategoryById as any).mockRejectedValue(new Error('404 Not Found'));
 
-      const result = await handleGetCategory(mockYnabAPI, { 
-        budget_id: 'budget-1', 
-        category_id: 'invalid-category' 
+      const result = await handleGetCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
+        category_id: 'invalid-category',
       });
 
       expect(result.content).toHaveLength(1);
@@ -247,15 +243,15 @@ describe('Category Tools', () => {
         data: { category: mockUpdatedCategory },
       });
 
-      const result = await handleUpdateCategory(mockYnabAPI, { 
-        budget_id: 'budget-1', 
+      const result = await handleUpdateCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
         category_id: 'category-1',
-        budgeted: 60000
+        budgeted: 60000,
       });
 
       expect(result.content).toHaveLength(1);
       expect(result.content[0].type).toBe('text');
-      
+
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.category.budgeted).toBe(60000);
       expect(parsedContent.updated_month).toMatch(/^\d{4}-\d{2}-01$/);
@@ -265,19 +261,19 @@ describe('Category Tools', () => {
         'budget-1',
         expect.stringMatching(/^\d{4}-\d{2}-01$/),
         'category-1',
-        { budgeted: 60000 }
+        { budgeted: 60000 },
       );
     });
 
     it('should handle 404 not found errors', async () => {
       (mockYnabAPI.categories.updateMonthCategory as any).mockRejectedValue(
-        new Error('404 Not Found')
+        new Error('404 Not Found'),
       );
 
-      const result = await handleUpdateCategory(mockYnabAPI, { 
-        budget_id: 'budget-1', 
+      const result = await handleUpdateCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
         category_id: 'invalid-category',
-        budgeted: 50000
+        budgeted: 50000,
       });
 
       expect(result.content).toHaveLength(1);
@@ -287,13 +283,13 @@ describe('Category Tools', () => {
 
     it('should handle 403 forbidden errors', async () => {
       (mockYnabAPI.categories.updateMonthCategory as any).mockRejectedValue(
-        new Error('403 Forbidden')
+        new Error('403 Forbidden'),
       );
 
-      const result = await handleUpdateCategory(mockYnabAPI, { 
-        budget_id: 'budget-1', 
+      const result = await handleUpdateCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
         category_id: 'category-1',
-        budgeted: 50000
+        budgeted: 50000,
       });
 
       expect(result.content).toHaveLength(1);
@@ -320,19 +316,21 @@ describe('Category Tools', () => {
 
     describe('GetCategorySchema', () => {
       it('should validate valid parameters', () => {
-        const result = GetCategorySchema.parse({ 
-          budget_id: 'budget-1', 
-          category_id: 'category-1' 
+        const result = GetCategorySchema.parse({
+          budget_id: 'budget-1',
+          category_id: 'category-1',
         });
         expect(result.budget_id).toBe('budget-1');
         expect(result.category_id).toBe('category-1');
       });
 
       it('should reject empty category_id', () => {
-        expect(() => GetCategorySchema.parse({ 
-          budget_id: 'budget-1', 
-          category_id: '' 
-        })).toThrow();
+        expect(() =>
+          GetCategorySchema.parse({
+            budget_id: 'budget-1',
+            category_id: '',
+          }),
+        ).toThrow();
       });
 
       it('should reject missing category_id', () => {
@@ -342,10 +340,10 @@ describe('Category Tools', () => {
 
     describe('UpdateCategorySchema', () => {
       it('should validate valid parameters', () => {
-        const result = UpdateCategorySchema.parse({ 
-          budget_id: 'budget-1', 
+        const result = UpdateCategorySchema.parse({
+          budget_id: 'budget-1',
           category_id: 'category-1',
-          budgeted: 50000
+          budgeted: 50000,
         });
         expect(result.budget_id).toBe('budget-1');
         expect(result.category_id).toBe('category-1');
@@ -353,34 +351,38 @@ describe('Category Tools', () => {
       });
 
       it('should reject non-integer budgeted amount', () => {
-        expect(() => UpdateCategorySchema.parse({ 
-          budget_id: 'budget-1', 
-          category_id: 'category-1',
-          budgeted: 50.5
-        })).toThrow();
+        expect(() =>
+          UpdateCategorySchema.parse({
+            budget_id: 'budget-1',
+            category_id: 'category-1',
+            budgeted: 50.5,
+          }),
+        ).toThrow();
       });
 
       it('should reject missing budgeted amount', () => {
-        expect(() => UpdateCategorySchema.parse({ 
-          budget_id: 'budget-1', 
-          category_id: 'category-1'
-        })).toThrow();
+        expect(() =>
+          UpdateCategorySchema.parse({
+            budget_id: 'budget-1',
+            category_id: 'category-1',
+          }),
+        ).toThrow();
       });
 
       it('should accept negative budgeted amounts', () => {
-        const result = UpdateCategorySchema.parse({ 
-          budget_id: 'budget-1', 
+        const result = UpdateCategorySchema.parse({
+          budget_id: 'budget-1',
           category_id: 'category-1',
-          budgeted: -10000
+          budgeted: -10000,
         });
         expect(result.budgeted).toBe(-10000);
       });
 
       it('should accept zero budgeted amount', () => {
-        const result = UpdateCategorySchema.parse({ 
-          budget_id: 'budget-1', 
+        const result = UpdateCategorySchema.parse({
+          budget_id: 'budget-1',
           category_id: 'category-1',
-          budgeted: 0
+          budgeted: 0,
         });
         expect(result.budgeted).toBe(0);
       });

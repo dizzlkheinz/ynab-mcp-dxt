@@ -3,7 +3,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 /**
  * YNAB API error codes and their corresponding HTTP status codes
  */
- 
+
 export const enum YNABErrorCode {
   UNAUTHORIZED = 401,
   FORBIDDEN = 403,
@@ -20,7 +20,6 @@ export const enum SecurityErrorCode {
   VALIDATION_ERROR = 'VALIDATION_ERROR',
   UNKNOWN_ERROR = 'UNKNOWN_ERROR',
 }
- 
 
 /**
  * Standardized error response structure
@@ -41,12 +40,8 @@ export interface ErrorResponse {
 export class YNABAPIError extends Error {
   public readonly code: YNABErrorCode;
   public readonly originalError?: unknown;
-  
-  constructor(
-    code: YNABErrorCode,
-    message: string,
-    originalError?: unknown
-  ) {
+
+  constructor(code: YNABErrorCode, message: string, originalError?: unknown) {
     super(message);
     this.name = 'YNABAPIError';
     this.code = code;
@@ -56,7 +51,7 @@ export class YNABAPIError extends Error {
 
 export class ValidationError extends Error {
   public readonly details?: string | undefined;
-  
+
   constructor(message: string, details?: string | undefined) {
     super(message);
     this.name = 'ValidationError';
@@ -73,7 +68,7 @@ export class ErrorHandler {
    */
   static handleError(error: unknown, context: string): CallToolResult {
     const errorResponse = this.createErrorResponse(error, context);
-    
+
     return {
       content: [
         {
@@ -136,7 +131,11 @@ export class ErrorHandler {
         code: SecurityErrorCode.UNKNOWN_ERROR,
         message: this.getGenericErrorMessage(context),
         userMessage: this.getUserFriendlyGenericMessage(context),
-        suggestions: ['Try the operation again', 'Check your internet connection', 'Contact support if the issue persists'],
+        suggestions: [
+          'Try the operation again',
+          'Check your internet connection',
+          'Contact support if the issue persists',
+        ],
       },
     };
   }
@@ -169,18 +168,21 @@ export class ErrorHandler {
   /**
    * Returns user-friendly error messages for end users
    */
-  private static getUserFriendlyMessage(code: YNABErrorCode | SecurityErrorCode, context: string): string {
+  private static getUserFriendlyMessage(
+    code: YNABErrorCode | SecurityErrorCode,
+    context: string,
+  ): string {
     switch (code) {
       case YNABErrorCode.UNAUTHORIZED:
         return 'Your YNAB access token is invalid or has expired. Please check your token and try again.';
       case YNABErrorCode.FORBIDDEN:
-        return 'You don\'t have permission to access this YNAB data. Please check your account permissions.';
+        return "You don't have permission to access this YNAB data. Please check your account permissions.";
       case YNABErrorCode.NOT_FOUND:
         return this.getUserFriendlyNotFoundMessage(context);
       case YNABErrorCode.TOO_MANY_REQUESTS:
-        return 'We\'re making too many requests to YNAB. Please wait a moment and try again.';
+        return "We're making too many requests to YNAB. Please wait a moment and try again.";
       case YNABErrorCode.INTERNAL_SERVER_ERROR:
-        return 'YNAB\'s servers are having issues. Please try again in a few minutes.';
+        return "YNAB's servers are having issues. Please try again in a few minutes.";
       case SecurityErrorCode.VALIDATION_ERROR:
         return 'Some of the information provided is invalid. Please check your inputs and try again.';
       case SecurityErrorCode.RATE_LIMIT_EXCEEDED:
@@ -193,19 +195,22 @@ export class ErrorHandler {
   /**
    * Returns actionable suggestions for users based on error type
    */
-  private static getErrorSuggestions(code: YNABErrorCode | SecurityErrorCode, context: string): string[] {
+  private static getErrorSuggestions(
+    code: YNABErrorCode | SecurityErrorCode,
+    context: string,
+  ): string[] {
     switch (code) {
       case YNABErrorCode.UNAUTHORIZED:
         return [
           'Go to https://app.youneedabudget.com/settings/developer to generate a new access token',
           'Make sure you copied the entire token without any extra spaces',
-          'Check that your token hasn\'t expired'
+          "Check that your token hasn't expired",
         ];
       case YNABErrorCode.FORBIDDEN:
         return [
           'Verify that your YNAB account has access to the requested budget',
           'Check if your YNAB subscription is active',
-          'Try logging into YNAB directly to confirm access'
+          'Try logging into YNAB directly to confirm access',
         ];
       case YNABErrorCode.NOT_FOUND:
         return this.getNotFoundSuggestions(context);
@@ -213,25 +218,25 @@ export class ErrorHandler {
         return [
           'Wait 1-2 minutes before trying again',
           'Try making fewer requests at once',
-          'The system will automatically retry after a short delay'
+          'The system will automatically retry after a short delay',
         ];
       case YNABErrorCode.INTERNAL_SERVER_ERROR:
         return [
-          'Check YNAB\'s status page at https://status.youneedabudget.com',
+          "Check YNAB's status page at https://status.youneedabudget.com",
           'Try again in a few minutes',
-          'Contact YNAB support if the issue persists'
+          'Contact YNAB support if the issue persists',
         ];
       case SecurityErrorCode.VALIDATION_ERROR:
         return [
           'Double-check all required fields are filled out',
           'Verify that amounts are in the correct format',
-          'Make sure dates are valid and in the right format'
+          'Make sure dates are valid and in the right format',
         ];
       default:
         return [
           'Try the operation again',
           'Check your internet connection',
-          'Contact support if the issue persists'
+          'Contact support if the issue persists',
         ];
     }
   }
@@ -241,21 +246,21 @@ export class ErrorHandler {
    */
   private static getUserFriendlyNotFoundMessage(context: string): string {
     if (context.includes('account')) {
-      return 'We couldn\'t find the budget or account you\'re looking for.';
+      return "We couldn't find the budget or account you're looking for.";
     }
     if (context.includes('budget')) {
-      return 'We couldn\'t find that budget. It may have been deleted or you may not have access.';
+      return "We couldn't find that budget. It may have been deleted or you may not have access.";
     }
     if (context.includes('category')) {
-      return 'We couldn\'t find that category. It may have been deleted or moved.';
+      return "We couldn't find that category. It may have been deleted or moved.";
     }
     if (context.includes('transaction')) {
-      return 'We couldn\'t find that transaction. It may have been deleted or moved.';
+      return "We couldn't find that transaction. It may have been deleted or moved.";
     }
     if (context.includes('payee')) {
-      return 'We couldn\'t find that payee in your budget.';
+      return "We couldn't find that payee in your budget.";
     }
-    return 'We couldn\'t find what you\'re looking for. Please check that all information is correct.';
+    return "We couldn't find what you're looking for. Please check that all information is correct.";
   }
 
   /**
@@ -265,19 +270,25 @@ export class ErrorHandler {
     const baseSuggestions = [
       'Double-check that the name or ID is spelled correctly',
       'Try refreshing your budget data',
-      'Make sure you\'re using the right budget'
+      "Make sure you're using the right budget",
     ];
 
     if (context.includes('account')) {
       return [...baseSuggestions, 'Check if the account was recently closed or renamed'];
     }
     if (context.includes('category')) {
-      return [...baseSuggestions, 'Check if the category was deleted or moved to a different group'];
+      return [
+        ...baseSuggestions,
+        'Check if the category was deleted or moved to a different group',
+      ];
     }
     if (context.includes('transaction')) {
-      return [...baseSuggestions, 'Check if the transaction was deleted or is in a different account'];
+      return [
+        ...baseSuggestions,
+        'Check if the transaction was deleted or is in a different account',
+      ];
     }
-    
+
     return baseSuggestions;
   }
 
@@ -430,7 +441,7 @@ export class ErrorHandler {
    */
   static async withErrorHandling<T>(
     operation: () => Promise<T>,
-    context: string
+    context: string,
   ): Promise<T | CallToolResult> {
     try {
       return await operation();
@@ -452,7 +463,7 @@ export class ErrorHandler {
   static createYNABError(
     code: YNABErrorCode,
     context: string,
-    originalError?: unknown
+    originalError?: unknown,
   ): YNABAPIError {
     const message = this.getErrorMessage(code, context);
     return new YNABAPIError(code, message, originalError);
@@ -462,7 +473,11 @@ export class ErrorHandler {
 /**
  * Utility function for handling errors in tool handlers
  */
-export function handleToolError(error: unknown, toolName: string, operation: string): CallToolResult {
+export function handleToolError(
+  error: unknown,
+  toolName: string,
+  operation: string,
+): CallToolResult {
   return ErrorHandler.handleError(error, `executing ${toolName} - ${operation}`);
 }
 
@@ -472,10 +487,7 @@ export function handleToolError(error: unknown, toolName: string, operation: str
 export async function withToolErrorHandling<T>(
   operation: () => Promise<T>,
   toolName: string,
-  operationName: string
+  operationName: string,
 ): Promise<T | CallToolResult> {
-  return ErrorHandler.withErrorHandling(
-    operation,
-    `executing ${toolName} - ${operationName}`
-  );
+  return ErrorHandler.withErrorHandling(operation, `executing ${toolName} - ${operationName}`);
 }
