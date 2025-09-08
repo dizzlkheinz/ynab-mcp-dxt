@@ -7,6 +7,14 @@ on:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag name to publish (e.g., v0.1.1)'
+        required: true
+      ref:
+        description: 'Git ref to build from (branch or tag)'
+        required: false
+        default: 'master'
 
 permissions:
   contents: write
@@ -24,8 +32,14 @@ jobs:
       YNAB_ACCESS_TOKEN: ci-build-token-1234567890
       SKIP_ENV_VALIDATION: true
     steps:
-      - name: Checkout
+      - name: Checkout (default ref)
         uses: actions/checkout@v4
+
+      - name: Checkout (specified ref)
+        if: ${{ inputs.ref != '' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -68,8 +82,8 @@ jobs:
       - name: Upload or create release with asset
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ inputs.release_tag || github.ref_name }}
+          name: ${{ inputs.release_tag || github.ref_name }}
           files: ${{ steps.meta.outputs.file }}
           generate_release_notes: true
           fail_on_unmatched_files: true
