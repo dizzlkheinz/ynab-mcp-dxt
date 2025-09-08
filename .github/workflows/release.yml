@@ -18,6 +18,10 @@ concurrency:
 jobs:
   build-and-attach-dxt:
     runs-on: ubuntu-latest
+    env:
+      # Provide a dummy token for build-time env validation.
+      # If you add a real secret YNAB token, it will override this when set at step-level.
+      YNAB_ACCESS_TOKEN: ci-build-token-1234567890
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,10 +36,13 @@ jobs:
         run: npm ci
 
       - name: Set build environment
-        run: echo "YNAB_ACCESS_TOKEN=ci-build-token-1234567890" >> $GITHUB_ENV
+        run: echo "YNAB_ACCESS_TOKEN=${YNAB_ACCESS_TOKEN}" >> $GITHUB_ENV
 
       - name: Build (format + lint + bundle)
         run: npm run build:prod
+        env:
+          # Prefer secret if configured; otherwise use the job-level default above
+          YNAB_ACCESS_TOKEN: ${{ secrets.YNAB_ACCESS_TOKEN || env.YNAB_ACCESS_TOKEN }}
 
       - name: Install DXT CLI
         run: npm i -g @anthropic-ai/dxt
