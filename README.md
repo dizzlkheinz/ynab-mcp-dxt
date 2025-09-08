@@ -124,12 +124,14 @@ YNAB_MCP_PRETTY_SPACES=2
 
 ## Available Tools
 
-The server provides 18 MCP tools organized into categories:
+The server provides 22 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 4 diagnostics and utilities (26 total):
 
 ### Budget Management
 
 - `list_budgets` - List all user budgets
 - `get_budget` - Get detailed budget information
+- `set_default_budget` - Set a default budget for subsequent calls
+- `get_default_budget` - Get the currently set default budget
 
 ### Account Management
 
@@ -161,7 +163,7 @@ The server provides 18 MCP tools organized into categories:
 - `get_month` - Get monthly budget data
 - `list_months` - List all months summary
 
-### Financial Analysis & Insights
+### Financial Analysis & Insights (work in progress)
 
 - `financial_overview` - Comprehensive multi-month financial analysis with trends and AI insights
 - `spending_analysis` - Detailed spending analysis with category breakdowns and trends
@@ -171,6 +173,11 @@ The server provides 18 MCP tools organized into categories:
 
 - `get_user` - Get authenticated user information
 - `convert_amount` - Convert between dollars and milliunits
+
+### Diagnostics
+
+- `get_memory_usage` - Current server memory usage stats
+- `get_env_status` - Debug info about environment (token masked)
 
 ## Documentation
 

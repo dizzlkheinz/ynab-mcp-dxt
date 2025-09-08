@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "ynab-mcp-server",
   "version": "0.1.1",
-  "description": "Model Context Protocol server for YNAB (You Need A Budget) integration. Provides 21 comprehensive tools for budget management, transaction tracking, advanced financial analysis with AI insights, spending trend analysis, cash flow forecasting, and budget health assessments.",
+  "description": "Model Context Protocol server for YNAB (You Need A Budget) integration. Provides 22 tools for budget management, transaction tracking, and advanced financial analysis with AI insights and spending trend analysis, plus 4 diagnostic and utility tools (26 total).",
   "author": {
     "name": "kdizzl"
   },
