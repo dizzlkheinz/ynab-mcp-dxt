@@ -12,6 +12,12 @@ import { dirname } from 'path';
 // Load environment variables from .env file
 config();
 
+// Allow CI builds to skip strict validation when packaging artifacts
+if (process.env['SKIP_ENV_VALIDATION'] === 'true') {
+  console.log('Skipping environment validation (SKIP_ENV_VALIDATION=true)');
+  process.exit(0);
+}
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
