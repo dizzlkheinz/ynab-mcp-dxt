@@ -2,6 +2,8 @@
  * Test setup and configuration
  */
 
+// Load environment variables from .env for integration tests
+import 'dotenv/config';
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 
 /**

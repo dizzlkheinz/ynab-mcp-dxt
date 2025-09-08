@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import * as ynab from 'ynab';
 import { handleListBudgets, handleGetBudget } from '../budgetTools.js';
 
@@ -12,29 +10,13 @@ describe('Budget Tools Integration', () => {
   let testBudgetId: string;
 
   beforeAll(() => {
-    // Load API key from file
-    try {
-      const apiKeyFile = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8');
-      const lines = apiKeyFile.split('\n');
-
-      let accessToken = '';
-      for (const line of lines) {
-        const [key, value] = line.split('=');
-        if (key === 'YNAB_API_KEY' && value) {
-          accessToken = value.trim();
-          break;
-        }
-      }
-
-      if (!accessToken) {
-        throw new Error('YNAB_API_KEY not found in api_key.txt');
-      }
-
-      ynabAPI = new ynab.API(accessToken);
-      console.log('✅ Loaded YNAB API key for integration tests');
-    } catch (error) {
-      throw new Error(`Failed to load API key from api_key.txt: ${error}`);
+    const accessToken = process.env['YNAB_ACCESS_TOKEN'];
+    if (!accessToken) {
+      throw new Error(
+        'YNAB_ACCESS_TOKEN is required. Set it in your .env file to run integration tests.',
+      );
     }
+    ynabAPI = new ynab.API(accessToken);
   });
 
   describe('handleListBudgets', () => {

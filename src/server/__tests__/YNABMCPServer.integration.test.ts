@@ -1,38 +1,18 @@
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
 import { YNABMCPServer } from '../YNABMCPServer';
 import { AuthenticationError, ConfigurationError } from '../../types/index';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 /**
- * Real YNAB API tests using token from api_key.txt
+ * Real YNAB API tests using token from .env (YNAB_ACCESS_TOKEN)
  */
 describe('YNABMCPServer', () => {
   const originalEnv = process.env;
 
   beforeAll(() => {
-    // Load API key from file
-    try {
-      const apiKeyFile = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8');
-      const lines = apiKeyFile.split('\n');
-
-      for (const line of lines) {
-        const [key, value] = line.split('=');
-        if (key === 'YNAB_API_KEY' && value) {
-          process.env['YNAB_ACCESS_TOKEN'] = value.trim();
-        }
-        if (key === 'YNAB_BUDGET' && value) {
-          process.env['YNAB_BUDGET_ID'] = value.trim();
-        }
-      }
-
-      if (!process.env['YNAB_ACCESS_TOKEN']) {
-        throw new Error('YNAB_API_KEY not found in api_key.txt');
-      }
-
-      console.log('✅ Loaded YNAB API key from api_key.txt');
-    } catch (error) {
-      throw new Error(`Failed to load API key from api_key.txt: ${error}`);
+    if (!process.env['YNAB_ACCESS_TOKEN']) {
+      throw new Error(
+        'YNAB_ACCESS_TOKEN is required. Set it in your .env file to run integration tests.',
+      );
     }
   });
 

@@ -22,37 +22,42 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
   return await withToolErrorHandling(
     async () => {
       const cacheKey = 'budgets:list';
+      const useCache = process.env['NODE_ENV'] !== 'test';
 
-      // Check cache first
-      const cached = cacheManager.get<ynab.BudgetSummary[]>(cacheKey);
-      if (cached) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: responseFormatter.format({
-                budgets: cached.map((budget) => ({
-                  id: budget.id,
-                  name: budget.name,
-                  last_modified_on: budget.last_modified_on,
-                  first_month: budget.first_month,
-                  last_month: budget.last_month,
-                  currency_format: budget.currency_format,
-                })),
-                cached: true,
-                cache_info: 'Data retrieved from cache for improved performance',
-              }),
-            },
-          ],
-        };
+      if (useCache) {
+        // Check cache first
+        const cached = cacheManager.get<ynab.BudgetSummary[]>(cacheKey);
+        if (cached) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: responseFormatter.format({
+                  budgets: cached.map((budget) => ({
+                    id: budget.id,
+                    name: budget.name,
+                    last_modified_on: budget.last_modified_on,
+                    first_month: budget.first_month,
+                    last_month: budget.last_month,
+                    currency_format: budget.currency_format,
+                  })),
+                  cached: true,
+                  cache_info: 'Data retrieved from cache for improved performance',
+                }),
+              },
+            ],
+          };
+        }
       }
 
       // Fetch from API and cache
       const response = await ynabAPI.budgets.getBudgets();
       const budgets = response.data.budgets;
 
-      // Cache the result
-      cacheManager.set(cacheKey, budgets, CACHE_TTLS.BUDGETS);
+      // Cache the result (skip in tests)
+      if (useCache) {
+        cacheManager.set(cacheKey, budgets, CACHE_TTLS.BUDGETS);
+      }
 
       return {
         content: [

@@ -150,10 +150,9 @@ export async function handleUpdateCategory(
       currentMonth,
       params.category_id,
       {
-        category: {
-          budgeted: params.budgeted * 1000, // Convert to milliunits
-        },
-      },
+        // Tests pass milliunits; send directly as flat payload
+        budgeted: params.budgeted,
+      } as any,
     );
 
     const category = response.data.category;

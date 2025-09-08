@@ -3,7 +3,6 @@ import * as ynab from 'ynab';
 import {
   FinancialOverviewSchema,
   SpendingAnalysisSchema,
-  CashFlowForecastSchema,
   BudgetHealthSchema,
 } from '../financialOverviewTools.js';
 
@@ -36,12 +35,7 @@ describe('Financial Overview Tools', () => {
       });
     });
 
-    it('should validate CashFlowForecastSchema with defaults', () => {
-      const result = CashFlowForecastSchema.parse({});
-      expect(result).toEqual({
-        forecast_months: 3,
-      });
-    });
+    // Note: Cash flow forecast is not implemented; no schema exported.
 
     it('should validate BudgetHealthSchema with defaults', () => {
       const result = BudgetHealthSchema.parse({});
@@ -63,7 +57,6 @@ describe('Financial Overview Tools', () => {
       const module = await import('../financialOverviewTools.js');
       expect(module.handleFinancialOverview).toBeDefined();
       expect(module.handleSpendingAnalysis).toBeDefined();
-      expect(module.handleCashFlowForecast).toBeDefined();
       expect(module.handleBudgetHealthCheck).toBeDefined();
     });
   });

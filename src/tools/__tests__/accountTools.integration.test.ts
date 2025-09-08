@@ -1,32 +1,23 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
 import { handleListAccounts, handleGetAccount } from '../accountTools.js';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 
 describe('Account Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
 
   beforeAll(async () => {
-    // Load API key from file
-    try {
-      const fileContent = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8').trim();
-      const apiKeyLine = fileContent.split('\n').find((line) => line.startsWith('YNAB_API_KEY='));
-      if (!apiKeyLine) {
-        throw new Error('YNAB_API_KEY not found in api_key.txt');
-      }
-      const apiKey = apiKeyLine.split('=')[1];
-      console.log('✅ Loaded YNAB API key for integration tests');
-      ynabAPI = new ynab.API(apiKey);
-
-      // Get the first budget for testing
-      const budgetsResponse = await ynabAPI.budgets.getBudgets();
-      testBudgetId = budgetsResponse.data.budgets[0].id;
-    } catch (error) {
-      console.log('⚠️ Skipping integration tests - no API key found');
-      throw error;
+    const accessToken = process.env['YNAB_ACCESS_TOKEN'];
+    if (!accessToken) {
+      throw new Error(
+        'YNAB_ACCESS_TOKEN is required. Set it in your .env file to run integration tests.',
+      );
     }
+    ynabAPI = new ynab.API(accessToken);
+
+    // Get the first budget for testing
+    const budgetsResponse = await ynabAPI.budgets.getBudgets();
+    testBudgetId = budgetsResponse.data.budgets[0].id;
   });
 
   it('should successfully list accounts from real API', async () => {

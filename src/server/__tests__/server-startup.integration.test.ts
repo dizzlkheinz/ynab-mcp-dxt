@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { YNABMCPServer } from '../YNABMCPServer';
 import { AuthenticationError, ConfigurationError } from '../../types/index';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 
@@ -19,28 +17,10 @@ describe('Server Startup and Transport Integration', () => {
   const originalEnv = process.env;
 
   beforeAll(() => {
-    // Load API key from file for integration tests
-    try {
-      const apiKeyFile = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8');
-      const lines = apiKeyFile.split('\n');
-
-      for (const line of lines) {
-        const [key, value] = line.split('=');
-        if (key === 'YNAB_API_KEY' && value) {
-          process.env['YNAB_ACCESS_TOKEN'] = value.trim();
-        }
-        if (key === 'YNAB_BUDGET' && value) {
-          process.env['YNAB_BUDGET_ID'] = value.trim();
-        }
-      }
-
-      if (!process.env['YNAB_ACCESS_TOKEN']) {
-        throw new Error('YNAB_API_KEY not found in api_key.txt');
-      }
-
-      console.log('✅ Loaded YNAB API key for server startup tests');
-    } catch (error) {
-      throw new Error(`Failed to load API key from api_key.txt: ${error}`);
+    if (!process.env['YNAB_ACCESS_TOKEN']) {
+      throw new Error(
+        'YNAB_ACCESS_TOKEN is required. Set it in your .env file to run integration tests.',
+      );
     }
   });
 

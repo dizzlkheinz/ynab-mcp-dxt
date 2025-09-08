@@ -1,6 +1,4 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import * as ynab from 'ynab';
 import { handleGetMonth, handleListMonths } from '../monthTools.js';
 
@@ -13,46 +11,28 @@ describe('Month Tools Integration', () => {
   let testMonth: string;
 
   beforeAll(async () => {
-    // Load API key from file
-    try {
-      const apiKeyFile = readFileSync(join(process.cwd(), 'api_key.txt'), 'utf-8');
-      const lines = apiKeyFile.split('\n');
-
-      let accessToken = '';
-      for (const line of lines) {
-        const [key, value] = line.split('=');
-        if (key === 'YNAB_API_KEY' && value) {
-          accessToken = value.trim();
-          break;
-        }
-      }
-
-      if (!accessToken) {
-        throw new Error('YNAB_API_KEY not found in api_key.txt');
-      }
-
-      ynabAPI = new ynab.API(accessToken);
-      console.log('✅ Loaded YNAB API key for integration tests');
-
-      // Get a test budget ID
-      const budgetsResponse = await ynabAPI.budgets.getBudgets();
-      if (budgetsResponse.data.budgets.length === 0) {
-        throw new Error('No budgets found for testing');
-      }
-      testBudgetId = budgetsResponse.data.budgets[0].id;
-
-      // Get a test month from the existing months in the budget
-      const monthsResponse = await ynabAPI.months.getBudgetMonths(testBudgetId);
-      if (monthsResponse.data.months.length === 0) {
-        throw new Error('No months found for testing');
-      }
-      testMonth = monthsResponse.data.months[0].month;
-
-      console.log(`✅ Using test budget: ${testBudgetId}`);
-      console.log(`✅ Using test month: ${testMonth}`);
-    } catch (error) {
-      throw new Error(`Failed to setup integration tests: ${error}`);
+    const accessToken = process.env['YNAB_ACCESS_TOKEN'];
+    if (!accessToken) {
+      throw new Error(
+        'YNAB_ACCESS_TOKEN is required. Set it in your .env file to run integration tests.',
+      );
     }
+
+    ynabAPI = new ynab.API(accessToken);
+
+    // Get a test budget ID
+    const budgetsResponse = await ynabAPI.budgets.getBudgets();
+    if (budgetsResponse.data.budgets.length === 0) {
+      throw new Error('No budgets found for testing');
+    }
+    testBudgetId = budgetsResponse.data.budgets[0].id;
+
+    // Get a test month from the existing months in the budget
+    const monthsResponse = await ynabAPI.months.getBudgetMonths(testBudgetId);
+    if (monthsResponse.data.months.length === 0) {
+      throw new Error('No months found for testing');
+    }
+    testMonth = monthsResponse.data.months[0].month;
   });
 
   describe('handleListMonths', () => {
