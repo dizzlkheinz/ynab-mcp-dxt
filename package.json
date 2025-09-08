@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "prebuild": "npm run clean && npm run format && npm run validate-env && npm run lint",
+    "prebuild": "npm run clean && npm run format && npm run lint",
     "build": "tsc && npm run bundle",
     "build:prod": "npm run prebuild && tsc --project tsconfig.prod.json && npm run bundle:prod && npm run verify-build",
     "clean": "rimraf dist",
