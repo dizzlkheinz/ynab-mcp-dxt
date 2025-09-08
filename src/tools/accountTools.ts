@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
  * Schema for ynab:list_accounts tool parameters
@@ -59,30 +60,26 @@ export async function handleListAccounts(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                accounts: accounts.map((account) => ({
-                  id: account.id,
-                  name: account.name,
-                  type: account.type,
-                  on_budget: account.on_budget,
-                  closed: account.closed,
-                  note: account.note,
-                  balance: ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance),
-                  cleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
-                    account.cleared_balance,
-                  ),
-                  uncleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
-                    account.uncleared_balance,
-                  ),
-                  transfer_payee_id: account.transfer_payee_id,
-                  direct_import_linked: account.direct_import_linked,
-                  direct_import_in_error: account.direct_import_in_error,
-                })),
-              },
-              null,
-              2,
-            ),
+            text: responseFormatter.format({
+              accounts: accounts.map((account) => ({
+                id: account.id,
+                name: account.name,
+                type: account.type,
+                on_budget: account.on_budget,
+                closed: account.closed,
+                note: account.note,
+                balance: ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance),
+                cleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
+                  account.cleared_balance,
+                ),
+                uncleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
+                  account.uncleared_balance,
+                ),
+                transfer_payee_id: account.transfer_payee_id,
+                direct_import_linked: account.direct_import_linked,
+                direct_import_in_error: account.direct_import_in_error,
+              })),
+            }),
           },
         ],
       };
@@ -109,30 +106,26 @@ export async function handleGetAccount(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                account: {
-                  id: account.id,
-                  name: account.name,
-                  type: account.type,
-                  on_budget: account.on_budget,
-                  closed: account.closed,
-                  note: account.note,
-                  balance: ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance),
-                  cleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
-                    account.cleared_balance,
-                  ),
-                  uncleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
-                    account.uncleared_balance,
-                  ),
-                  transfer_payee_id: account.transfer_payee_id,
-                  direct_import_linked: account.direct_import_linked,
-                  direct_import_in_error: account.direct_import_in_error,
-                },
+            text: responseFormatter.format({
+              account: {
+                id: account.id,
+                name: account.name,
+                type: account.type,
+                on_budget: account.on_budget,
+                closed: account.closed,
+                note: account.note,
+                balance: ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance),
+                cleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
+                  account.cleared_balance,
+                ),
+                uncleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
+                  account.uncleared_balance,
+                ),
+                transfer_payee_id: account.transfer_payee_id,
+                direct_import_linked: account.direct_import_linked,
+                direct_import_in_error: account.direct_import_in_error,
               },
-              null,
-              2,
-            ),
+            }),
           },
         ],
       };
@@ -168,30 +161,26 @@ export async function handleCreateAccount(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                account: {
-                  id: account.id,
-                  name: account.name,
-                  type: account.type,
-                  on_budget: account.on_budget,
-                  closed: account.closed,
-                  note: account.note,
-                  balance: ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance),
-                  cleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
-                    account.cleared_balance,
-                  ),
-                  uncleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
-                    account.uncleared_balance,
-                  ),
-                  transfer_payee_id: account.transfer_payee_id,
-                  direct_import_linked: account.direct_import_linked,
-                  direct_import_in_error: account.direct_import_in_error,
-                },
+            text: responseFormatter.format({
+              account: {
+                id: account.id,
+                name: account.name,
+                type: account.type,
+                on_budget: account.on_budget,
+                closed: account.closed,
+                note: account.note,
+                balance: ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance),
+                cleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
+                  account.cleared_balance,
+                ),
+                uncleared_balance: ynab.utils.convertMilliUnitsToCurrencyAmount(
+                  account.uncleared_balance,
+                ),
+                transfer_payee_id: account.transfer_payee_id,
+                direct_import_linked: account.direct_import_linked,
+                direct_import_in_error: account.direct_import_in_error,
               },
-              null,
-              2,
-            ),
+            }),
           },
         ],
       };

@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
 import { cacheManager, CACHE_TTLS } from '../server/cacheManager.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
  * Schema for ynab:get_budget tool parameters
@@ -29,22 +30,18 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
           content: [
             {
               type: 'text',
-              text: JSON.stringify(
-                {
-                  budgets: cached.map((budget) => ({
-                    id: budget.id,
-                    name: budget.name,
-                    last_modified_on: budget.last_modified_on,
-                    first_month: budget.first_month,
-                    last_month: budget.last_month,
-                    currency_format: budget.currency_format,
-                  })),
-                  cached: true,
-                  cache_info: 'Data retrieved from cache for improved performance',
-                },
-                null,
-                2,
-              ),
+              text: responseFormatter.format({
+                budgets: cached.map((budget) => ({
+                  id: budget.id,
+                  name: budget.name,
+                  last_modified_on: budget.last_modified_on,
+                  first_month: budget.first_month,
+                  last_month: budget.last_month,
+                  currency_format: budget.currency_format,
+                })),
+                cached: true,
+                cache_info: 'Data retrieved from cache for improved performance',
+              }),
             },
           ],
         };
@@ -61,23 +58,19 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                budgets: budgets.map((budget) => ({
-                  id: budget.id,
-                  name: budget.name,
-                  last_modified_on: budget.last_modified_on,
-                  first_month: budget.first_month,
-                  last_month: budget.last_month,
-                  date_format: budget.date_format,
-                  currency_format: budget.currency_format,
-                })),
-                cached: false,
-                cache_info: 'Fresh data retrieved from YNAB API',
-              },
-              null,
-              2,
-            ),
+            text: responseFormatter.format({
+              budgets: budgets.map((budget) => ({
+                id: budget.id,
+                name: budget.name,
+                last_modified_on: budget.last_modified_on,
+                first_month: budget.first_month,
+                last_month: budget.last_month,
+                date_format: budget.date_format,
+                currency_format: budget.currency_format,
+              })),
+              cached: false,
+              cache_info: 'Fresh data retrieved from YNAB API',
+            }),
           },
         ],
       };
@@ -104,53 +97,49 @@ export async function handleGetBudget(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                budget: {
-                  id: budget.id,
-                  name: budget.name,
-                  last_modified_on: budget.last_modified_on,
-                  first_month: budget.first_month,
-                  last_month: budget.last_month,
-                  date_format: budget.date_format,
-                  currency_format: budget.currency_format,
-                  accounts: budget.accounts?.map((account) => ({
-                    id: account.id,
-                    name: account.name,
-                    type: account.type,
-                    on_budget: account.on_budget,
-                    closed: account.closed,
-                    balance: account.balance,
-                    cleared_balance: account.cleared_balance,
-                    uncleared_balance: account.uncleared_balance,
-                  })),
-                  categories: budget.categories?.map((category) => ({
-                    id: category.id,
-                    category_group_id: category.category_group_id,
-                    name: category.name,
-                    hidden: category.hidden,
-                    budgeted: category.budgeted,
-                    activity: category.activity,
-                    balance: category.balance,
-                  })),
-                  payees: budget.payees?.map((payee) => ({
-                    id: payee.id,
-                    name: payee.name,
-                    transfer_account_id: payee.transfer_account_id,
-                  })),
-                  months: budget.months?.map((month) => ({
-                    month: month.month,
-                    note: month.note,
-                    income: month.income,
-                    budgeted: month.budgeted,
-                    activity: month.activity,
-                    to_be_budgeted: month.to_be_budgeted,
-                  })),
-                },
+            text: responseFormatter.format({
+              budget: {
+                id: budget.id,
+                name: budget.name,
+                last_modified_on: budget.last_modified_on,
+                first_month: budget.first_month,
+                last_month: budget.last_month,
+                date_format: budget.date_format,
+                currency_format: budget.currency_format,
+                accounts: budget.accounts?.map((account) => ({
+                  id: account.id,
+                  name: account.name,
+                  type: account.type,
+                  on_budget: account.on_budget,
+                  closed: account.closed,
+                  balance: account.balance,
+                  cleared_balance: account.cleared_balance,
+                  uncleared_balance: account.uncleared_balance,
+                })),
+                categories: budget.categories?.map((category) => ({
+                  id: category.id,
+                  category_group_id: category.category_group_id,
+                  name: category.name,
+                  hidden: category.hidden,
+                  budgeted: category.budgeted,
+                  activity: category.activity,
+                  balance: category.balance,
+                })),
+                payees: budget.payees?.map((payee) => ({
+                  id: payee.id,
+                  name: payee.name,
+                  transfer_account_id: payee.transfer_account_id,
+                })),
+                months: budget.months?.map((month) => ({
+                  month: month.month,
+                  note: month.note,
+                  income: month.income,
+                  budgeted: month.budgeted,
+                  activity: month.activity,
+                  to_be_budgeted: month.to_be_budgeted,
+                })),
               },
-              null,
-              2,
-            ),
+            }),
           },
         ],
       };

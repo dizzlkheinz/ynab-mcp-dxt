@@ -19,12 +19,11 @@ A Model Context Protocol (MCP) server that provides AI assistants with secure ac
 ## Features
 
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
-- **Smart Financial Analysis**: Statistical spending trends using linear regression, accurate overspending detection, comprehensive budget optimization insights, and AI-generated recommendations
+- **Smart Financial Analysis (work in progress)**: Statistical spending trends using linear regression, accurate overspending detection, comprehensive budget optimization insights, and AI-generated recommendations
 - **Secure Authentication**: Uses YNAB Personal Access Tokens with proper security practices
 - **Comprehensive Error Handling**: Robust error handling with detailed feedback and security-conscious error messages
 - **Type Safety**: Built with TypeScript for enhanced reliability and developer experience
 - **Extensive Testing**: Unit, integration, end-to-end, and performance tests with high coverage
-- **Production Ready**: Includes deployment guides, monitoring, and security best practices
 
 ## Quick Start
 
@@ -104,6 +103,24 @@ dist/ynab-mcp-server-<version>.dxt
 - “Invalid or expired token” → Recheck `YNAB_ACCESS_TOKEN` in the extension settings; generate a new token in YNAB if needed.
 - Use `get_env_status` to confirm Claude passed the token into the server (shows token_present and token_length).
 - This DXT is a single-file Node bundle (no node_modules). If Claude Desktop reports a Node/runtime issue, update Claude Desktop to a recent version and try again.
+
+### Control Output Size (Minified JSON)
+
+Tool responses are JSON strings. To save context, outputs are minified by default. You can control this behavior via environment variables:
+
+- `YNAB_MCP_MINIFY_OUTPUT` (default: `true`) — when `true`, responses are compact (no whitespace).
+- `YNAB_MCP_PRETTY_SPACES` (default: `2`) — number of spaces used only if minification is disabled.
+
+Examples:
+
+```bash
+# Minified (default)
+YNAB_MCP_MINIFY_OUTPUT=true
+
+# Pretty-print with 2 spaces
+YNAB_MCP_MINIFY_OUTPUT=false
+YNAB_MCP_PRETTY_SPACES=2
+```
 
 ## Available Tools
 
@@ -251,6 +268,7 @@ This server follows security best practices:
 - Open a PR: https://github.com/dizzlkheinz/mcp-for-ynab/compare
 
 Notes:
+
 - PRs use an auto-applied template and a public API checklist (see docs/VERSIONING.md)
 - For release planning, use the “Release Checklist” issue template
 

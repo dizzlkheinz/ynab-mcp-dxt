@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
  * Schema for ynab:list_categories tool parameters
@@ -71,19 +72,15 @@ export async function handleListCategories(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                categories: allCategories,
-                category_groups: categoryGroups.map((group) => ({
-                  id: group.id,
-                  name: group.name,
-                  hidden: group.hidden,
-                  deleted: group.deleted,
-                })),
-              },
-              null,
-              2,
-            ),
+            text: responseFormatter.format({
+              categories: allCategories,
+              category_groups: categoryGroups.map((group) => ({
+                id: group.id,
+                name: group.name,
+                hidden: group.hidden,
+                deleted: group.deleted,
+              })),
+            }),
           },
         ],
       };
@@ -109,28 +106,24 @@ export async function handleGetCategory(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              category: {
-                id: category.id,
-                category_group_id: category.category_group_id,
-                name: category.name,
-                hidden: category.hidden,
-                original_category_group_id: category.original_category_group_id,
-                note: category.note,
-                budgeted: category.budgeted,
-                activity: category.activity,
-                balance: category.balance,
-                goal_type: category.goal_type,
-                goal_creation_month: category.goal_creation_month,
-                goal_target: category.goal_target,
-                goal_target_month: category.goal_target_month,
-                goal_percentage_complete: category.goal_percentage_complete,
-              },
+          text: responseFormatter.format({
+            category: {
+              id: category.id,
+              category_group_id: category.category_group_id,
+              name: category.name,
+              hidden: category.hidden,
+              original_category_group_id: category.original_category_group_id,
+              note: category.note,
+              budgeted: category.budgeted,
+              activity: category.activity,
+              balance: category.balance,
+              goal_type: category.goal_type,
+              goal_creation_month: category.goal_creation_month,
+              goal_target: category.goal_target,
+              goal_target_month: category.goal_target_month,
+              goal_percentage_complete: category.goal_percentage_complete,
             },
-            null,
-            2,
-          ),
+          }),
         },
       ],
     };
@@ -169,29 +162,25 @@ export async function handleUpdateCategory(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              category: {
-                id: category.id,
-                category_group_id: category.category_group_id,
-                name: category.name,
-                hidden: category.hidden,
-                original_category_group_id: category.original_category_group_id,
-                note: category.note,
-                budgeted: category.budgeted,
-                activity: category.activity,
-                balance: category.balance,
-                goal_type: category.goal_type,
-                goal_creation_month: category.goal_creation_month,
-                goal_target: category.goal_target,
-                goal_target_month: category.goal_target_month,
-                goal_percentage_complete: category.goal_percentage_complete,
-              },
-              updated_month: currentMonth,
+          text: responseFormatter.format({
+            category: {
+              id: category.id,
+              category_group_id: category.category_group_id,
+              name: category.name,
+              hidden: category.hidden,
+              original_category_group_id: category.original_category_group_id,
+              note: category.note,
+              budgeted: category.budgeted,
+              activity: category.activity,
+              balance: category.balance,
+              goal_type: category.goal_type,
+              goal_creation_month: category.goal_creation_month,
+              goal_target: category.goal_target,
+              goal_target_month: category.goal_target_month,
+              goal_percentage_complete: category.goal_percentage_complete,
             },
-            null,
-            2,
-          ),
+            updated_month: currentMonth,
+          }),
         },
       ],
     };
@@ -224,15 +213,11 @@ function handleCategoryError(error: unknown, defaultMessage: string): CallToolRe
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            error: {
-              message: errorMessage,
-            },
+        text: responseFormatter.format({
+          error: {
+            message: errorMessage,
           },
-          null,
-          2,
-        ),
+        }),
       },
     ],
   };

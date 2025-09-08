@@ -42,6 +42,23 @@ This document provides detailed information about environment variables and conf
 - **Description**: Controls the verbosity of application logging
 - **Example**: `LOG_LEVEL=warn`
 
+#### YNAB_MCP_MINIFY_OUTPUT
+
+- **Type**: Boolean
+- **Required**: No
+- **Default**: `true`
+- **Valid Values**: `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`
+- **Description**: Controls whether tool responses are returned as minified JSON to save context.
+- **Example**: `YNAB_MCP_MINIFY_OUTPUT=true`
+
+#### YNAB_MCP_PRETTY_SPACES
+
+- **Type**: Number
+- **Required**: No
+- **Default**: `2`
+- **Description**: Number of spaces to use when pretty-printing JSON. Only used when `YNAB_MCP_MINIFY_OUTPUT=false`.
+- **Example**: `YNAB_MCP_PRETTY_SPACES=2`
+
 ## Configuration Files
 
 ### .env File
@@ -55,6 +72,12 @@ YNAB_ACCESS_TOKEN=your_personal_access_token_here
 # Application Configuration
 NODE_ENV=development
 LOG_LEVEL=info
+
+# Output formatting
+# Minify JSON output (saves context)
+YNAB_MCP_MINIFY_OUTPUT=true
+# Pretty spaces when not minifying
+YNAB_MCP_PRETTY_SPACES=2
 ```
 
 **Important**: 

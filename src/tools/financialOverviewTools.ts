@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
 import { cacheManager, CACHE_TTLS } from '../server/cacheManager.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 import { getHistoricalMonths } from '../utils/dateUtils.js';
 import { mean, deviation, quantile } from 'd3-array';
 
@@ -122,7 +123,7 @@ export async function handleFinancialOverview(
           content: [
             {
               type: 'text',
-              text: JSON.stringify({ ...cached, cached: true }, null, 2),
+              text: responseFormatter.format({ ...cached, cached: true }),
             },
           ],
         };
@@ -242,7 +243,7 @@ export async function handleFinancialOverview(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(overview, null, 2),
+            text: responseFormatter.format(overview),
           },
         ],
       };
@@ -282,7 +283,7 @@ export async function handleSpendingAnalysis(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(analysis, null, 2),
+            text: responseFormatter.format(analysis),
           },
         ],
       };
@@ -326,7 +327,7 @@ export async function handleBudgetHealthCheck(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(healthCheck, null, 2),
+            text: responseFormatter.format(healthCheck),
           },
         ],
       };

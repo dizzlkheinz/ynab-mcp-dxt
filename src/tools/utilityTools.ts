@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
  * Schema for ynab:convert_amount tool parameters
@@ -27,15 +28,11 @@ export async function handleGetUser(ynabAPI: ynab.API): Promise<CallToolResult> 
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                user: {
-                  id: user.id,
-                },
+            text: responseFormatter.format({
+              user: {
+                id: user.id,
               },
-              null,
-              2,
-            ),
+            }),
           },
         ],
       };
@@ -73,18 +70,14 @@ export async function handleConvertAmount(params: ConvertAmountParams): Promise<
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                conversion: {
-                  original_amount: amount,
-                  converted_amount: result,
-                  to_milliunits,
-                  description,
-                },
+            text: responseFormatter.format({
+              conversion: {
+                original_amount: amount,
+                converted_amount: result,
+                to_milliunits,
+                description,
               },
-              null,
-              2,
-            ),
+            }),
           },
         ],
       };

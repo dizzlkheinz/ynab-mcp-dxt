@@ -2,6 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
  * Schema for ynab:list_payees tool parameters
@@ -39,18 +40,14 @@ export async function handleListPayees(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                payees: payees.map((payee) => ({
-                  id: payee.id,
-                  name: payee.name,
-                  transfer_account_id: payee.transfer_account_id,
-                  deleted: payee.deleted,
-                })),
-              },
-              null,
-              2,
-            ),
+            text: responseFormatter.format({
+              payees: payees.map((payee) => ({
+                id: payee.id,
+                name: payee.name,
+                transfer_account_id: payee.transfer_account_id,
+                deleted: payee.deleted,
+              })),
+            }),
           },
         ],
       };
@@ -77,18 +74,14 @@ export async function handleGetPayee(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                payee: {
-                  id: payee.id,
-                  name: payee.name,
-                  transfer_account_id: payee.transfer_account_id,
-                  deleted: payee.deleted,
-                },
+            text: responseFormatter.format({
+              payee: {
+                id: payee.id,
+                name: payee.name,
+                transfer_account_id: payee.transfer_account_id,
+                deleted: payee.deleted,
               },
-              null,
-              2,
-            ),
+            }),
           },
         ],
       };

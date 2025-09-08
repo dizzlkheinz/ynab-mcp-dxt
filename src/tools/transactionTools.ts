@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { SaveTransaction } from 'ynab/dist/models/SaveTransaction.js';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
+import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
  * Utility function to ensure transaction is not null/undefined
@@ -134,29 +135,25 @@ export async function handleListTransactions(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                transactions: transactions.map((transaction) => ({
-                  id: transaction.id,
-                  date: transaction.date,
-                  amount: transaction.amount,
-                  memo: transaction.memo,
-                  cleared: transaction.cleared,
-                  approved: transaction.approved,
-                  flag_color: transaction.flag_color,
-                  account_id: transaction.account_id,
-                  payee_id: transaction.payee_id,
-                  category_id: transaction.category_id,
-                  transfer_account_id: transaction.transfer_account_id,
-                  transfer_transaction_id: transaction.transfer_transaction_id,
-                  matched_transaction_id: transaction.matched_transaction_id,
-                  import_id: transaction.import_id,
-                  deleted: transaction.deleted,
-                })),
-              },
-              null,
-              2,
-            ),
+            text: responseFormatter.format({
+              transactions: transactions.map((transaction) => ({
+                id: transaction.id,
+                date: transaction.date,
+                amount: transaction.amount,
+                memo: transaction.memo,
+                cleared: transaction.cleared,
+                approved: transaction.approved,
+                flag_color: transaction.flag_color,
+                account_id: transaction.account_id,
+                payee_id: transaction.payee_id,
+                category_id: transaction.category_id,
+                transfer_account_id: transaction.transfer_account_id,
+                transfer_transaction_id: transaction.transfer_transaction_id,
+                matched_transaction_id: transaction.matched_transaction_id,
+                import_id: transaction.import_id,
+                deleted: transaction.deleted,
+              })),
+            }),
           },
         ],
       };
@@ -186,32 +183,28 @@ export async function handleGetTransaction(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              transaction: {
-                id: transaction.id,
-                date: transaction.date,
-                amount: transaction.amount,
-                memo: transaction.memo,
-                cleared: transaction.cleared,
-                approved: transaction.approved,
-                flag_color: transaction.flag_color,
-                account_id: transaction.account_id,
-                payee_id: transaction.payee_id,
-                category_id: transaction.category_id,
-                transfer_account_id: transaction.transfer_account_id,
-                transfer_transaction_id: transaction.transfer_transaction_id,
-                matched_transaction_id: transaction.matched_transaction_id,
-                import_id: transaction.import_id,
-                deleted: transaction.deleted,
-                account_name: transaction.account_name,
-                payee_name: transaction.payee_name,
-                category_name: transaction.category_name,
-              },
+          text: responseFormatter.format({
+            transaction: {
+              id: transaction.id,
+              date: transaction.date,
+              amount: transaction.amount,
+              memo: transaction.memo,
+              cleared: transaction.cleared,
+              approved: transaction.approved,
+              flag_color: transaction.flag_color,
+              account_id: transaction.account_id,
+              payee_id: transaction.payee_id,
+              category_id: transaction.category_id,
+              transfer_account_id: transaction.transfer_account_id,
+              transfer_transaction_id: transaction.transfer_transaction_id,
+              matched_transaction_id: transaction.matched_transaction_id,
+              import_id: transaction.import_id,
+              deleted: transaction.deleted,
+              account_name: transaction.account_name,
+              payee_name: transaction.payee_name,
+              category_name: transaction.category_name,
             },
-            null,
-            2,
-          ),
+          }),
         },
       ],
     };
@@ -253,29 +246,25 @@ export async function handleCreateTransaction(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              transaction: {
-                id: transaction.id,
-                date: transaction.date,
-                amount: transaction.amount,
-                memo: transaction.memo,
-                cleared: transaction.cleared,
-                approved: transaction.approved,
-                flag_color: transaction.flag_color,
-                account_id: transaction.account_id,
-                payee_id: transaction.payee_id,
-                category_id: transaction.category_id,
-                transfer_account_id: transaction.transfer_account_id,
-                transfer_transaction_id: transaction.transfer_transaction_id,
-                matched_transaction_id: transaction.matched_transaction_id,
-                import_id: transaction.import_id,
-                deleted: transaction.deleted,
-              },
+          text: responseFormatter.format({
+            transaction: {
+              id: transaction.id,
+              date: transaction.date,
+              amount: transaction.amount,
+              memo: transaction.memo,
+              cleared: transaction.cleared,
+              approved: transaction.approved,
+              flag_color: transaction.flag_color,
+              account_id: transaction.account_id,
+              payee_id: transaction.payee_id,
+              category_id: transaction.category_id,
+              transfer_account_id: transaction.transfer_account_id,
+              transfer_transaction_id: transaction.transfer_transaction_id,
+              matched_transaction_id: transaction.matched_transaction_id,
+              import_id: transaction.import_id,
+              deleted: transaction.deleted,
             },
-            null,
-            2,
-          ),
+          }),
         },
       ],
     };
@@ -342,29 +331,25 @@ export async function handleUpdateTransaction(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              transaction: {
-                id: transaction.id,
-                date: transaction.date,
-                amount: transaction.amount,
-                memo: transaction.memo,
-                cleared: transaction.cleared,
-                approved: transaction.approved,
-                flag_color: transaction.flag_color,
-                account_id: transaction.account_id,
-                payee_id: transaction.payee_id,
-                category_id: transaction.category_id,
-                transfer_account_id: transaction.transfer_account_id,
-                transfer_transaction_id: transaction.transfer_transaction_id,
-                matched_transaction_id: transaction.matched_transaction_id,
-                import_id: transaction.import_id,
-                deleted: transaction.deleted,
-              },
+          text: responseFormatter.format({
+            transaction: {
+              id: transaction.id,
+              date: transaction.date,
+              amount: transaction.amount,
+              memo: transaction.memo,
+              cleared: transaction.cleared,
+              approved: transaction.approved,
+              flag_color: transaction.flag_color,
+              account_id: transaction.account_id,
+              payee_id: transaction.payee_id,
+              category_id: transaction.category_id,
+              transfer_account_id: transaction.transfer_account_id,
+              transfer_transaction_id: transaction.transfer_transaction_id,
+              matched_transaction_id: transaction.matched_transaction_id,
+              import_id: transaction.import_id,
+              deleted: transaction.deleted,
             },
-            null,
-            2,
-          ),
+          }),
         },
       ],
     };
@@ -393,17 +378,13 @@ export async function handleDeleteTransaction(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              message: 'Transaction deleted successfully',
-              transaction: {
-                id: transaction.id,
-                deleted: transaction.deleted,
-              },
+          text: responseFormatter.format({
+            message: 'Transaction deleted successfully',
+            transaction: {
+              id: transaction.id,
+              deleted: transaction.deleted,
             },
-            null,
-            2,
-          ),
+          }),
         },
       ],
     };
@@ -436,15 +417,11 @@ function handleTransactionError(error: unknown, defaultMessage: string): CallToo
     content: [
       {
         type: 'text',
-        text: JSON.stringify(
-          {
-            error: {
-              message: errorMessage,
-            },
+        text: responseFormatter.format({
+          error: {
+            message: errorMessage,
           },
-          null,
-          2,
-        ),
+        }),
       },
     ],
   };

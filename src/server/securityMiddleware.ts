@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { globalRateLimiter, RateLimitError } from './rateLimiter.js';
 import { globalRequestLogger } from './requestLogger.js';
 import { ErrorHandler } from './errorHandler.js';
+import { responseFormatter } from './responseFormatter.js';
 
 /**
  * Security context for requests
@@ -147,20 +148,16 @@ export class SecurityMiddleware {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              error: {
-                code: 'RATE_LIMIT_EXCEEDED',
-                message: error.message,
-                details: {
-                  resetTime: error.resetTime.toISOString(),
-                  remaining: error.remaining,
-                },
+          text: responseFormatter.format({
+            error: {
+              code: 'RATE_LIMIT_EXCEEDED',
+              message: error.message,
+              details: {
+                resetTime: error.resetTime.toISOString(),
+                remaining: error.remaining,
               },
             },
-            null,
-            2,
-          ),
+          }),
         },
       ],
     };

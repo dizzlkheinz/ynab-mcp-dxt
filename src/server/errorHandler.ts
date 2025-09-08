@@ -73,7 +73,7 @@ export class ErrorHandler {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(errorResponse, null, 2),
+          text: responseFormatter.format(errorResponse),
         },
       ],
     };
@@ -491,3 +491,4 @@ export async function withToolErrorHandling<T>(
 ): Promise<T | CallToolResult> {
   return ErrorHandler.withErrorHandling(operation, `executing ${toolName} - ${operationName}`);
 }
+import { responseFormatter } from './responseFormatter.js';
