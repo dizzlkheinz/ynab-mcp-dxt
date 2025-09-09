@@ -168,6 +168,25 @@ export class YNABMCPServer {
             mimeType: 'application/json',
           },
           {
+            name: 'set_output_format',
+            description:
+              'Configure default JSON output formatting (minify or pretty spaces)',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                default_minify: { type: 'boolean', description: 'Default: true' },
+                pretty_spaces: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 10,
+                  description: 'Spaces for pretty printing when not minified',
+                },
+              },
+              required: [],
+            },
+          },
+          {
             uri: 'ynab://user',
             name: 'YNAB User Info',
             description: 'Current user information and subscription details',
@@ -441,6 +460,7 @@ Convert milliunits to dollars for easy reading.`,
             description: "List all budgets associated with the user's account",
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -450,6 +470,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -464,6 +485,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Set the default budget for subsequent operations',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -478,6 +500,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get the currently set default budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -488,6 +511,7 @@ Convert milliunits to dollars for easy reading.`,
               'List all accounts for a specific budget (uses default budget if not specified)',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -503,6 +527,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific account',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -521,6 +546,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Create a new account in the specified budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -556,6 +582,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List transactions for a budget with optional filtering',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -589,6 +616,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific transaction',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -607,6 +635,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Create a new transaction in the specified budget and account',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -664,6 +693,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Update an existing transaction',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -725,6 +755,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Delete a transaction from the specified budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -743,6 +774,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List all categories for a specific budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -757,6 +789,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific category',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -775,6 +808,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Update the budgeted amount for a category in the current month',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -797,6 +831,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List all payees for a specific budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -811,6 +846,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific payee',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -829,6 +865,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get budget data for a specific month',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -848,6 +885,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List all months summary data for a budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -862,6 +900,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get information about the authenticated user',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -872,6 +911,7 @@ Convert milliunits to dollars for easy reading.`,
               'Convert between dollars and milliunits with integer arithmetic for precision',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 amount: {
                   type: 'number',
@@ -891,6 +931,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get comprehensive financial overview with insights, trends, and analysis',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -922,6 +963,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Detailed spending analysis with category breakdowns and trends',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -947,6 +989,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Comprehensive budget health assessment with recommendations',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -1229,13 +1272,15 @@ Convert milliunits to dollars for easy reading.`,
             }
 
           case 'update_category':
-            try {
-              const params = UpdateCategorySchema.parse(args);
-              return await handleUpdateCategory(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:update_category',
-                error instanceof Error ? error.message : 'Unknown validation error',
+            {
+              const exec = withSecurityWrapper('ynab', 'update_category', UpdateCategorySchema)(
+                this.config.accessToken,
+              )(args as Record<string, unknown>);
+              return exec(async (validated) =>
+                handleUpdateCategory(
+                  this.ynabAPI,
+                  validated as unknown as Parameters<typeof handleUpdateCategory>[1],
+                ),
               );
             }
 
@@ -1427,6 +1472,24 @@ Convert milliunits to dollars for easy reading.`,
                 {
                   type: 'text',
                   text: responseFormatter.format(payload),
+                },
+              ],
+            };
+          }
+
+          case 'set_output_format': {
+            const raw = (args || {}) as { default_minify?: boolean; pretty_spaces?: number };
+            const options: { defaultMinify?: boolean; prettySpaces?: number } = {};
+            if (typeof raw.default_minify === 'boolean') options.defaultMinify = raw.default_minify;
+            if (typeof raw.pretty_spaces === 'number' && Number.isFinite(raw.pretty_spaces)) {
+              options.prettySpaces = Math.max(0, Math.min(10, Math.floor(raw.pretty_spaces)));
+            }
+            responseFormatter.configure(options);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: responseFormatter.format({ success: true, options }),
                 },
               ],
             };
