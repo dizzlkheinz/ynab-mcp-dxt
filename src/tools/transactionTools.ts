@@ -227,12 +227,13 @@ export async function handleCreateTransaction(
       account_id: params.account_id,
       amount: params.amount, // Already validated as integer milliunits
       date: params.date,
-      payee_name: params.payee_name || null,
-      payee_id: params.payee_id || null,
-      category_id: params.category_id || null,
-      memo: params.memo || null,
+      // Include optional fields as-is so undefined stays undefined when omitted
+      payee_name: params.payee_name as any,
+      payee_id: params.payee_id as any,
+      category_id: params.category_id as any,
+      memo: params.memo as any,
       cleared: params.cleared as ynab.TransactionClearedStatus,
-      approved: params.approved ?? false,
+      approved: params.approved as any,
       flag_color: params.flag_color as ynab.TransactionFlagColor,
     };
 

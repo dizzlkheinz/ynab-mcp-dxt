@@ -74,7 +74,7 @@ describe('YNAB MCP Server - Performance Tests', () => {
       expect(responseTime).toBeLessThan(1000); // Should respond within 1 second
 
       const budgets = parseToolResult(result);
-      expect(budgets.data.budgets).toHaveLength(5);
+      expect(budgets.budgets).toHaveLength(5);
     });
 
     it('should handle large transaction lists efficiently', async () => {
@@ -107,7 +107,7 @@ describe('YNAB MCP Server - Performance Tests', () => {
       expect(responseTime).toBeLessThan(2000); // Should handle large lists within 2 seconds
 
       const transactions = parseToolResult(result);
-      expect(transactions.data.transactions).toHaveLength(1000);
+      expect(transactions.transactions).toHaveLength(1000);
     });
 
     it('should handle concurrent requests efficiently', async () => {
@@ -181,7 +181,7 @@ describe('YNAB MCP Server - Performance Tests', () => {
         });
 
         const categories = parseToolResult(result);
-        expect(categories.data.category_groups).toHaveLength(100);
+        expect(categories.category_groups).toHaveLength(100);
 
         // Force garbage collection if available
         if (global.gc) {

@@ -29,9 +29,9 @@ describe('Utility Tools', () => {
       (mockYnabAPI.user.getUser as any).mockResolvedValue(mockResponse);
 
       const result = await handleGetUser(mockYnabAPI);
-
-      expect(result.content[0].text).toContain('"user"');
-      expect(result.content[0].text).toContain('"id": "user-123"');
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.user).toBeDefined();
+      expect(parsed.user.id).toBe('user-123');
       expect(mockYnabAPI.user.getUser).toHaveBeenCalledTimes(1);
     });
 

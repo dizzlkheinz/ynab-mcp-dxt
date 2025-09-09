@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
-import { readFileSync } from 'fs';
 import {
   handleListTransactions,
   handleGetTransaction,
@@ -15,24 +14,22 @@ describe('Transaction Tools Integration', () => {
   let testAccountId: string;
 
   beforeAll(async () => {
-    try {
-      const apiKeyFile = readFileSync('api_key.txt', 'utf-8').trim();
-      const apiKey = apiKeyFile.split('\n')[0].split('=')[1];
-      console.log('✅ Loaded YNAB API key for integration tests');
-
-      ynabAPI = new ynab.API(apiKey);
-
-      // Get the first budget for testing
-      const budgetsResponse = await ynabAPI.budgets.getBudgets();
-      testBudgetId = budgetsResponse.data.budgets[0].id;
-
-      // Get the first account for testing
-      const accountsResponse = await ynabAPI.accounts.getAccounts(testBudgetId);
-      testAccountId = accountsResponse.data.accounts[0].id;
-    } catch (error) {
-      console.error('❌ Failed to load API key or connect to YNAB:', error);
-      throw error;
+    const accessToken = process.env['YNAB_ACCESS_TOKEN'];
+    if (!accessToken) {
+      throw new Error(
+        'YNAB_ACCESS_TOKEN is required. Set it in your .env file to run integration tests.',
+      );
     }
+
+    ynabAPI = new ynab.API(accessToken);
+
+    // Get the first budget for testing
+    const budgetsResponse = await ynabAPI.budgets.getBudgets();
+    testBudgetId = budgetsResponse.data.budgets[0].id;
+
+    // Get the first account for testing
+    const accountsResponse = await ynabAPI.accounts.getAccounts(testBudgetId);
+    testAccountId = accountsResponse.data.accounts[0].id;
   });
 
   it('should successfully list transactions from real API', async () => {
