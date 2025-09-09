@@ -56,6 +56,7 @@ export const CreateTransactionSchema = z.object({
   cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional(),
   approved: z.boolean().optional(),
   flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
+  dry_run: z.boolean().optional(),
 });
 
 export type CreateTransactionParams = z.infer<typeof CreateTransactionSchema>;
@@ -79,6 +80,7 @@ export const UpdateTransactionSchema = z.object({
   cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional(),
   approved: z.boolean().optional(),
   flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
+  dry_run: z.boolean().optional(),
 });
 
 export type UpdateTransactionParams = z.infer<typeof UpdateTransactionSchema>;
@@ -89,6 +91,7 @@ export type UpdateTransactionParams = z.infer<typeof UpdateTransactionSchema>;
 export const DeleteTransactionSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   transaction_id: z.string().min(1, 'Transaction ID is required'),
+  dry_run: z.boolean().optional(),
 });
 
 export type DeleteTransactionParams = z.infer<typeof DeleteTransactionSchema>;
@@ -222,6 +225,20 @@ export async function handleCreateTransaction(
   params: CreateTransactionParams,
 ): Promise<CallToolResult> {
   try {
+    if ((params as any).dry_run) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseFormatter.format({
+              dry_run: true,
+              action: 'create_transaction',
+              request: params,
+            }),
+          },
+        ],
+      };
+    }
     // Prepare transaction data
     const transactionData: SaveTransaction = {
       account_id: params.account_id,
@@ -283,6 +300,20 @@ export async function handleUpdateTransaction(
   params: UpdateTransactionParams,
 ): Promise<CallToolResult> {
   try {
+    if ((params as any).dry_run) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseFormatter.format({
+              dry_run: true,
+              action: 'update_transaction',
+              request: params,
+            }),
+          },
+        ],
+      };
+    }
     // Prepare transaction update data - only include fields that are provided
     const transactionData: SaveTransaction = {};
 
@@ -368,6 +399,20 @@ export async function handleDeleteTransaction(
   params: DeleteTransactionParams,
 ): Promise<CallToolResult> {
   try {
+    if ((params as any).dry_run) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseFormatter.format({
+              dry_run: true,
+              action: 'delete_transaction',
+              request: params,
+            }),
+          },
+        ],
+      };
+    }
     const response = await ynabAPI.transactions.deleteTransaction(
       params.budget_id,
       params.transaction_id,

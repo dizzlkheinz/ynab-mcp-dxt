@@ -39,6 +39,7 @@ export const CreateAccountSchema = z.object({
     'otherLiability',
   ]),
   balance: z.number().optional(),
+  dry_run: z.boolean().optional(),
 });
 
 export type CreateAccountParams = z.infer<typeof CreateAccountSchema>;
@@ -137,6 +138,25 @@ export async function handleCreateAccount(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
+      if (params.dry_run) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                dry_run: true,
+                action: 'create_account',
+                request: {
+                  budget_id: params.budget_id,
+                  name: params.name,
+                  type: params.type,
+                  balance: params.balance ?? 0,
+                },
+              }),
+            },
+          ],
+        };
+      }
       const accountData: ynab.SaveAccount = {
         name: params.name,
         type: params.type as ynab.Account['type'],

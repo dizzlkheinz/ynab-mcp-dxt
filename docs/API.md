@@ -181,6 +181,7 @@ Creates a new account in the specified budget.
   - `otherAsset` - Other asset account
   - `otherLiability` - Other liability account
 - `balance` (number, optional): Initial balance in milliunits
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -279,6 +280,7 @@ Creates a new transaction in the specified budget and account.
 - `cleared` (string, optional): Transaction cleared status (`cleared`, `uncleared`, `reconciled`)
 - `approved` (boolean, optional): Whether the transaction is approved
 - `flag_color` (string, optional): Transaction flag color (`red`, `orange`, `yellow`, `green`, `blue`, `purple`)
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -315,6 +317,7 @@ Updates an existing transaction.
 - `cleared` (string, optional): Update the cleared status
 - `approved` (boolean, optional): Update the approved status
 - `flag_color` (string, optional): Update the flag color
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -337,6 +340,7 @@ Deletes a transaction from the specified budget.
 **Parameters:**
 - `budget_id` (string, required): The ID of the budget
 - `transaction_id` (string, required): The ID of the transaction to delete
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -396,6 +400,7 @@ Updates the budgeted amount for a category in the current month.
 - `budget_id` (string, required): The ID of the budget
 - `category_id` (string, required): The ID of the category
 - `budgeted` (number, required): The budgeted amount in milliunits
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json

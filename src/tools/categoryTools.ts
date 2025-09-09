@@ -30,6 +30,7 @@ export const UpdateCategorySchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   category_id: z.string().min(1, 'Category ID is required'),
   budgeted: z.number().int('Budgeted amount must be an integer in milliunits'),
+  dry_run: z.boolean().optional(),
 });
 
 export type UpdateCategoryParams = z.infer<typeof UpdateCategorySchema>;
@@ -141,6 +142,27 @@ export async function handleUpdateCategory(
   params: UpdateCategoryParams,
 ): Promise<CallToolResult> {
   try {
+    if ((params as any).dry_run) {
+      const currentDate = new Date();
+      const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseFormatter.format({
+              dry_run: true,
+              action: 'update_category',
+              request: {
+                budget_id: params.budget_id,
+                category_id: params.category_id,
+                budgeted: params.budgeted,
+                month: currentMonth,
+              },
+            }),
+          },
+        ],
+      };
+    }
     // Get current month in YNAB format (YYYY-MM-01)
     const currentDate = new Date();
     const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
