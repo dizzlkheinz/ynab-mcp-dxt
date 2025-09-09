@@ -2,6 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import fs from 'fs';
 import path from 'path';
+import { z } from 'zod';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -1084,53 +1085,45 @@ Convert milliunits to dollars for easy reading.`,
 
       return await responseFormatter.runWithMinifyOverride(perCallMinify, async () => {
         switch (name) {
-          case 'list_budgets':
-            return await handleListBudgets(this.ynabAPI);
+          case 'list_budgets': {
+            const exec = withSecurityWrapper('ynab', 'list_budgets', z.object({}))(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async () => handleListBudgets(this.ynabAPI));
+          }
 
-          case 'get_budget':
-            try {
-              const params = GetBudgetSchema.parse(args);
-              return await handleGetBudget(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_budget',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_budget': {
+            const exec = withSecurityWrapper('ynab', 'get_budget', GetBudgetSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetBudget(this.ynabAPI, validated as unknown as Parameters<typeof handleGetBudget>[1]),
+            );
+          }
 
-          case 'set_default_budget':
-            try {
-              const { budget_id } = args as { budget_id: string };
-              if (!budget_id) {
-                throw new Error('budget_id is required');
-              }
-
-              // Validate that the budget exists
-              try {
-                await this.ynabAPI.budgets.getBudgetById(budget_id);
-                this.setDefaultBudget(budget_id);
-
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: responseFormatter.format({
-                        success: true,
-                        message: `Default budget set to: ${budget_id}`,
-                        default_budget_id: budget_id,
-                      }),
-                    },
-                  ],
-                };
-              } catch {
-                throw new Error(`Invalid budget ID: ${budget_id}. Budget not found.`);
-              }
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:set_default_budget',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'set_default_budget': {
+            const SetDefaultBudgetSchema = z.object({ budget_id: z.string().min(1) });
+            const exec = withSecurityWrapper('ynab', 'set_default_budget', SetDefaultBudgetSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) => {
+              const { budget_id } = validated as { budget_id: string };
+              await this.ynabAPI.budgets.getBudgetById(budget_id);
+              this.setDefaultBudget(budget_id);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: responseFormatter.format({
+                      success: true,
+                      message: `Default budget set to: ${budget_id}`,
+                      default_budget_id: budget_id,
+                    }),
+                  },
+                ],
+              };
+            });
+          }
 
           case 'get_default_budget':
             try {
@@ -1157,29 +1150,31 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'list_accounts':
-            try {
-              const rawParams = args as Record<string, unknown>;
-              const budgetId = this.getBudgetId(rawParams?.['budget_id'] as string | undefined);
-              const params = ListAccountsSchema.parse({ ...rawParams, budget_id: budgetId });
-              return await handleListAccounts(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_accounts',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_accounts': {
+            const raw = (args || {}) as Record<string, unknown>;
+            const resolved = {
+              ...raw,
+              budget_id: this.getBudgetId(raw?.['budget_id'] as string | undefined),
+            };
+            const exec = withSecurityWrapper('ynab', 'list_accounts', ListAccountsSchema)(
+              this.config.accessToken,
+            )(resolved);
+            return exec(async (validated) =>
+              handleListAccounts(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListAccounts>[1],
+              ),
+            );
+          }
 
-          case 'get_account':
-            try {
-              const params = GetAccountSchema.parse(args);
-              return await handleGetAccount(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_account',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_account': {
+            const exec = withSecurityWrapper('ynab', 'get_account', GetAccountSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetAccount(this.ynabAPI, validated as unknown as Parameters<typeof handleGetAccount>[1]),
+            );
+          }
 
           case 'create_account': {
             const exec = withSecurityWrapper(
@@ -1195,27 +1190,33 @@ Convert milliunits to dollars for easy reading.`,
             );
           }
 
-          case 'list_transactions':
-            try {
-              const params = ListTransactionsSchema.parse(args);
-              return await handleListTransactions(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_transactions',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_transactions': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_transactions',
+              ListTransactionsSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListTransactions(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListTransactions>[1],
+              ),
+            );
+          }
 
-          case 'get_transaction':
-            try {
-              const params = GetTransactionSchema.parse(args);
-              return await handleGetTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_transaction': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_transaction',
+              GetTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetTransaction>[1],
+              ),
+            );
+          }
 
           case 'create_transaction': {
             const exec = withSecurityWrapper(
@@ -1259,27 +1260,31 @@ Convert milliunits to dollars for easy reading.`,
             );
           }
 
-          case 'list_categories':
-            try {
-              const params = ListCategoriesSchema.parse(args);
-              return await handleListCategories(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_categories',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_categories': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_categories',
+              ListCategoriesSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListCategories(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListCategories>[1],
+              ),
+            );
+          }
 
-          case 'get_category':
-            try {
-              const params = GetCategorySchema.parse(args);
-              return await handleGetCategory(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_category',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_category': {
+            const exec = withSecurityWrapper('ynab', 'get_category', GetCategorySchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetCategory(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetCategory>[1],
+              ),
+            );
+          }
 
           case 'update_category': {
             const exec = withSecurityWrapper(
@@ -1295,52 +1300,48 @@ Convert milliunits to dollars for easy reading.`,
             );
           }
 
-          case 'list_payees':
-            try {
-              const params = ListPayeesSchema.parse(args);
-              return await handleListPayees(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_payees',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_payees': {
+            const exec = withSecurityWrapper('ynab', 'list_payees', ListPayeesSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListPayees(this.ynabAPI, validated as unknown as Parameters<typeof handleListPayees>[1]),
+            );
+          }
 
-          case 'get_payee':
-            try {
-              const params = GetPayeeSchema.parse(args);
-              return await handleGetPayee(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_payee',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_payee': {
+            const exec = withSecurityWrapper('ynab', 'get_payee', GetPayeeSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetPayee(this.ynabAPI, validated as unknown as Parameters<typeof handleGetPayee>[1]),
+            );
+          }
 
-          case 'get_month':
-            try {
-              const params = GetMonthSchema.parse(args);
-              return await handleGetMonth(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_month',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_month': {
+            const exec = withSecurityWrapper('ynab', 'get_month', GetMonthSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetMonth(this.ynabAPI, validated as unknown as Parameters<typeof handleGetMonth>[1]),
+            );
+          }
 
-          case 'list_months':
-            try {
-              const params = ListMonthsSchema.parse(args);
-              return await handleListMonths(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_months',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_months': {
+            const exec = withSecurityWrapper('ynab', 'list_months', ListMonthsSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListMonths(this.ynabAPI, validated as unknown as Parameters<typeof handleListMonths>[1]),
+            );
+          }
 
-          case 'get_user':
-            return await handleGetUser(this.ynabAPI);
+          case 'get_user': {
+            const exec = withSecurityWrapper('ynab', 'get_user', z.object({}))(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async () => handleGetUser(this.ynabAPI));
+          }
 
           case 'convert_amount':
             try {
@@ -1353,47 +1354,38 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'financial_overview':
-            try {
-              const params = FinancialOverviewSchema.parse(args || {});
+          case 'financial_overview': {
+            const exec = withSecurityWrapper('ynab', 'financial_overview', FinancialOverviewSchema)(
+              this.config.accessToken,
+            )((args || {}) as Record<string, unknown>);
+            return exec(async (validated) => {
+              const params = validated as unknown as Parameters<typeof handleFinancialOverview>[1];
               const budgetId = this.getBudgetId(params.budget_id);
-              return await handleFinancialOverview(this.ynabAPI, {
-                ...params,
-                budget_id: budgetId,
-              });
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:financial_overview',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+              return handleFinancialOverview(this.ynabAPI, { ...params, budget_id: budgetId });
+            });
+          }
 
-          case 'spending_analysis':
-            try {
-              const params = SpendingAnalysisSchema.parse(args || {});
+          case 'spending_analysis': {
+            const exec = withSecurityWrapper('ynab', 'spending_analysis', SpendingAnalysisSchema)(
+              this.config.accessToken,
+            )((args || {}) as Record<string, unknown>);
+            return exec(async (validated) => {
+              const params = validated as unknown as Parameters<typeof handleSpendingAnalysis>[1];
               const budgetId = this.getBudgetId(params.budget_id);
-              return await handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:spending_analysis',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+              return handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
+            });
+          }
 
-          case 'budget_health_check':
-            try {
-              const params = BudgetHealthSchema.parse(args || {});
+          case 'budget_health_check': {
+            const exec = withSecurityWrapper('ynab', 'budget_health_check', BudgetHealthSchema)(
+              this.config.accessToken,
+            )((args || {}) as Record<string, unknown>);
+            return exec(async (validated) => {
+              const params = validated as unknown as Parameters<typeof handleBudgetHealthCheck>[1];
               const budgetId = this.getBudgetId(params.budget_id);
-              return await handleBudgetHealthCheck(this.ynabAPI, {
-                ...params,
-                budget_id: budgetId,
-              });
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:budget_health_check',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+              return handleBudgetHealthCheck(this.ynabAPI, { ...params, budget_id: budgetId });
+            });
+          }
 
           case 'get_memory_usage':
             return this.getMemoryUsage();
