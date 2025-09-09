@@ -225,7 +225,7 @@ export async function handleCreateTransaction(
   params: CreateTransactionParams,
 ): Promise<CallToolResult> {
   try {
-    if ((params as any).dry_run) {
+    if (params.dry_run) {
       return {
         content: [
           {
@@ -244,15 +244,14 @@ export async function handleCreateTransaction(
       account_id: params.account_id,
       amount: params.amount, // Already validated as integer milliunits
       date: params.date,
-      // Include optional fields as-is so undefined stays undefined when omitted
-      payee_name: params.payee_name as any,
-      payee_id: params.payee_id as any,
-      category_id: params.category_id as any,
-      memo: params.memo as any,
       cleared: params.cleared as ynab.TransactionClearedStatus,
-      approved: params.approved as any,
       flag_color: params.flag_color as ynab.TransactionFlagColor,
     };
+    if (params.payee_name !== undefined) transactionData.payee_name = params.payee_name;
+    if (params.payee_id !== undefined) transactionData.payee_id = params.payee_id;
+    if (params.category_id !== undefined) transactionData.category_id = params.category_id;
+    if (params.memo !== undefined) transactionData.memo = params.memo;
+    if (params.approved !== undefined) transactionData.approved = params.approved;
 
     const response = await ynabAPI.transactions.createTransaction(params.budget_id, {
       transaction: transactionData,
@@ -300,7 +299,7 @@ export async function handleUpdateTransaction(
   params: UpdateTransactionParams,
 ): Promise<CallToolResult> {
   try {
-    if ((params as any).dry_run) {
+    if (params.dry_run) {
       return {
         content: [
           {
@@ -399,7 +398,7 @@ export async function handleDeleteTransaction(
   params: DeleteTransactionParams,
 ): Promise<CallToolResult> {
   try {
-    if ((params as any).dry_run) {
+    if (params.dry_run) {
       return {
         content: [
           {

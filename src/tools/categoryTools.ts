@@ -142,7 +142,7 @@ export async function handleUpdateCategory(
   params: UpdateCategoryParams,
 ): Promise<CallToolResult> {
   try {
-    if ((params as any).dry_run) {
+    if (params.dry_run) {
       const currentDate = new Date();
       const currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
       return {
@@ -171,10 +171,7 @@ export async function handleUpdateCategory(
       params.budget_id,
       currentMonth,
       params.category_id,
-      {
-        // Tests pass milliunits; send directly as flat payload
-        budgeted: params.budgeted,
-      } as any,
+      { category: { budgeted: params.budgeted } },
     );
 
     const category = response.data.category;
