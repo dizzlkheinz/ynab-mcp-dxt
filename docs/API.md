@@ -653,6 +653,54 @@ Converts between dollars and milliunits with integer arithmetic for precision.
 }
 ```
 
+## Server & Debug Tools
+
+These tools help inspect the server, environment, and performance. They do not modify YNAB data.
+
+### server_info
+
+Returns server metadata including version, runtime, uptime, and memory usage.
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "server_info", "arguments": {} }
+```
+
+### security_stats
+
+Returns rate-limiting and request logging statistics (sanitized; no sensitive data).
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "security_stats", "arguments": {} }
+```
+
+### cache_stats
+
+Returns cache size and keys for the in-memory cache.
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "cache_stats", "arguments": {} }
+```
+
+### clear_cache
+
+Clears the in-memory cache. Safe; does not modify YNAB.
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "clear_cache", "arguments": {} }
+```
+
 ## Error Handling
 
 All tools implement comprehensive error handling with consistent error response formats.

@@ -1,5 +1,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import fs from 'fs';
+import path from 'path';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -15,6 +17,7 @@ import {
   ServerConfig,
   ErrorHandler,
 } from '../types/index.js';
+import { SecurityMiddleware, withSecurityWrapper } from './securityMiddleware.js';
 import { handleListBudgets, handleGetBudget, GetBudgetSchema } from '../tools/budgetTools.js';
 import {
   handleListAccounts,
@@ -77,6 +80,7 @@ export class YNABMCPServer {
   private config: ServerConfig;
   private exitOnError: boolean;
   private defaultBudgetId?: string;
+  private serverVersion: string;
 
   constructor(exitOnError: boolean = true) {
     this.exitOnError = exitOnError;
@@ -86,11 +90,14 @@ export class YNABMCPServer {
     // Initialize YNAB API
     this.ynabAPI = new ynab.API(this.config.accessToken);
 
+    // Determine server version (prefer package.json)
+    this.serverVersion = this.readPackageVersion() ?? '0.0.0';
+
     // Initialize MCP Server
     this.server = new Server(
       {
         name: 'ynab-mcp-server',
-        version: '1.0.0',
+        version: this.serverVersion,
       },
       {
         capabilities: {
@@ -972,6 +979,48 @@ Convert milliunits to dollars for easy reading.`,
               required: [],
             },
           },
+          {
+            name: 'server_info',
+            description:
+              'Return server version, runtime info, uptime, and basic capabilities',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'security_stats',
+            description:
+              'Return rate-limiting and request logging statistics (no sensitive data)',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'cache_stats',
+            description: 'Return cache keys and size statistics',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'clear_cache',
+            description: 'Clear the in-memory cache (safe, no YNAB data is modified)',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
         ],
       };
     });
@@ -1090,16 +1139,14 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'create_account':
-            try {
-              const params = CreateAccountSchema.parse(args);
-              return await handleCreateAccount(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:create_account',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'create_account': {
+            const exec = withSecurityWrapper('ynab', 'create_account', CreateAccountSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleCreateAccount(this.ynabAPI, validated as unknown as Parameters<typeof handleCreateAccount>[1]),
+            );
+          }
 
           case 'list_transactions':
             try {
@@ -1123,38 +1170,41 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'create_transaction':
-            try {
-              const params = CreateTransactionSchema.parse(args);
-              return await handleCreateTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:create_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'create_transaction': {
+            const exec = withSecurityWrapper('ynab', 'create_transaction', CreateTransactionSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleCreateTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleCreateTransaction>[1],
+              ),
+            );
+          }
 
-          case 'update_transaction':
-            try {
-              const params = UpdateTransactionSchema.parse(args);
-              return await handleUpdateTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:update_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'update_transaction': {
+            const exec = withSecurityWrapper('ynab', 'update_transaction', UpdateTransactionSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleUpdateTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleUpdateTransaction>[1],
+              ),
+            );
+          }
 
-          case 'delete_transaction':
-            try {
-              const params = DeleteTransactionSchema.parse(args);
-              return await handleDeleteTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:delete_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'delete_transaction': {
+            const exec = withSecurityWrapper('ynab', 'delete_transaction', DeleteTransactionSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleDeleteTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleDeleteTransaction>[1],
+              ),
+            );
+          }
 
           case 'list_categories':
             try {
@@ -1291,6 +1341,63 @@ Convert milliunits to dollars for easy reading.`,
 
           case 'get_memory_usage':
             return this.getMemoryUsage();
+
+          case 'server_info': {
+            const uptimeMs = Math.round(process.uptime() * 1000);
+            const mem = process.memoryUsage();
+            const payload = {
+              name: 'ynab-mcp-server',
+              version: this.serverVersion,
+              node_version: process.version,
+              platform: process.platform,
+              arch: process.arch,
+              pid: process.pid,
+              uptime_ms: uptimeMs,
+              uptime_readable: this.formatUptime(uptimeMs),
+              memory: {
+                rss: mem.rss,
+                heap_used: mem.heapUsed,
+                heap_total: mem.heapTotal,
+                external: mem.external,
+              },
+              env: {
+                node_env: process.env['NODE_ENV'] || 'development',
+                minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
+              },
+            };
+            return {
+              content: [
+                { type: 'text', text: responseFormatter.format(payload) },
+              ],
+            };
+          }
+
+          case 'security_stats': {
+            const stats = SecurityMiddleware.getSecurityStats();
+            return {
+              content: [
+                { type: 'text', text: responseFormatter.format(stats) },
+              ],
+            };
+          }
+
+          case 'cache_stats': {
+            const stats = cacheManager.getStats();
+            return {
+              content: [
+                { type: 'text', text: responseFormatter.format(stats) },
+              ],
+            };
+          }
+
+          case 'clear_cache': {
+            cacheManager.clear();
+            return {
+              content: [
+                { type: 'text', text: responseFormatter.format({ success: true }) },
+              ],
+            };
+          }
 
           case 'get_env_status': {
             const token = process.env['YNAB_ACCESS_TOKEN'];
@@ -1477,5 +1584,27 @@ Convert milliunits to dollars for easy reading.`,
     } else {
       return `${seconds}s`;
     }
+  }
+
+  /**
+   * Try to read the package version for accurate server metadata
+   */
+  private readPackageVersion(): string | null {
+    const candidates = [
+      path.resolve(process.cwd(), 'package.json'),
+      path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../package.json'),
+    ];
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) {
+          const raw = fs.readFileSync(p, 'utf8');
+          const pkg = JSON.parse(raw) as { version?: string };
+          if (pkg.version && typeof pkg.version === 'string') return pkg.version;
+        }
+      } catch {
+        // ignore and try next
+      }
+    }
+    return null;
   }
 }
