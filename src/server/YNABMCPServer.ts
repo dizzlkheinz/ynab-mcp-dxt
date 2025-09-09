@@ -169,8 +169,7 @@ export class YNABMCPServer {
           },
           {
             name: 'set_output_format',
-            description:
-              'Configure default JSON output formatting (minify or pretty spaces)',
+            description: 'Configure default JSON output formatting (minify or pretty spaces)',
             inputSchema: {
               type: 'object',
               additionalProperties: false,
@@ -1026,8 +1025,7 @@ Convert milliunits to dollars for easy reading.`,
           },
           {
             name: 'server_info',
-            description:
-              'Return server version, runtime info, uptime, and basic capabilities',
+            description: 'Return server version, runtime info, uptime, and basic capabilities',
             inputSchema: {
               type: 'object',
               additionalProperties: false,
@@ -1037,8 +1035,7 @@ Convert milliunits to dollars for easy reading.`,
           },
           {
             name: 'security_stats',
-            description:
-              'Return rate-limiting and request logging statistics (no sensitive data)',
+            description: 'Return rate-limiting and request logging statistics (no sensitive data)',
             inputSchema: {
               type: 'object',
               additionalProperties: false,
@@ -1185,11 +1182,16 @@ Convert milliunits to dollars for easy reading.`,
             }
 
           case 'create_account': {
-            const exec = withSecurityWrapper('ynab', 'create_account', CreateAccountSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'create_account',
+              CreateAccountSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleCreateAccount(this.ynabAPI, validated as unknown as Parameters<typeof handleCreateAccount>[1]),
+              handleCreateAccount(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleCreateAccount>[1],
+              ),
             );
           }
 
@@ -1216,9 +1218,11 @@ Convert milliunits to dollars for easy reading.`,
             }
 
           case 'create_transaction': {
-            const exec = withSecurityWrapper('ynab', 'create_transaction', CreateTransactionSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'create_transaction',
+              CreateTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
               handleCreateTransaction(
                 this.ynabAPI,
@@ -1228,9 +1232,11 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'update_transaction': {
-            const exec = withSecurityWrapper('ynab', 'update_transaction', UpdateTransactionSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'update_transaction',
+              UpdateTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
               handleUpdateTransaction(
                 this.ynabAPI,
@@ -1240,9 +1246,11 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'delete_transaction': {
-            const exec = withSecurityWrapper('ynab', 'delete_transaction', DeleteTransactionSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'delete_transaction',
+              DeleteTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
               handleDeleteTransaction(
                 this.ynabAPI,
@@ -1273,18 +1281,19 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'update_category':
-            {
-              const exec = withSecurityWrapper('ynab', 'update_category', UpdateCategorySchema)(
-                this.config.accessToken,
-              )(args as Record<string, unknown>);
-              return exec(async (validated) =>
-                handleUpdateCategory(
-                  this.ynabAPI,
-                  validated as unknown as Parameters<typeof handleUpdateCategory>[1],
-                ),
-              );
-            }
+          case 'update_category': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'update_category',
+              UpdateCategorySchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleUpdateCategory(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleUpdateCategory>[1],
+              ),
+            );
+          }
 
           case 'list_payees':
             try {
@@ -1413,36 +1422,28 @@ Convert milliunits to dollars for easy reading.`,
               },
             };
             return {
-              content: [
-                { type: 'text', text: responseFormatter.format(payload) },
-              ],
+              content: [{ type: 'text', text: responseFormatter.format(payload) }],
             };
           }
 
           case 'security_stats': {
             const stats = SecurityMiddleware.getSecurityStats();
             return {
-              content: [
-                { type: 'text', text: responseFormatter.format(stats) },
-              ],
+              content: [{ type: 'text', text: responseFormatter.format(stats) }],
             };
           }
 
           case 'cache_stats': {
             const stats = cacheManager.getStats();
             return {
-              content: [
-                { type: 'text', text: responseFormatter.format(stats) },
-              ],
+              content: [{ type: 'text', text: responseFormatter.format(stats) }],
             };
           }
 
           case 'clear_cache': {
             cacheManager.clear();
             return {
-              content: [
-                { type: 'text', text: responseFormatter.format({ success: true }) },
-              ],
+              content: [{ type: 'text', text: responseFormatter.format({ success: true }) }],
             };
           }
 
@@ -1655,10 +1656,17 @@ Convert milliunits to dollars for easy reading.`,
    * Try to read the package version for accurate server metadata
    */
   private readPackageVersion(): string | null {
-    const candidates = [
-      path.resolve(process.cwd(), 'package.json'),
-      path.resolve(path.dirname(new URL(import.meta.url).pathname), '../../package.json'),
-    ];
+    const candidates = [path.resolve(process.cwd(), 'package.json')];
+    try {
+      // May fail in bundled CJS builds; guard accordingly
+      const metaUrl = (import.meta as unknown as { url?: string })?.url;
+      if (metaUrl) {
+        const maybe = path.resolve(path.dirname(new URL(metaUrl).pathname), '../../package.json');
+        candidates.push(maybe);
+      }
+    } catch {
+      // ignore
+    }
     for (const p of candidates) {
       try {
         if (fs.existsSync(p)) {
