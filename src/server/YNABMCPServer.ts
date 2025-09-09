@@ -1009,6 +1009,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get current memory usage statistics for the MCP server',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -1018,6 +1019,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Debug: Show YNAB token presence and server environment info (masked)',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -1351,9 +1353,9 @@ Convert milliunits to dollars for easy reading.`,
                 budget_id: budgetId,
               });
             } catch (error) {
-              throw new Error(
-                'Invalid parameters for ynab:financial_overview: ' +
-                  (error instanceof Error ? error.message : 'Unknown validation error'),
+              return ErrorHandler.createValidationError(
+                'Invalid parameters for ynab:financial_overview',
+                error instanceof Error ? error.message : 'Unknown validation error',
               );
             }
 
@@ -1363,9 +1365,9 @@ Convert milliunits to dollars for easy reading.`,
               const budgetId = this.getBudgetId(params.budget_id);
               return await handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
             } catch (error) {
-              throw new Error(
-                'Invalid parameters for ynab:spending_analysis: ' +
-                  (error instanceof Error ? error.message : 'Unknown validation error'),
+              return ErrorHandler.createValidationError(
+                'Invalid parameters for ynab:spending_analysis',
+                error instanceof Error ? error.message : 'Unknown validation error',
               );
             }
 
@@ -1378,9 +1380,9 @@ Convert milliunits to dollars for easy reading.`,
                 budget_id: budgetId,
               });
             } catch (error) {
-              throw new Error(
-                'Invalid parameters for ynab:budget_health_check: ' +
-                  (error instanceof Error ? error.message : 'Unknown validation error'),
+              return ErrorHandler.createValidationError(
+                'Invalid parameters for ynab:budget_health_check',
+                error instanceof Error ? error.message : 'Unknown validation error',
               );
             }
 

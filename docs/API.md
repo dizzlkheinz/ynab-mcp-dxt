@@ -701,6 +701,19 @@ Example Request:
 { "name": "clear_cache", "arguments": {} }
 ```
 
+### set_output_format
+
+Configures default JSON formatting for responses.
+
+Parameters:
+- `default_minify` (boolean, optional): Minify JSON outputs by default (default: true)
+- `pretty_spaces` (number, optional): Spaces to use when pretty-printing (0-10)
+
+Example Request:
+```json
+{ "name": "set_output_format", "arguments": { "default_minify": false, "pretty_spaces": 2 } }
+```
+
 ## Error Handling
 
 All tools implement comprehensive error handling with consistent error response formats.
