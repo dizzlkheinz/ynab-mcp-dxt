@@ -19,6 +19,7 @@ A Model Context Protocol (MCP) server that provides AI assistants with secure ac
 ## Features
 
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
+- **Bank Statement Reconciliation**: Compare bank transactions from CSV files with YNAB data to find missing transactions and ensure accuracy
 - **Smart Financial Analysis (work in progress)**: Statistical spending trends using linear regression, accurate overspending detection, comprehensive budget optimization insights, and AI-generated recommendations
 - **Secure Authentication**: Uses YNAB Personal Access Tokens with proper security practices
 - **Comprehensive Error Handling**: Robust error handling with detailed feedback and security-conscious error messages
@@ -135,7 +136,7 @@ YNAB_EXPORT_PATH=/home/user/exports
 
 ## Available Tools
 
-The server provides 23 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 4 diagnostics and utilities (27 total):
+The server provides 24 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 4 diagnostics and utilities (28 total):
 
 ### Budget Management
 
@@ -154,6 +155,7 @@ The server provides 23 core tools for budgets, accounts, transactions, categorie
 
 - `list_transactions` - List transactions with filtering options (auto-suggests export for large results)
 - `export_transactions` - Export all transactions to JSON file with descriptive filename and platform-specific default paths
+- `compare_transactions` - Compare bank transactions from CSV with YNAB transactions to find missing entries and reconcile accounts
 - `get_transaction` - Get specific transaction details
 - `create_transaction` - Create new transaction
 - `update_transaction` - Update existing transaction

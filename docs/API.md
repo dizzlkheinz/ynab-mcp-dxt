@@ -20,7 +20,7 @@ This document provides comprehensive documentation for all tools available in th
 
 ## Overview
 
-The YNAB MCP Server provides 18 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
+The YNAB MCP Server provides 19 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
 
 ### Tool Naming Convention
 
@@ -292,6 +292,89 @@ The exported JSON file contains:
 - Windows/Mac: `~/Downloads`
 - Linux/Unix: `~/Documents` (or `$XDG_DOCUMENTS_DIR`)
 - Configurable via `YNAB_EXPORT_PATH` environment variable
+
+### compare_transactions
+
+Compares bank transactions from CSV files with YNAB transactions to identify missing entries in either direction. This tool helps with bank statement reconciliation by finding transactions that exist in your bank statement but not in YNAB (need to import) or vice versa (double-check for duplicates).
+
+**Parameters:**
+- `budget_id` (string, required): The ID of the budget to compare against
+- `account_id` (string, required): The ID of the account to compare transactions for
+- `csv_file_path` (string, optional): Path to CSV file containing bank transactions
+- `csv_data` (string, optional): CSV data as string (alternative to csv_file_path)
+- `amount_tolerance` (number, optional): Amount difference tolerance as decimal (0.01 = 1%, default: 0.01)
+- `date_tolerance_days` (number, optional): Date difference tolerance in days (default: 5)
+- `csv_format` (object, optional): CSV format configuration
+  - `date_column` (string): Column name for transaction date (default: "Date")
+  - `amount_column` (string): Column name for transaction amount (default: "Amount")
+  - `description_column` (string): Column name for transaction description (default: "Description")
+  - `date_format` (string): Date format pattern (default: "MM/DD/YYYY")
+  - `has_header` (boolean): Whether CSV has header row (default: true)
+  - `delimiter` (string): CSV delimiter character (default: ",")
+
+**Example Request (CSV data):**
+```json
+{
+  "name": "compare_transactions",
+  "arguments": {
+    "budget_id": "12345678-1234-1234-1234-123456789012",
+    "account_id": "87654321-4321-4321-4321-210987654321",
+    "csv_data": "Date,Amount,Description\n2024-01-01,100.00,Coffee Shop\n2024-01-02,-50.25,Gas Station\n2024-01-03,25.00,ATM Withdrawal"
+  }
+}
+```
+
+**Example Request (CSV file with custom format):**
+```json
+{
+  "name": "compare_transactions",
+  "arguments": {
+    "budget_id": "12345678-1234-1234-1234-123456789012",
+    "account_id": "87654321-4321-4321-4321-210987654321",
+    "csv_file_path": "/path/to/bank-statement.csv",
+    "csv_format": {
+      "date_column": "Transaction Date",
+      "amount_column": "Dollar Amount",
+      "description_column": "Description",
+      "date_format": "DD/MM/YYYY",
+      "delimiter": ";",
+      "has_header": true
+    },
+    "amount_tolerance": 0.02,
+    "date_tolerance_days": 3
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"summary\": {\n    \"bank_transactions_count\": 15,\n    \"ynab_transactions_count\": 12,\n    \"matches_found\": 10,\n    \"missing_in_ynab\": 5,\n    \"missing_in_bank\": 2,\n    \"date_range\": {\n      \"start\": \"2024-01-01\",\n      \"end\": \"2024-01-15\"\n    },\n    \"parameters\": {\n      \"amount_tolerance\": 0.01,\n      \"date_tolerance_days\": 5\n    }\n  },\n  \"matches\": [\n    {\n      \"bank_date\": \"2024-01-01\",\n      \"bank_amount\": \"100.00\",\n      \"bank_description\": \"Coffee Shop\",\n      \"ynab_date\": \"2024-01-01\",\n      \"ynab_amount\": \"100.00\",\n      \"ynab_payee\": \"Starbucks\",\n      \"match_score\": 90,\n      \"match_reasons\": [\"Exact date match\", \"Exact amount match\"]\n    }\n  ],\n  \"missing_in_ynab\": [\n    {\n      \"date\": \"2024-01-03\",\n      \"amount\": \"25.00\",\n      \"description\": \"ATM Withdrawal\",\n      \"row_number\": 4\n    }\n  ],\n  \"missing_in_bank\": [\n    {\n      \"id\": \"transaction-xyz\",\n      \"date\": \"2024-01-02\",\n      \"amount\": \"-15.50\",\n      \"payee_name\": \"Coffee Bean\",\n      \"memo\": \"Morning coffee\",\n      \"cleared\": \"cleared\"\n    }\n  ]\n}"
+    }
+  ]
+}
+```
+
+**Matching Algorithm:**
+- **Date matching** (40 points max): Exact dates get full points, nearby dates get partial points
+- **Amount matching** (50 points max): Exact amounts get full points, close amounts within tolerance get partial points
+- **Description matching** (10 points max): Similarity between bank description and YNAB payee/memo
+- **Minimum match score**: 30 points required for a valid match
+
+**Supported Date Formats:**
+- `MM/DD/YYYY` or `M/D/YYYY` (default)
+- `DD/MM/YYYY` or `D/M/YYYY`
+- `YYYY-MM-DD` (ISO format)
+- `MM-DD-YYYY`
+
+**Use Cases:**
+- **Bank reconciliation**: Find transactions missing from YNAB that need to be imported
+- **Duplicate detection**: Identify YNAB transactions that don't appear in bank statements
+- **Import verification**: Verify that imported transactions match your bank statement exactly
+- **Data cleanup**: Find and resolve discrepancies between bank and YNAB data
 
 ### get_transaction
 

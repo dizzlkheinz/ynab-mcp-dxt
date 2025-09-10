@@ -42,6 +42,10 @@ import {
 } from '../tools/transactionTools.js';
 import { handleExportTransactions, ExportTransactionsSchema } from '../tools/exportTransactions.js';
 import {
+  handleCompareTransactions,
+  CompareTransactionsSchema,
+} from '../tools/compareTransactions.js';
+import {
   handleListCategories,
   handleGetCategory,
   handleUpdateCategory,
@@ -658,6 +662,84 @@ Convert milliunits to dollars for easy reading.`,
                 },
               },
               required: ['budget_id'],
+            },
+          },
+          {
+            name: 'compare_transactions',
+            description:
+              'Compare bank transactions from CSV with YNAB transactions to find missing entries',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'The ID of the budget to compare against',
+                },
+                account_id: {
+                  type: 'string',
+                  description: 'The ID of the account to compare transactions for',
+                },
+                csv_file_path: {
+                  type: 'string',
+                  description: 'Optional: Path to CSV file containing bank transactions',
+                },
+                csv_data: {
+                  type: 'string',
+                  description: 'Optional: CSV data as string (alternative to csv_file_path)',
+                },
+                date_range_days: {
+                  type: 'number',
+                  minimum: 1,
+                  maximum: 365,
+                  description: 'Optional: Number of days to extend search range (default: 30)',
+                },
+                amount_tolerance: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 1,
+                  description:
+                    'Optional: Amount difference tolerance as decimal (0.01 = 1%, default: 0.01)',
+                },
+                date_tolerance_days: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 7,
+                  description: 'Optional: Date difference tolerance in days (default: 5)',
+                },
+                csv_format: {
+                  type: 'object',
+                  description: 'Optional: CSV format configuration',
+                  properties: {
+                    date_column: {
+                      type: 'string',
+                      description: 'Column name for transaction date (default: "Date")',
+                    },
+                    amount_column: {
+                      type: 'string',
+                      description: 'Column name for transaction amount (default: "Amount")',
+                    },
+                    description_column: {
+                      type: 'string',
+                      description:
+                        'Column name for transaction description (default: "Description")',
+                    },
+                    date_format: {
+                      type: 'string',
+                      description: 'Date format pattern (default: "MM/DD/YYYY")',
+                    },
+                    has_header: {
+                      type: 'boolean',
+                      description: 'Whether CSV has header row (default: true)',
+                    },
+                    delimiter: {
+                      type: 'string',
+                      description: 'CSV delimiter character (default: ",")',
+                    },
+                  },
+                },
+              },
+              required: ['budget_id', 'account_id'],
             },
           },
           {
@@ -1295,6 +1377,20 @@ Convert milliunits to dollars for easy reading.`,
               handleExportTransactions(
                 this.ynabAPI,
                 validated as unknown as Parameters<typeof handleExportTransactions>[1],
+              ),
+            );
+          }
+
+          case 'compare_transactions': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'compare_transactions',
+              CompareTransactionsSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleCompareTransactions(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleCompareTransactions>[1],
               ),
             );
           }
