@@ -256,6 +256,7 @@ Exports all transactions to a JSON file with descriptive filename and platform-s
 - `since_date` (string, optional): Only export transactions on or after this date (YYYY-MM-DD)
 - `type` (string, optional): Filter by transaction type (`uncategorized` or `unapproved`)
 - `filename` (string, optional): Custom filename (auto-generated if not provided)
+- `minimal` (boolean, optional): Export only essential fields for smaller files (default: true)
 
 **Example Request:**
 ```json
@@ -282,8 +283,10 @@ Exports all transactions to a JSON file with descriptive filename and platform-s
 
 **Export File Structure:**
 The exported JSON file contains:
-- `export_info`: Metadata about the export (timestamp, filters, count)
-- `transactions`: Array of transaction objects with all available fields
+- `export_info`: Metadata about the export (timestamp, filters, count, minimal flag)
+- `transactions`: Array of transaction objects
+  - **Minimal mode (default)**: `id`, `date`, `amount`, `payee_name`, `cleared`
+  - **Full mode**: All available transaction fields
 
 **Platform-Specific Default Paths:**
 - Windows/Mac: `~/Downloads`

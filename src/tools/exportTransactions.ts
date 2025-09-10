@@ -21,6 +21,7 @@ export const ExportTransactionsSchema = z.object({
     .optional(),
   type: z.enum(['uncategorized', 'unapproved']).optional(),
   filename: z.string().optional(),
+  minimal: z.boolean().optional().default(true),
 });
 
 export type ExportTransactionsParams = z.infer<typeof ExportTransactionsSchema>;
@@ -56,6 +57,11 @@ function generateExportFilename(
 
   if (params.type) {
     filters.push(params.type);
+  }
+
+  if (params.minimal !== false) {
+    // Default true, only false if explicitly set
+    filters.push('minimal');
   }
 
   if (filters.length > 0) {
@@ -177,34 +183,51 @@ export async function handleExportTransactions(
         export_info: {
           exported_at: new Date().toISOString(),
           total_transactions: transactions.length,
+          minimal: params.minimal !== false, // Default true, only false if explicitly set
           filters: {
             budget_id: params.budget_id,
             account_id: params.account_id || null,
             category_id: params.category_id || null,
             since_date: params.since_date || null,
             type: params.type || null,
+            minimal: params.minimal !== false,
           },
         },
-        transactions: transactions.map((transaction) => ({
-          id: transaction.id,
-          date: transaction.date,
-          amount: transaction.amount,
-          memo: transaction.memo,
-          cleared: transaction.cleared,
-          approved: transaction.approved,
-          flag_color: transaction.flag_color,
-          account_id: transaction.account_id,
-          payee_id: transaction.payee_id,
-          category_id: transaction.category_id,
-          transfer_account_id: transaction.transfer_account_id,
-          transfer_transaction_id: transaction.transfer_transaction_id,
-          matched_transaction_id: transaction.matched_transaction_id,
-          import_id: transaction.import_id,
-          deleted: transaction.deleted,
-          account_name: transaction.account_name,
-          payee_name: transaction.payee_name,
-          category_name: transaction.category_name,
-        })),
+        transactions: transactions.map((transaction) => {
+          if (params.minimal !== false) {
+            // Default true, only false if explicitly set
+            // Minimal export: only essential fields
+            return {
+              id: transaction.id,
+              date: transaction.date,
+              amount: transaction.amount,
+              payee_name: transaction.payee_name,
+              cleared: transaction.cleared,
+            };
+          } else {
+            // Full export: all available fields
+            return {
+              id: transaction.id,
+              date: transaction.date,
+              amount: transaction.amount,
+              memo: transaction.memo,
+              cleared: transaction.cleared,
+              approved: transaction.approved,
+              flag_color: transaction.flag_color,
+              account_id: transaction.account_id,
+              payee_id: transaction.payee_id,
+              category_id: transaction.category_id,
+              transfer_account_id: transaction.transfer_account_id,
+              transfer_transaction_id: transaction.transfer_transaction_id,
+              matched_transaction_id: transaction.matched_transaction_id,
+              import_id: transaction.import_id,
+              deleted: transaction.deleted,
+              account_name: transaction.account_name,
+              payee_name: transaction.payee_name,
+              category_name: transaction.category_name,
+            };
+          }
+        }),
       };
 
       // Write to file
@@ -219,10 +242,13 @@ export async function handleExportTransactions(
           {
             type: 'text',
             text: responseFormatter.format({
-              message: `Successfully exported ${transactions.length} transactions`,
+              message: `Successfully exported ${transactions.length} transactions${params.minimal !== false ? ' (minimal fields)' : ' (full fields)'}`,
               filename: filename,
               full_path: fullPath,
               export_directory: exportDir,
+              export_mode: params.minimal !== false ? 'minimal' : 'full',
+              minimal_fields:
+                params.minimal !== false ? 'id, date, amount, payee_name, cleared' : null,
               filename_explanation:
                 'Filename format: ynab_{filters}_{count}items_{timestamp}.json - identifies what data was exported, when, and how many transactions',
               preview_count: previewCount,

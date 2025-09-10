@@ -651,6 +651,11 @@ Convert milliunits to dollars for easy reading.`,
                   description:
                     'Optional: Custom filename for export (auto-generated if not provided)',
                 },
+                minimal: {
+                  type: 'boolean',
+                  description:
+                    'Optional: Export only essential fields (id, date, amount, payee_name, cleared) for smaller file size (default: true)',
+                },
               },
               required: ['budget_id'],
             },
