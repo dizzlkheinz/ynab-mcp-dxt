@@ -40,6 +40,7 @@ import {
   UpdateTransactionSchema,
   DeleteTransactionSchema,
 } from '../tools/transactionTools.js';
+import { handleExportTransactions, ExportTransactionsSchema } from '../tools/exportTransactions.js';
 import {
   handleListCategories,
   handleGetCategory,
@@ -616,6 +617,45 @@ Convert milliunits to dollars for easy reading.`,
             },
           },
           {
+            name: 'export_transactions',
+            description: 'Export all transactions to a JSON file with descriptive filename',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'The ID of the budget to export transactions from',
+                },
+                account_id: {
+                  type: 'string',
+                  description: 'Optional: Filter transactions by account ID',
+                },
+                category_id: {
+                  type: 'string',
+                  description: 'Optional: Filter transactions by category ID',
+                },
+                since_date: {
+                  type: 'string',
+                  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
+                  description:
+                    'Optional: Only export transactions on or after this date (ISO format: YYYY-MM-DD)',
+                },
+                type: {
+                  type: 'string',
+                  enum: ['uncategorized', 'unapproved'],
+                  description: 'Optional: Filter by transaction type',
+                },
+                filename: {
+                  type: 'string',
+                  description:
+                    'Optional: Custom filename for export (auto-generated if not provided)',
+                },
+              },
+              required: ['budget_id'],
+            },
+          },
+          {
             name: 'get_transaction',
             description: 'Get detailed information for a specific transaction',
             inputSchema: {
@@ -1106,26 +1146,35 @@ Convert milliunits to dollars for easy reading.`,
       return await responseFormatter.runWithMinifyOverride(perCallMinify, async () => {
         switch (name) {
           case 'list_budgets': {
-            const exec = withSecurityWrapper('ynab', 'list_budgets', z.object({}))(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_budgets',
+              z.object({}),
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async () => handleListBudgets(this.ynabAPI));
           }
 
           case 'get_budget': {
-            const exec = withSecurityWrapper('ynab', 'get_budget', GetBudgetSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_budget',
+              GetBudgetSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleGetBudget(this.ynabAPI, validated as unknown as Parameters<typeof handleGetBudget>[1]),
+              handleGetBudget(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetBudget>[1],
+              ),
             );
           }
 
           case 'set_default_budget': {
             const SetDefaultBudgetSchema = z.object({ budget_id: z.string().min(1) });
-            const exec = withSecurityWrapper('ynab', 'set_default_budget', SetDefaultBudgetSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'set_default_budget',
+              SetDefaultBudgetSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) => {
               const { budget_id } = validated as { budget_id: string };
               await this.ynabAPI.budgets.getBudgetById(budget_id);
@@ -1176,9 +1225,11 @@ Convert milliunits to dollars for easy reading.`,
               ...raw,
               budget_id: this.getBudgetId(raw?.['budget_id'] as string | undefined),
             };
-            const exec = withSecurityWrapper('ynab', 'list_accounts', ListAccountsSchema)(
-              this.config.accessToken,
-            )(resolved);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_accounts',
+              ListAccountsSchema,
+            )(this.config.accessToken)(resolved);
             return exec(async (validated) =>
               handleListAccounts(
                 this.ynabAPI,
@@ -1188,11 +1239,16 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'get_account': {
-            const exec = withSecurityWrapper('ynab', 'get_account', GetAccountSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_account',
+              GetAccountSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleGetAccount(this.ynabAPI, validated as unknown as Parameters<typeof handleGetAccount>[1]),
+              handleGetAccount(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetAccount>[1],
+              ),
             );
           }
 
@@ -1220,6 +1276,20 @@ Convert milliunits to dollars for easy reading.`,
               handleListTransactions(
                 this.ynabAPI,
                 validated as unknown as Parameters<typeof handleListTransactions>[1],
+              ),
+            );
+          }
+
+          case 'export_transactions': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'export_transactions',
+              ExportTransactionsSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleExportTransactions(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleExportTransactions>[1],
               ),
             );
           }
@@ -1295,9 +1365,11 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'get_category': {
-            const exec = withSecurityWrapper('ynab', 'get_category', GetCategorySchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_category',
+              GetCategorySchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
               handleGetCategory(
                 this.ynabAPI,
@@ -1321,45 +1393,67 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'list_payees': {
-            const exec = withSecurityWrapper('ynab', 'list_payees', ListPayeesSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_payees',
+              ListPayeesSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleListPayees(this.ynabAPI, validated as unknown as Parameters<typeof handleListPayees>[1]),
+              handleListPayees(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListPayees>[1],
+              ),
             );
           }
 
           case 'get_payee': {
-            const exec = withSecurityWrapper('ynab', 'get_payee', GetPayeeSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_payee',
+              GetPayeeSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleGetPayee(this.ynabAPI, validated as unknown as Parameters<typeof handleGetPayee>[1]),
+              handleGetPayee(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetPayee>[1],
+              ),
             );
           }
 
           case 'get_month': {
-            const exec = withSecurityWrapper('ynab', 'get_month', GetMonthSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_month',
+              GetMonthSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleGetMonth(this.ynabAPI, validated as unknown as Parameters<typeof handleGetMonth>[1]),
+              handleGetMonth(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetMonth>[1],
+              ),
             );
           }
 
           case 'list_months': {
-            const exec = withSecurityWrapper('ynab', 'list_months', ListMonthsSchema)(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_months',
+              ListMonthsSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async (validated) =>
-              handleListMonths(this.ynabAPI, validated as unknown as Parameters<typeof handleListMonths>[1]),
+              handleListMonths(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListMonths>[1],
+              ),
             );
           }
 
           case 'get_user': {
-            const exec = withSecurityWrapper('ynab', 'get_user', z.object({}))(
-              this.config.accessToken,
-            )(args as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_user',
+              z.object({}),
+            )(this.config.accessToken)(args as Record<string, unknown>);
             return exec(async () => handleGetUser(this.ynabAPI));
           }
 
@@ -1375,9 +1469,11 @@ Convert milliunits to dollars for easy reading.`,
             }
 
           case 'financial_overview': {
-            const exec = withSecurityWrapper('ynab', 'financial_overview', FinancialOverviewSchema)(
-              this.config.accessToken,
-            )((args || {}) as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'financial_overview',
+              FinancialOverviewSchema,
+            )(this.config.accessToken)((args || {}) as Record<string, unknown>);
             return exec(async (validated) => {
               const params = validated as unknown as Parameters<typeof handleFinancialOverview>[1];
               const budgetId = this.getBudgetId(params.budget_id);
@@ -1386,9 +1482,11 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'spending_analysis': {
-            const exec = withSecurityWrapper('ynab', 'spending_analysis', SpendingAnalysisSchema)(
-              this.config.accessToken,
-            )((args || {}) as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'spending_analysis',
+              SpendingAnalysisSchema,
+            )(this.config.accessToken)((args || {}) as Record<string, unknown>);
             return exec(async (validated) => {
               const params = validated as unknown as Parameters<typeof handleSpendingAnalysis>[1];
               const budgetId = this.getBudgetId(params.budget_id);
@@ -1397,9 +1495,11 @@ Convert milliunits to dollars for easy reading.`,
           }
 
           case 'budget_health_check': {
-            const exec = withSecurityWrapper('ynab', 'budget_health_check', BudgetHealthSchema)(
-              this.config.accessToken,
-            )((args || {}) as Record<string, unknown>);
+            const exec = withSecurityWrapper(
+              'ynab',
+              'budget_health_check',
+              BudgetHealthSchema,
+            )(this.config.accessToken)((args || {}) as Record<string, unknown>);
             return exec(async (validated) => {
               const params = validated as unknown as Parameters<typeof handleBudgetHealthCheck>[1];
               const budgetId = this.getBudgetId(params.budget_id);

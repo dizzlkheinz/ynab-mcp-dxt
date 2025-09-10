@@ -104,27 +104,36 @@ dist/ynab-mcp-server-<version>.dxt
 - Use `get_env_status` to confirm Claude passed the token into the server (shows token_present and token_length).
 - This DXT is a single-file Node bundle (no node_modules). If Claude Desktop reports a Node/runtime issue, update Claude Desktop to a recent version and try again.
 
-### Control Output Size (Minified JSON)
+### Configuration Options
 
-Tool responses are JSON strings. To save context, outputs are minified by default. You can control this behavior via environment variables:
+Tool responses are JSON strings. To save context, outputs are minified by default. You can control this behavior and other settings via environment variables:
 
+**Output Formatting:**
 - `YNAB_MCP_MINIFY_OUTPUT` (default: `true`) — when `true`, responses are compact (no whitespace).
 - `YNAB_MCP_PRETTY_SPACES` (default: `2`) — number of spaces used only if minification is disabled.
+
+**Export Settings:**
+- `YNAB_EXPORT_PATH` — Directory for exported transaction files. Defaults to platform-specific locations:
+  - Windows/Mac: `~/Downloads`
+  - Linux/Unix: `~/Documents` (or `$XDG_DOCUMENTS_DIR`)
 
 Examples:
 
 ```bash
-# Minified (default)
+# Output formatting
 YNAB_MCP_MINIFY_OUTPUT=true
-
-# Pretty-print with 2 spaces
-YNAB_MCP_MINIFY_OUTPUT=false
 YNAB_MCP_PRETTY_SPACES=2
+
+# Custom export location
+YNAB_EXPORT_PATH=~/Desktop
+# Or absolute paths
+YNAB_EXPORT_PATH=C:\Users\YourName\Documents
+YNAB_EXPORT_PATH=/home/user/exports
 ```
 
 ## Available Tools
 
-The server provides 22 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 4 diagnostics and utilities (26 total):
+The server provides 23 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 4 diagnostics and utilities (27 total):
 
 ### Budget Management
 
@@ -141,7 +150,8 @@ The server provides 22 core tools for budgets, accounts, transactions, categorie
 
 ### Transaction Management
 
-- `list_transactions` - List transactions with filtering options
+- `list_transactions` - List transactions with filtering options (auto-suggests export for large results)
+- `export_transactions` - Export all transactions to JSON file with descriptive filename and platform-specific default paths
 - `get_transaction` - Get specific transaction details
 - `create_transaction` - Create new transaction
 - `update_transaction` - Update existing transaction

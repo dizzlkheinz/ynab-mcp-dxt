@@ -1,8 +1,8 @@
 {
   "dxt_version": "0.1",
   "name": "ynab-mcp-server",
-  "version": "0.2.0",
-  "description": "Model Context Protocol server for YNAB (You Need A Budget) integration. Provides 22 tools for budget management, transaction tracking, and advanced financial analysis with AI insights and spending trend analysis, plus 4 diagnostic and utility tools (26 total).",
+  "version": "0.3.0",
+  "description": "Model Context Protocol server for YNAB (You Need A Budget) integration. Provides 23 tools for budget management, transaction tracking, and advanced financial analysis with AI insights and spending trend analysis, plus 4 diagnostic and utility tools (27 total).",
   "author": {
     "name": "kdizzl"
   },
@@ -13,6 +13,13 @@
       "description": "Your YNAB Personal Access Token. Generate one at: https://app.youneedabudget.com/settings/developer",
       "required": true,
       "sensitive": true
+    },
+    "YNAB_EXPORT_PATH": {
+      "type": "string",
+      "title": "Export Directory Path",
+      "description": "Directory where exported transaction files will be saved. Leave empty for platform default: Windows/Mac use Downloads, Linux/Unix use Documents. Examples: ~/Desktop, C:\\Users\\YourName\\Documents, /home/user/exports",
+      "required": false,
+      "default": ""
     }
   },
   "server": {
@@ -24,7 +31,8 @@
         "${__dirname}/dist/bundle/index.cjs"
       ],
       "env": {
-        "YNAB_ACCESS_TOKEN": "${user_config.YNAB_ACCESS_TOKEN}"
+        "YNAB_ACCESS_TOKEN": "${user_config.YNAB_ACCESS_TOKEN}",
+        "YNAB_EXPORT_PATH": "${user_config.YNAB_EXPORT_PATH}"
       }
     }
   },

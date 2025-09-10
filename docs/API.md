@@ -245,6 +245,51 @@ Lists transactions for a budget with optional filtering.
 }
 ```
 
+### export_transactions
+
+Exports all transactions to a JSON file with descriptive filename and platform-specific default paths. This tool bypasses MCP response size limits by saving data to a file instead of returning it in the response.
+
+**Parameters:**
+- `budget_id` (string, required): The ID of the budget
+- `account_id` (string, optional): Filter by account ID
+- `category_id` (string, optional): Filter by category ID
+- `since_date` (string, optional): Only export transactions on or after this date (YYYY-MM-DD)
+- `type` (string, optional): Filter by transaction type (`uncategorized` or `unapproved`)
+- `filename` (string, optional): Custom filename (auto-generated if not provided)
+
+**Example Request:**
+```json
+{
+  "name": "export_transactions",
+  "arguments": {
+    "budget_id": "12345678-1234-1234-1234-123456789012",
+    "since_date": "2024-01-01"
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"message\": \"Successfully exported 1247 transactions\",\n  \"filename\": \"ynab_since_2024-01-01_1247items_2024-09-10_14-30-15.json\",\n  \"full_path\": \"C:\\\\Users\\\\YourName\\\\Downloads\\\\ynab_since_2024-01-01_1247items_2024-09-10_14-30-15.json\",\n  \"export_directory\": \"C:\\\\Users\\\\YourName\\\\Downloads\",\n  \"filename_explanation\": \"Filename format: ynab_{filters}_{count}items_{timestamp}.json - identifies what data was exported, when, and how many transactions\",\n  \"preview_count\": 10,\n  \"total_count\": 1247,\n  \"preview_transactions\": [\n    {\n      \"id\": \"transaction-id\",\n      \"date\": \"2024-01-15\",\n      \"amount\": -5000,\n      \"memo\": \"Coffee shop\",\n      \"payee_name\": \"Starbucks\",\n      \"category_name\": \"Dining Out\"\n    }\n  ]\n}"
+    }
+  ]
+}
+```
+
+**Export File Structure:**
+The exported JSON file contains:
+- `export_info`: Metadata about the export (timestamp, filters, count)
+- `transactions`: Array of transaction objects with all available fields
+
+**Platform-Specific Default Paths:**
+- Windows/Mac: `~/Downloads`
+- Linux/Unix: `~/Documents` (or `$XDG_DOCUMENTS_DIR`)
+- Configurable via `YNAB_EXPORT_PATH` environment variable
+
 ### get_transaction
 
 Gets detailed information for a specific transaction.

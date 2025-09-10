@@ -134,11 +134,43 @@ export async function handleListTransactions(
 
       const transactions = response.data.transactions;
 
+      // Check if response might be too large for MCP
+      const estimatedSize = JSON.stringify(transactions).length;
+      const sizeLimit = 90000; // Conservative limit under 100KB
+
+      if (estimatedSize > sizeLimit) {
+        // Return summary and suggest export
+        const preview = transactions.slice(0, 50);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                message: `Found ${transactions.length} transactions (${Math.round(estimatedSize / 1024)}KB). Too large to display all.`,
+                suggestion: "Use 'export_transactions' tool to save all transactions to a file.",
+                showing: `First ${preview.length} transactions:`,
+                total_count: transactions.length,
+                estimated_size_kb: Math.round(estimatedSize / 1024),
+                preview_transactions: preview.map((transaction) => ({
+                  id: transaction.id,
+                  date: transaction.date,
+                  amount: transaction.amount,
+                  memo: transaction.memo,
+                  payee_name: transaction.payee_name,
+                  category_name: transaction.category_name,
+                })),
+              }),
+            },
+          ],
+        };
+      }
+
       return {
         content: [
           {
             type: 'text',
             text: responseFormatter.format({
+              total_count: transactions.length,
               transactions: transactions.map((transaction) => ({
                 id: transaction.id,
                 date: transaction.date,
