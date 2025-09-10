@@ -147,3 +147,6 @@ ynab-mcp-dxt-updated/
 
 # IDE specific
 .kiro/
+
+# Claude Code specific
+.claude/
