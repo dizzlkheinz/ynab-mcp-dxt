@@ -109,10 +109,12 @@ dist/ynab-mcp-server-<version>.dxt
 Tool responses are JSON strings. To save context, outputs are minified by default. You can control this behavior and other settings via environment variables:
 
 **Output Formatting:**
+
 - `YNAB_MCP_MINIFY_OUTPUT` (default: `true`) — when `true`, responses are compact (no whitespace).
 - `YNAB_MCP_PRETTY_SPACES` (default: `2`) — number of spaces used only if minification is disabled.
 
 **Export Settings:**
+
 - `YNAB_EXPORT_PATH` — Directory for exported transaction files. Defaults to platform-specific locations:
   - Windows/Mac: `~/Downloads`
   - Linux/Unix: `~/Documents` (or `$XDG_DOCUMENTS_DIR`)
