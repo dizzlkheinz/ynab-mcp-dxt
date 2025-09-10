@@ -1,5 +1,8 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import fs from 'fs';
+import path from 'path';
+import { z } from 'zod';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -15,6 +18,7 @@ import {
   ServerConfig,
   ErrorHandler,
 } from '../types/index.js';
+import { SecurityMiddleware, withSecurityWrapper } from './securityMiddleware.js';
 import { handleListBudgets, handleGetBudget, GetBudgetSchema } from '../tools/budgetTools.js';
 import {
   handleListAccounts,
@@ -77,6 +81,7 @@ export class YNABMCPServer {
   private config: ServerConfig;
   private exitOnError: boolean;
   private defaultBudgetId?: string;
+  private serverVersion: string;
 
   constructor(exitOnError: boolean = true) {
     this.exitOnError = exitOnError;
@@ -86,11 +91,14 @@ export class YNABMCPServer {
     // Initialize YNAB API
     this.ynabAPI = new ynab.API(this.config.accessToken);
 
+    // Determine server version (prefer package.json)
+    this.serverVersion = this.readPackageVersion() ?? '0.0.0';
+
     // Initialize MCP Server
     this.server = new Server(
       {
         name: 'ynab-mcp-server',
-        version: '1.0.0',
+        version: this.serverVersion,
       },
       {
         capabilities: {
@@ -159,6 +167,24 @@ export class YNABMCPServer {
             name: 'YNAB Budgets',
             description: 'List of all available budgets',
             mimeType: 'application/json',
+          },
+          {
+            name: 'set_output_format',
+            description: 'Configure default JSON output formatting (minify or pretty spaces)',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                default_minify: { type: 'boolean', description: 'Default: true' },
+                pretty_spaces: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 10,
+                  description: 'Spaces for pretty printing when not minified',
+                },
+              },
+              required: [],
+            },
           },
           {
             uri: 'ynab://user',
@@ -434,6 +460,7 @@ Convert milliunits to dollars for easy reading.`,
             description: "List all budgets associated with the user's account",
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -443,6 +470,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -457,6 +485,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Set the default budget for subsequent operations',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -471,6 +500,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get the currently set default budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -481,6 +511,7 @@ Convert milliunits to dollars for easy reading.`,
               'List all accounts for a specific budget (uses default budget if not specified)',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -496,6 +527,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific account',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -514,6 +546,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Create a new account in the specified budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -540,6 +573,10 @@ Convert milliunits to dollars for easy reading.`,
                   type: 'number',
                   description: 'The initial balance of the account in currency units (optional)',
                 },
+                dry_run: {
+                  type: 'boolean',
+                  description: 'If true, simulate the create without calling YNAB',
+                },
               },
               required: ['budget_id', 'name', 'type'],
             },
@@ -549,6 +586,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List transactions for a budget with optional filtering',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -582,6 +620,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific transaction',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -600,6 +639,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Create a new transaction in the specified budget and account',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -648,6 +688,10 @@ Convert milliunits to dollars for easy reading.`,
                   enum: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
                   description: 'Optional: Transaction flag color',
                 },
+                dry_run: {
+                  type: 'boolean',
+                  description: 'If true, simulate the create without calling YNAB',
+                },
               },
               required: ['budget_id', 'account_id', 'amount', 'date'],
             },
@@ -657,6 +701,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Update an existing transaction',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -709,6 +754,10 @@ Convert milliunits to dollars for easy reading.`,
                   enum: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
                   description: 'Optional: Update the flag color',
                 },
+                dry_run: {
+                  type: 'boolean',
+                  description: 'If true, simulate the update without calling YNAB',
+                },
               },
               required: ['budget_id', 'transaction_id'],
             },
@@ -718,6 +767,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Delete a transaction from the specified budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -726,6 +776,10 @@ Convert milliunits to dollars for easy reading.`,
                 transaction_id: {
                   type: 'string',
                   description: 'The ID of the transaction to delete',
+                },
+                dry_run: {
+                  type: 'boolean',
+                  description: 'If true, simulate the deletion without calling YNAB',
                 },
               },
               required: ['budget_id', 'transaction_id'],
@@ -736,6 +790,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List all categories for a specific budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -750,6 +805,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific category',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -768,6 +824,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Update the budgeted amount for a category in the current month',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -781,6 +838,10 @@ Convert milliunits to dollars for easy reading.`,
                   type: 'integer',
                   description: 'The budgeted amount in milliunits (1/1000th of currency unit)',
                 },
+                dry_run: {
+                  type: 'boolean',
+                  description: 'If true, simulate the update without calling YNAB',
+                },
               },
               required: ['budget_id', 'category_id', 'budgeted'],
             },
@@ -790,6 +851,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List all payees for a specific budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -804,6 +866,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get detailed information for a specific payee',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -822,6 +885,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get budget data for a specific month',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -841,6 +905,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'List all months summary data for a budget',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -855,6 +920,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get information about the authenticated user',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -865,6 +931,7 @@ Convert milliunits to dollars for easy reading.`,
               'Convert between dollars and milliunits with integer arithmetic for precision',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 amount: {
                   type: 'number',
@@ -884,6 +951,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get comprehensive financial overview with insights, trends, and analysis',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -915,6 +983,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Detailed spending analysis with category breakdowns and trends',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -940,6 +1009,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Comprehensive budget health assessment with recommendations',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {
                 budget_id: {
                   type: 'string',
@@ -959,6 +1029,7 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Get current memory usage statistics for the MCP server',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -968,6 +1039,47 @@ Convert milliunits to dollars for easy reading.`,
             description: 'Debug: Show YNAB token presence and server environment info (masked)',
             inputSchema: {
               type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'server_info',
+            description: 'Return server version, runtime info, uptime, and basic capabilities',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'security_stats',
+            description: 'Return rate-limiting and request logging statistics (no sensitive data)',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'cache_stats',
+            description: 'Return cache keys and size statistics',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {},
+              required: [],
+            },
+          },
+          {
+            name: 'clear_cache',
+            description: 'Clear the in-memory cache (safe, no YNAB data is modified)',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
               properties: {},
               required: [],
             },
@@ -993,53 +1105,45 @@ Convert milliunits to dollars for easy reading.`,
 
       return await responseFormatter.runWithMinifyOverride(perCallMinify, async () => {
         switch (name) {
-          case 'list_budgets':
-            return await handleListBudgets(this.ynabAPI);
+          case 'list_budgets': {
+            const exec = withSecurityWrapper('ynab', 'list_budgets', z.object({}))(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async () => handleListBudgets(this.ynabAPI));
+          }
 
-          case 'get_budget':
-            try {
-              const params = GetBudgetSchema.parse(args);
-              return await handleGetBudget(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_budget',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_budget': {
+            const exec = withSecurityWrapper('ynab', 'get_budget', GetBudgetSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetBudget(this.ynabAPI, validated as unknown as Parameters<typeof handleGetBudget>[1]),
+            );
+          }
 
-          case 'set_default_budget':
-            try {
-              const { budget_id } = args as { budget_id: string };
-              if (!budget_id) {
-                throw new Error('budget_id is required');
-              }
-
-              // Validate that the budget exists
-              try {
-                await this.ynabAPI.budgets.getBudgetById(budget_id);
-                this.setDefaultBudget(budget_id);
-
-                return {
-                  content: [
-                    {
-                      type: 'text',
-                      text: responseFormatter.format({
-                        success: true,
-                        message: `Default budget set to: ${budget_id}`,
-                        default_budget_id: budget_id,
-                      }),
-                    },
-                  ],
-                };
-              } catch {
-                throw new Error(`Invalid budget ID: ${budget_id}. Budget not found.`);
-              }
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:set_default_budget',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'set_default_budget': {
+            const SetDefaultBudgetSchema = z.object({ budget_id: z.string().min(1) });
+            const exec = withSecurityWrapper('ynab', 'set_default_budget', SetDefaultBudgetSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) => {
+              const { budget_id } = validated as { budget_id: string };
+              await this.ynabAPI.budgets.getBudgetById(budget_id);
+              this.setDefaultBudget(budget_id);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: responseFormatter.format({
+                      success: true,
+                      message: `Default budget set to: ${budget_id}`,
+                      default_budget_id: budget_id,
+                    }),
+                  },
+                ],
+              };
+            });
+          }
 
           case 'get_default_budget':
             try {
@@ -1066,175 +1170,198 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'list_accounts':
-            try {
-              const rawParams = args as Record<string, unknown>;
-              const budgetId = this.getBudgetId(rawParams?.['budget_id'] as string | undefined);
-              const params = ListAccountsSchema.parse({ ...rawParams, budget_id: budgetId });
-              return await handleListAccounts(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_accounts',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_accounts': {
+            const raw = (args || {}) as Record<string, unknown>;
+            const resolved = {
+              ...raw,
+              budget_id: this.getBudgetId(raw?.['budget_id'] as string | undefined),
+            };
+            const exec = withSecurityWrapper('ynab', 'list_accounts', ListAccountsSchema)(
+              this.config.accessToken,
+            )(resolved);
+            return exec(async (validated) =>
+              handleListAccounts(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListAccounts>[1],
+              ),
+            );
+          }
 
-          case 'get_account':
-            try {
-              const params = GetAccountSchema.parse(args);
-              return await handleGetAccount(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_account',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_account': {
+            const exec = withSecurityWrapper('ynab', 'get_account', GetAccountSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetAccount(this.ynabAPI, validated as unknown as Parameters<typeof handleGetAccount>[1]),
+            );
+          }
 
-          case 'create_account':
-            try {
-              const params = CreateAccountSchema.parse(args);
-              return await handleCreateAccount(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:create_account',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'create_account': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'create_account',
+              CreateAccountSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleCreateAccount(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleCreateAccount>[1],
+              ),
+            );
+          }
 
-          case 'list_transactions':
-            try {
-              const params = ListTransactionsSchema.parse(args);
-              return await handleListTransactions(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_transactions',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_transactions': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_transactions',
+              ListTransactionsSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListTransactions(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListTransactions>[1],
+              ),
+            );
+          }
 
-          case 'get_transaction':
-            try {
-              const params = GetTransactionSchema.parse(args);
-              return await handleGetTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_transaction': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'get_transaction',
+              GetTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetTransaction>[1],
+              ),
+            );
+          }
 
-          case 'create_transaction':
-            try {
-              const params = CreateTransactionSchema.parse(args);
-              return await handleCreateTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:create_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'create_transaction': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'create_transaction',
+              CreateTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleCreateTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleCreateTransaction>[1],
+              ),
+            );
+          }
 
-          case 'update_transaction':
-            try {
-              const params = UpdateTransactionSchema.parse(args);
-              return await handleUpdateTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:update_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'update_transaction': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'update_transaction',
+              UpdateTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleUpdateTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleUpdateTransaction>[1],
+              ),
+            );
+          }
 
-          case 'delete_transaction':
-            try {
-              const params = DeleteTransactionSchema.parse(args);
-              return await handleDeleteTransaction(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:delete_transaction',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'delete_transaction': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'delete_transaction',
+              DeleteTransactionSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleDeleteTransaction(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleDeleteTransaction>[1],
+              ),
+            );
+          }
 
-          case 'list_categories':
-            try {
-              const params = ListCategoriesSchema.parse(args);
-              return await handleListCategories(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_categories',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_categories': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'list_categories',
+              ListCategoriesSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListCategories(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleListCategories>[1],
+              ),
+            );
+          }
 
-          case 'get_category':
-            try {
-              const params = GetCategorySchema.parse(args);
-              return await handleGetCategory(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_category',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_category': {
+            const exec = withSecurityWrapper('ynab', 'get_category', GetCategorySchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetCategory(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleGetCategory>[1],
+              ),
+            );
+          }
 
-          case 'update_category':
-            try {
-              const params = UpdateCategorySchema.parse(args);
-              return await handleUpdateCategory(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:update_category',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'update_category': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'update_category',
+              UpdateCategorySchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleUpdateCategory(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleUpdateCategory>[1],
+              ),
+            );
+          }
 
-          case 'list_payees':
-            try {
-              const params = ListPayeesSchema.parse(args);
-              return await handleListPayees(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_payees',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_payees': {
+            const exec = withSecurityWrapper('ynab', 'list_payees', ListPayeesSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListPayees(this.ynabAPI, validated as unknown as Parameters<typeof handleListPayees>[1]),
+            );
+          }
 
-          case 'get_payee':
-            try {
-              const params = GetPayeeSchema.parse(args);
-              return await handleGetPayee(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_payee',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_payee': {
+            const exec = withSecurityWrapper('ynab', 'get_payee', GetPayeeSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetPayee(this.ynabAPI, validated as unknown as Parameters<typeof handleGetPayee>[1]),
+            );
+          }
 
-          case 'get_month':
-            try {
-              const params = GetMonthSchema.parse(args);
-              return await handleGetMonth(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:get_month',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'get_month': {
+            const exec = withSecurityWrapper('ynab', 'get_month', GetMonthSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleGetMonth(this.ynabAPI, validated as unknown as Parameters<typeof handleGetMonth>[1]),
+            );
+          }
 
-          case 'list_months':
-            try {
-              const params = ListMonthsSchema.parse(args);
-              return await handleListMonths(this.ynabAPI, params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:list_months',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
+          case 'list_months': {
+            const exec = withSecurityWrapper('ynab', 'list_months', ListMonthsSchema)(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleListMonths(this.ynabAPI, validated as unknown as Parameters<typeof handleListMonths>[1]),
+            );
+          }
 
-          case 'get_user':
-            return await handleGetUser(this.ynabAPI);
+          case 'get_user': {
+            const exec = withSecurityWrapper('ynab', 'get_user', z.object({}))(
+              this.config.accessToken,
+            )(args as Record<string, unknown>);
+            return exec(async () => handleGetUser(this.ynabAPI));
+          }
 
           case 'convert_amount':
             try {
@@ -1247,50 +1374,90 @@ Convert milliunits to dollars for easy reading.`,
               );
             }
 
-          case 'financial_overview':
-            try {
-              const params = FinancialOverviewSchema.parse(args || {});
+          case 'financial_overview': {
+            const exec = withSecurityWrapper('ynab', 'financial_overview', FinancialOverviewSchema)(
+              this.config.accessToken,
+            )((args || {}) as Record<string, unknown>);
+            return exec(async (validated) => {
+              const params = validated as unknown as Parameters<typeof handleFinancialOverview>[1];
               const budgetId = this.getBudgetId(params.budget_id);
-              return await handleFinancialOverview(this.ynabAPI, {
-                ...params,
-                budget_id: budgetId,
-              });
-            } catch (error) {
-              throw new Error(
-                'Invalid parameters for ynab:financial_overview: ' +
-                  (error instanceof Error ? error.message : 'Unknown validation error'),
-              );
-            }
+              return handleFinancialOverview(this.ynabAPI, { ...params, budget_id: budgetId });
+            });
+          }
 
-          case 'spending_analysis':
-            try {
-              const params = SpendingAnalysisSchema.parse(args || {});
+          case 'spending_analysis': {
+            const exec = withSecurityWrapper('ynab', 'spending_analysis', SpendingAnalysisSchema)(
+              this.config.accessToken,
+            )((args || {}) as Record<string, unknown>);
+            return exec(async (validated) => {
+              const params = validated as unknown as Parameters<typeof handleSpendingAnalysis>[1];
               const budgetId = this.getBudgetId(params.budget_id);
-              return await handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
-            } catch (error) {
-              throw new Error(
-                'Invalid parameters for ynab:spending_analysis: ' +
-                  (error instanceof Error ? error.message : 'Unknown validation error'),
-              );
-            }
+              return handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
+            });
+          }
 
-          case 'budget_health_check':
-            try {
-              const params = BudgetHealthSchema.parse(args || {});
+          case 'budget_health_check': {
+            const exec = withSecurityWrapper('ynab', 'budget_health_check', BudgetHealthSchema)(
+              this.config.accessToken,
+            )((args || {}) as Record<string, unknown>);
+            return exec(async (validated) => {
+              const params = validated as unknown as Parameters<typeof handleBudgetHealthCheck>[1];
               const budgetId = this.getBudgetId(params.budget_id);
-              return await handleBudgetHealthCheck(this.ynabAPI, {
-                ...params,
-                budget_id: budgetId,
-              });
-            } catch (error) {
-              throw new Error(
-                'Invalid parameters for ynab:budget_health_check: ' +
-                  (error instanceof Error ? error.message : 'Unknown validation error'),
-              );
-            }
+              return handleBudgetHealthCheck(this.ynabAPI, { ...params, budget_id: budgetId });
+            });
+          }
 
           case 'get_memory_usage':
             return this.getMemoryUsage();
+
+          case 'server_info': {
+            const uptimeMs = Math.round(process.uptime() * 1000);
+            const mem = process.memoryUsage();
+            const payload = {
+              name: 'ynab-mcp-server',
+              version: this.serverVersion,
+              node_version: process.version,
+              platform: process.platform,
+              arch: process.arch,
+              pid: process.pid,
+              uptime_ms: uptimeMs,
+              uptime_readable: this.formatUptime(uptimeMs),
+              memory: {
+                rss: mem.rss,
+                heap_used: mem.heapUsed,
+                heap_total: mem.heapTotal,
+                external: mem.external,
+              },
+              env: {
+                node_env: process.env['NODE_ENV'] || 'development',
+                minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
+              },
+            };
+            return {
+              content: [{ type: 'text', text: responseFormatter.format(payload) }],
+            };
+          }
+
+          case 'security_stats': {
+            const stats = SecurityMiddleware.getSecurityStats();
+            return {
+              content: [{ type: 'text', text: responseFormatter.format(stats) }],
+            };
+          }
+
+          case 'cache_stats': {
+            const stats = cacheManager.getStats();
+            return {
+              content: [{ type: 'text', text: responseFormatter.format(stats) }],
+            };
+          }
+
+          case 'clear_cache': {
+            cacheManager.clear();
+            return {
+              content: [{ type: 'text', text: responseFormatter.format({ success: true }) }],
+            };
+          }
 
           case 'get_env_status': {
             const token = process.env['YNAB_ACCESS_TOKEN'];
@@ -1320,6 +1487,24 @@ Convert milliunits to dollars for easy reading.`,
                 {
                   type: 'text',
                   text: responseFormatter.format(payload),
+                },
+              ],
+            };
+          }
+
+          case 'set_output_format': {
+            const raw = (args || {}) as { default_minify?: boolean; pretty_spaces?: number };
+            const options: { defaultMinify?: boolean; prettySpaces?: number } = {};
+            if (typeof raw.default_minify === 'boolean') options.defaultMinify = raw.default_minify;
+            if (typeof raw.pretty_spaces === 'number' && Number.isFinite(raw.pretty_spaces)) {
+              options.prettySpaces = Math.max(0, Math.min(10, Math.floor(raw.pretty_spaces)));
+            }
+            responseFormatter.configure(options);
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: responseFormatter.format({ success: true, options }),
                 },
               ],
             };
@@ -1477,5 +1662,34 @@ Convert milliunits to dollars for easy reading.`,
     } else {
       return `${seconds}s`;
     }
+  }
+
+  /**
+   * Try to read the package version for accurate server metadata
+   */
+  private readPackageVersion(): string | null {
+    const candidates = [path.resolve(process.cwd(), 'package.json')];
+    try {
+      // May fail in bundled CJS builds; guard accordingly
+      const metaUrl = (import.meta as unknown as { url?: string })?.url;
+      if (metaUrl) {
+        const maybe = path.resolve(path.dirname(new URL(metaUrl).pathname), '../../package.json');
+        candidates.push(maybe);
+      }
+    } catch {
+      // ignore
+    }
+    for (const p of candidates) {
+      try {
+        if (fs.existsSync(p)) {
+          const raw = fs.readFileSync(p, 'utf8');
+          const pkg = JSON.parse(raw) as { version?: string };
+          if (pkg.version && typeof pkg.version === 'string') return pkg.version;
+        }
+      } catch {
+        // ignore and try next
+      }
+    }
+    return null;
   }
 }

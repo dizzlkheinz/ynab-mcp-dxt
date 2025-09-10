@@ -181,6 +181,7 @@ Creates a new account in the specified budget.
   - `otherAsset` - Other asset account
   - `otherLiability` - Other liability account
 - `balance` (number, optional): Initial balance in milliunits
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -279,6 +280,7 @@ Creates a new transaction in the specified budget and account.
 - `cleared` (string, optional): Transaction cleared status (`cleared`, `uncleared`, `reconciled`)
 - `approved` (boolean, optional): Whether the transaction is approved
 - `flag_color` (string, optional): Transaction flag color (`red`, `orange`, `yellow`, `green`, `blue`, `purple`)
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -315,6 +317,7 @@ Updates an existing transaction.
 - `cleared` (string, optional): Update the cleared status
 - `approved` (boolean, optional): Update the approved status
 - `flag_color` (string, optional): Update the flag color
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -337,6 +340,7 @@ Deletes a transaction from the specified budget.
 **Parameters:**
 - `budget_id` (string, required): The ID of the budget
 - `transaction_id` (string, required): The ID of the transaction to delete
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -396,6 +400,7 @@ Updates the budgeted amount for a category in the current month.
 - `budget_id` (string, required): The ID of the budget
 - `category_id` (string, required): The ID of the category
 - `budgeted` (number, required): The budgeted amount in milliunits
+- `dry_run` (boolean, optional): Validate and return simulated result; no API call
 
 **Example Request:**
 ```json
@@ -651,6 +656,67 @@ Converts between dollars and milliunits with integer arithmetic for precision.
     }
   ]
 }
+```
+
+## Server & Debug Tools
+
+These tools help inspect the server, environment, and performance. They do not modify YNAB data.
+
+### server_info
+
+Returns server metadata including version, runtime, uptime, and memory usage.
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "server_info", "arguments": {} }
+```
+
+### security_stats
+
+Returns rate-limiting and request logging statistics (sanitized; no sensitive data).
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "security_stats", "arguments": {} }
+```
+
+### cache_stats
+
+Returns cache size and keys for the in-memory cache.
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "cache_stats", "arguments": {} }
+```
+
+### clear_cache
+
+Clears the in-memory cache. Safe; does not modify YNAB.
+
+Parameters: none
+
+Example Request:
+```json
+{ "name": "clear_cache", "arguments": {} }
+```
+
+### set_output_format
+
+Configures default JSON formatting for responses.
+
+Parameters:
+- `default_minify` (boolean, optional): Minify JSON outputs by default (default: true)
+- `pretty_spaces` (number, optional): Spaces to use when pretty-printing (0-10)
+
+Example Request:
+```json
+{ "name": "set_output_format", "arguments": { "default_minify": false, "pretty_spaces": 2 } }
 ```
 
 ## Error Handling
