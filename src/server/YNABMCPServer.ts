@@ -713,16 +713,18 @@ Convert milliunits to dollars for easy reading.`,
                   properties: {
                     date_column: {
                       type: 'string',
-                      description: 'Column name for transaction date (default: "Date")',
+                      description:
+                        'Column name for transaction date when has_header is true, or column index as string when has_header is false (default: "Date")',
                     },
                     amount_column: {
                       type: 'string',
-                      description: 'Column name for transaction amount (default: "Amount")',
+                      description:
+                        'Column name for transaction amount when has_header is true, or column index as string when has_header is false (default: "Amount")',
                     },
                     description_column: {
                       type: 'string',
                       description:
-                        'Column name for transaction description (default: "Description")',
+                        'Column name for transaction description when has_header is true, or column index as string when has_header is false (default: "Description")',
                     },
                     date_format: {
                       type: 'string',

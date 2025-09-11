@@ -18,11 +18,14 @@ export const CompareTransactionsSchema = z
     date_range_days: z.number().min(1).max(365).optional().default(30),
     amount_tolerance: z.number().min(0).max(1).optional().default(0.01),
     date_tolerance_days: z.number().min(0).max(7).optional().default(5),
+    auto_detect_format: z.boolean().optional().default(false),
     csv_format: z
       .object({
-        date_column: z.string().optional().default('Date'),
-        amount_column: z.string().optional().default('Amount'),
-        description_column: z.string().optional().default('Description'),
+        date_column: z.union([z.string(), z.number()]).optional().default('Date'),
+        amount_column: z.union([z.string(), z.number()]).optional(),
+        debit_column: z.union([z.string(), z.number()]).optional(),
+        credit_column: z.union([z.string(), z.number()]).optional(),
+        description_column: z.union([z.string(), z.number()]).optional().default('Description'),
         date_format: z.string().optional().default('MM/DD/YYYY'),
         has_header: z.boolean().optional().default(true),
         delimiter: z.string().optional().default(','),
@@ -30,12 +33,19 @@ export const CompareTransactionsSchema = z
       .optional()
       .default(() => ({
         date_column: 'Date',
-        amount_column: 'Amount',
         description_column: 'Description',
         date_format: 'MM/DD/YYYY',
         has_header: true,
         delimiter: ',',
-      })),
+      }))
+      .refine(
+        (data) =>
+          data.amount_column ||
+          (data.debit_column !== undefined && data.credit_column !== undefined),
+        {
+          message: 'Either amount_column OR both debit_column and credit_column must be specified',
+        },
+      ),
   })
   .refine((data) => data.csv_file_path || data.csv_data, {
     message: 'Either csv_file_path or csv_data must be provided',
@@ -138,6 +148,89 @@ function amountToMilliunits(amountStr: string): number {
 }
 
 /**
+ * Auto-detect CSV format by analyzing the first few rows
+ */
+function autoDetectCSVFormat(
+  csvContent: string,
+): NonNullable<CompareTransactionsParams['csv_format']> {
+  const lines = csvContent.trim().split('\n').slice(0, 3);
+  if (lines.length === 0) {
+    throw new Error('CSV file is empty');
+  }
+
+  const firstLine = lines[0]!.split(',');
+  const hasHeader = !isDateLike(firstLine[0] || '');
+
+  // Check for separate debit/credit columns by looking for empty cells pattern
+  let hasDebitCredit = false;
+  if (lines.length > 1) {
+    const dataLines = hasHeader ? lines.slice(1) : lines;
+    hasDebitCredit = dataLines.some((line) => {
+      const cols = line.split(',');
+      // Look for pattern: amount in col2 OR col3, but not both
+      return (
+        cols.length >= 4 &&
+        ((cols[2]?.trim() && !cols[3]?.trim()) || (!cols[2]?.trim() && cols[3]?.trim()))
+      );
+    });
+  }
+
+  if (hasDebitCredit && firstLine.length >= 4) {
+    return {
+      date_column: 0,
+      description_column: 1,
+      debit_column: 2,
+      credit_column: 3,
+      date_format: detectDateFormat(hasHeader ? lines[1]?.split(',')[0] : firstLine[0]),
+      has_header: hasHeader,
+      delimiter: ',',
+    };
+  } else {
+    return {
+      date_column: hasHeader ? 'Date' : 0,
+      amount_column: hasHeader ? 'Amount' : 1,
+      description_column: hasHeader ? 'Description' : firstLine.length >= 3 ? 2 : 1,
+      date_format: detectDateFormat(hasHeader ? lines[1]?.split(',')[0] : firstLine[0]),
+      has_header: hasHeader,
+      delimiter: ',',
+    };
+  }
+}
+
+/**
+ * Check if a string looks like a date
+ */
+function isDateLike(str: string): boolean {
+  if (!str) return false;
+  // Common date patterns
+  const datePatterns = [
+    /^\d{1,2}\/\d{1,2}\/\d{4}$/, // MM/DD/YYYY
+    /^\d{4}-\d{1,2}-\d{1,2}$/, // YYYY-MM-DD
+    /^\d{1,2}-\d{1,2}-\d{4}$/, // MM-DD-YYYY
+  ];
+  return datePatterns.some((pattern) => pattern.test(str.trim()));
+}
+
+/**
+ * Detect date format from a sample date string
+ */
+function detectDateFormat(dateStr: string | undefined): string {
+  if (!dateStr) return 'MM/DD/YYYY';
+  const cleaned = dateStr.trim();
+
+  if (cleaned.includes('/')) {
+    return 'MM/DD/YYYY';
+  } else if (cleaned.includes('-')) {
+    if (/^\d{4}-/.test(cleaned)) {
+      return 'YYYY-MM-DD';
+    } else {
+      return 'MM-DD-YYYY';
+    }
+  }
+  return 'MM/DD/YYYY';
+}
+
+/**
  * Parse CSV data into bank transactions
  */
 function parseBankCSV(
@@ -165,18 +258,66 @@ function parseBankCSV(
       if (format.has_header) {
         // Record is an object when using headers
         const recordObj = record as unknown as Record<string, string>;
-        rawDate = recordObj[format.date_column] || '';
-        rawAmount = recordObj[format.amount_column] || '';
-        description = recordObj[format.description_column] || '';
+        rawDate = recordObj[format.date_column as string] || '';
+
+        if (format.amount_column) {
+          rawAmount = recordObj[format.amount_column as string] || '';
+        } else if (format.debit_column !== undefined && format.credit_column !== undefined) {
+          const debitVal = recordObj[format.debit_column as string] || '0';
+          const creditVal = recordObj[format.credit_column as string] || '0';
+          // Convert: debits negative, credits positive
+          rawAmount = parseFloat(debitVal) !== 0 ? `-${debitVal}` : creditVal;
+        } else {
+          throw new Error('No amount column configuration found');
+        }
+
+        description = recordObj[format.description_column as string] || '';
       } else {
         // Record is an array when not using headers, so use column indices
         const recordArray = record as string[];
-        const dateIndex = parseInt(format.date_column) || 0;
-        const amountIndex = parseInt(format.amount_column) || 1;
-        const descIndex = parseInt(format.description_column) || 2;
-        rawDate = recordArray[dateIndex] || '';
-        rawAmount = recordArray[amountIndex] || '';
-        description = recordArray[descIndex] || '';
+        const dateIndex =
+          typeof format.date_column === 'number'
+            ? format.date_column
+            : parseInt(format.date_column, 10);
+        const descIndex =
+          typeof format.description_column === 'number'
+            ? format.description_column
+            : parseInt(format.description_column, 10);
+
+        // Validate indices are valid numbers (fallback to defaults if invalid)
+        const safeDateIndex = isNaN(dateIndex) ? 0 : dateIndex;
+        const safeDescIndex = isNaN(descIndex) ? 2 : descIndex;
+
+        rawDate = recordArray[safeDateIndex] || '';
+
+        if (format.amount_column !== undefined) {
+          const amountIndex =
+            typeof format.amount_column === 'number'
+              ? format.amount_column
+              : parseInt(format.amount_column, 10);
+          const safeAmountIndex = isNaN(amountIndex) ? 1 : amountIndex;
+          rawAmount = recordArray[safeAmountIndex] || '';
+        } else if (format.debit_column !== undefined && format.credit_column !== undefined) {
+          const debitIndex =
+            typeof format.debit_column === 'number'
+              ? format.debit_column
+              : parseInt(format.debit_column, 10);
+          const creditIndex =
+            typeof format.credit_column === 'number'
+              ? format.credit_column
+              : parseInt(format.credit_column, 10);
+
+          const debitVal = recordArray[debitIndex] || '0';
+          const creditVal = recordArray[creditIndex] || '0';
+
+          // Convert: debits negative, credits positive
+          rawAmount =
+            parseFloat(debitVal.replace(/[^\d.-]/g, '')) !== 0 ? `-${debitVal}` : creditVal;
+        } else {
+          throw new Error('No amount column configuration found');
+        }
+
+        description = recordArray[safeDescIndex] || '';
       }
 
       if (!rawDate || !rawAmount) {
@@ -326,16 +467,37 @@ export async function handleCompareTransactions(
       // Get CSV data
       let csvContent: string;
       if (params.csv_file_path) {
-        csvContent = readFileSync(params.csv_file_path, 'utf-8');
+        try {
+          csvContent = readFileSync(params.csv_file_path, 'utf-8');
+        } catch (error) {
+          throw new Error(
+            `Unable to read CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          );
+        }
       } else {
         csvContent = params.csv_data!;
       }
 
+      // Auto-detect format if requested
+      let csvFormat = params.csv_format;
+      if (params.auto_detect_format) {
+        try {
+          csvFormat = autoDetectCSVFormat(csvContent);
+          console.log('Auto-detected CSV format:', csvFormat);
+        } catch (error) {
+          console.warn('Auto-detection failed, using provided format:', error);
+        }
+      }
+
       // Parse bank transactions from CSV
-      const bankTransactions = parseBankCSV(csvContent, params.csv_format);
+      const bankTransactions = parseBankCSV(csvContent, csvFormat);
 
       if (bankTransactions.length === 0) {
-        throw new Error('No valid transactions found in CSV data');
+        throw new Error(
+          'No valid transactions found in CSV data. ' +
+            'Check your csv_format parameters or try auto_detect_format: true. ' +
+            `CSV has ${csvContent.split('\n').length} lines.`,
+        );
       }
 
       // Calculate date range for YNAB query

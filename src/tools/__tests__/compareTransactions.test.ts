@@ -170,5 +170,33 @@ describe('compareTransactions', () => {
       const response = JSON.parse(result.content[0].text);
       expect(response.summary.bank_transactions_count).toBe(1);
     });
+
+    it('should handle CSV without headers using column indices', async () => {
+      const csvData = '2024-01-01,100.00,Test Transaction\n2024-01-02,-25.50,Another Transaction';
+
+      (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue({
+        data: { transactions: mockTransactions },
+      });
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        csv_data: csvData,
+        csv_format: {
+          date_column: '0',
+          amount_column: '1',
+          description_column: '2',
+          delimiter: ',',
+          has_header: false,
+          date_format: 'YYYY-MM-DD',
+        },
+      };
+
+      const result = await handleCompareTransactions(mockYnabAPI, params);
+
+      expect(result.content).toHaveLength(1);
+      const response = JSON.parse(result.content[0].text);
+      expect(response.summary.bank_transactions_count).toBe(2);
+    });
   });
 });

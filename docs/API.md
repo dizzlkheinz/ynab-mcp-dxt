@@ -305,9 +305,9 @@ Compares bank transactions from CSV files with YNAB transactions to identify mis
 - `amount_tolerance` (number, optional): Amount difference tolerance as decimal (0.01 = 1%, default: 0.01)
 - `date_tolerance_days` (number, optional): Date difference tolerance in days (default: 5)
 - `csv_format` (object, optional): CSV format configuration
-  - `date_column` (string): Column name for transaction date (default: "Date")
-  - `amount_column` (string): Column name for transaction amount (default: "Amount")
-  - `description_column` (string): Column name for transaction description (default: "Description")
+  - `date_column` (string): Column name for transaction date when `has_header: true`, or column index as string when `has_header: false` (default: "Date")
+  - `amount_column` (string): Column name for transaction amount when `has_header: true`, or column index as string when `has_header: false` (default: "Amount")
+  - `description_column` (string): Column name for transaction description when `has_header: true`, or column index as string when `has_header: false` (default: "Description")
   - `date_format` (string): Date format pattern (default: "MM/DD/YYYY")
   - `has_header` (boolean): Whether CSV has header row (default: true)
   - `delimiter` (string): CSV delimiter character (default: ",")
@@ -342,6 +342,26 @@ Compares bank transactions from CSV files with YNAB transactions to identify mis
     },
     "amount_tolerance": 0.02,
     "date_tolerance_days": 3
+  }
+}
+```
+
+**Example Request (CSV without headers using column indices):**
+```json
+{
+  "name": "compare_transactions",
+  "arguments": {
+    "budget_id": "12345678-1234-1234-1234-123456789012",
+    "account_id": "87654321-4321-4321-4321-210987654321",
+    "csv_data": "2024-01-01,100.00,Coffee Shop\n2024-01-02,-15.50,ATM Fee\n2024-01-03,250.00,Paycheck",
+    "csv_format": {
+      "date_column": "0",
+      "amount_column": "1",
+      "description_column": "2",
+      "date_format": "YYYY-MM-DD",
+      "has_header": false,
+      "delimiter": ","
+    }
   }
 }
 ```
