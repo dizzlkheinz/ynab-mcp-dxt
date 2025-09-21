@@ -45,6 +45,7 @@ import {
   handleCompareTransactions,
   CompareTransactionsSchema,
 } from '../tools/compareTransactions.js';
+import { handleReconcileAccount, ReconcileAccountSchema } from '../tools/reconcileAccount.js';
 import {
   handleListCategories,
   handleGetCategory,
@@ -745,6 +746,93 @@ Convert milliunits to dollars for easy reading.`,
             },
           },
           {
+            name: 'reconcile_account',
+            description:
+              'Perform comprehensive account reconciliation with bank statement data, including automatic transaction creation and status updates',
+            inputSchema: {
+              type: 'object',
+              additionalProperties: false,
+              properties: {
+                budget_id: {
+                  type: 'string',
+                  description: 'The ID of the budget to reconcile',
+                },
+                account_id: {
+                  type: 'string',
+                  description: 'The ID of the account to reconcile',
+                },
+                csv_file_path: {
+                  type: 'string',
+                  description: 'Optional: Path to CSV file containing bank transactions',
+                },
+                csv_data: {
+                  type: 'string',
+                  description: 'Optional: CSV data as string (alternative to csv_file_path)',
+                },
+                auto_create_transactions: {
+                  type: 'boolean',
+                  description:
+                    'Optional: Automatically create missing transactions in YNAB (default: false)',
+                },
+                auto_update_cleared_status: {
+                  type: 'boolean',
+                  description:
+                    'Optional: Automatically mark matched transactions as cleared (default: false)',
+                },
+                dry_run: {
+                  type: 'boolean',
+                  description: 'Optional: Preview changes without making them (default: true)',
+                },
+                amount_tolerance: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 1,
+                  description:
+                    'Optional: Amount difference tolerance as decimal (0.01 = 1%, default: 0.01)',
+                },
+                date_tolerance_days: {
+                  type: 'number',
+                  minimum: 0,
+                  maximum: 7,
+                  description: 'Optional: Date difference tolerance in days (default: 5)',
+                },
+                csv_format: {
+                  type: 'object',
+                  description: 'Optional: CSV format configuration (same as compare_transactions)',
+                  properties: {
+                    date_column: {
+                      type: 'string',
+                      description: 'Column name or index for transaction date (default: "Date")',
+                    },
+                    amount_column: {
+                      type: 'string',
+                      description:
+                        'Column name or index for transaction amount (default: "Amount")',
+                    },
+                    description_column: {
+                      type: 'string',
+                      description:
+                        'Column name or index for transaction description (default: "Description")',
+                    },
+                    date_format: {
+                      type: 'string',
+                      description: 'Date format pattern (default: "MM/DD/YYYY")',
+                    },
+                    has_header: {
+                      type: 'boolean',
+                      description: 'Whether CSV has header row (default: true)',
+                    },
+                    delimiter: {
+                      type: 'string',
+                      description: 'CSV delimiter character (default: ",")',
+                    },
+                  },
+                },
+              },
+              required: ['budget_id', 'account_id'],
+            },
+          },
+          {
             name: 'get_transaction',
             description: 'Get detailed information for a specific transaction',
             inputSchema: {
@@ -1393,6 +1481,20 @@ Convert milliunits to dollars for easy reading.`,
               handleCompareTransactions(
                 this.ynabAPI,
                 validated as unknown as Parameters<typeof handleCompareTransactions>[1],
+              ),
+            );
+          }
+
+          case 'reconcile_account': {
+            const exec = withSecurityWrapper(
+              'ynab',
+              'reconcile_account',
+              ReconcileAccountSchema,
+            )(this.config.accessToken)(args as Record<string, unknown>);
+            return exec(async (validated) =>
+              handleReconcileAccount(
+                this.ynabAPI,
+                validated as unknown as Parameters<typeof handleReconcileAccount>[1],
               ),
             );
           }

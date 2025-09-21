@@ -38,15 +38,7 @@ export const CompareTransactionsSchema = z
         date_format: 'MM/DD/YYYY',
         has_header: true,
         delimiter: ',',
-      }))
-      .refine(
-        (data) =>
-          data.amount_column ||
-          (data.debit_column !== undefined && data.credit_column !== undefined),
-        {
-          message: 'Either amount_column OR both debit_column and credit_column must be specified',
-        },
-      ),
+      })),
   })
   .refine((data) => data.csv_file_path || data.csv_data, {
     message: 'Either csv_file_path or csv_data must be provided',
