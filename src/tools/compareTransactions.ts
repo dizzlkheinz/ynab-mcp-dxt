@@ -456,6 +456,40 @@ function findMatches(
   return { matches, unmatched_bank, unmatched_ynab };
 }
 
+function findSuggestedPayee(
+  description: string,
+  payees: ynab.Payee[],
+): { suggested_payee_id?: string; suggested_payee_name?: string; suggestion_reason?: string } {
+  if (!description) {
+    return {};
+  }
+
+  const lower_description = description.toLowerCase();
+
+  // Simple search: check if payee name is contained in the description
+  for (const payee of payees) {
+    const lower_payee_name = payee.name.toLowerCase();
+    if (lower_description.includes(lower_payee_name)) {
+      return {
+        suggested_payee_id: payee.id,
+        suggested_payee_name: payee.name,
+        suggestion_reason: `Matched payee '${payee.name}' in description.`,
+      };
+    }
+  }
+
+  // If no match, suggest the original description as the new payee name (cleaned up a bit)
+  const suggested_name = description
+    .replace(/\d+/, '') // Remove numbers
+    .replace(/\s+/, ' ') // Consolidate whitespace
+    .trim();
+
+  return {
+    suggested_payee_name: suggested_name,
+    suggestion_reason: `No matching payee found. Suggested new payee name from description.`,
+  };
+}
+
 /**
  * Handles the ynab:compare_transactions tool call
  */
@@ -467,6 +501,9 @@ export async function handleCompareTransactions(
     async () => {
       // Parse and apply defaults/validation
       const parsed = CompareTransactionsSchema.parse(params);
+
+      const payeesResponse = await ynabAPI.payees.getPayees(parsed.budget_id);
+      const payees = payeesResponse.data.payees;
 
       // Get CSV data
       let csvContent: string;
@@ -580,12 +617,16 @@ export async function handleCompareTransactions(
                 match_score: match.match_score,
                 match_reasons: match.match_reasons,
               })),
-              missing_in_ynab: unmatched_bank.map((txn) => ({
-                date: txn.date.toISOString().split('T')[0],
-                amount: (txn.amount / 1000).toFixed(2),
-                description: txn.description,
-                row_number: txn.row_number,
-              })),
+              missing_in_ynab: unmatched_bank.map((txn) => {
+                const payeeSuggestion = findSuggestedPayee(txn.description, payees);
+                return {
+                  date: txn.date.toISOString().split('T')[0],
+                  amount: (txn.amount / 1000).toFixed(2),
+                  description: txn.description,
+                  row_number: txn.row_number,
+                  ...payeeSuggestion,
+                };
+              }),
               missing_in_bank: unmatched_ynab.map((txn) => ({
                 id: txn.id,
                 date: txn.date.toISOString().split('T')[0],

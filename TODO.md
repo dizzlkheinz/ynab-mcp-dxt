@@ -4,7 +4,7 @@ This file tracks the development plan for improving the account reconciliation p
 
 ## TODO List
 
-- [ ] **1. Enhance Foundational Transaction Tools:**
+- [x] **1. Enhance Foundational Transaction Tools:**
     - Modify `create_transaction`, `update_transaction`, and `delete_transaction` to return the updated `balance` and `cleared_balance` of the affected account in their response.
 
 - [ ] **2. Enhance Comparison Tool:**
