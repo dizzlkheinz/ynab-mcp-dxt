@@ -291,6 +291,10 @@ export async function handleCreateTransaction(
 
     const transaction = ensureTransaction(response.data.transaction, 'Transaction creation failed');
 
+    // Get the updated account balance
+    const accountResponse = await ynabAPI.accounts.getAccount(params.budget_id, params.account_id);
+    const account = accountResponse.data.account;
+
     return {
       content: [
         {
@@ -313,6 +317,8 @@ export async function handleCreateTransaction(
               import_id: transaction.import_id,
               deleted: transaction.deleted,
             },
+            updated_balance: account.balance,
+            updated_cleared_balance: account.cleared_balance,
           }),
         },
       ],
@@ -390,6 +396,10 @@ export async function handleUpdateTransaction(
 
     const transaction = ensureTransaction(response.data.transaction, 'Transaction update failed');
 
+    // Get the updated account balance
+    const accountResponse = await ynabAPI.accounts.getAccount(params.budget_id, transaction.account_id);
+    const account = accountResponse.data.account;
+
     return {
       content: [
         {
@@ -412,6 +422,8 @@ export async function handleUpdateTransaction(
               import_id: transaction.import_id,
               deleted: transaction.deleted,
             },
+            updated_balance: account.balance,
+            updated_cleared_balance: account.cleared_balance,
           }),
         },
       ],
@@ -451,6 +463,10 @@ export async function handleDeleteTransaction(
 
     const transaction = ensureTransaction(response.data.transaction, 'Transaction deletion failed');
 
+    // Get the updated account balance
+    const accountResponse = await ynabAPI.accounts.getAccount(params.budget_id, transaction.account_id);
+    const account = accountResponse.data.account;
+
     return {
       content: [
         {
@@ -461,6 +477,8 @@ export async function handleDeleteTransaction(
               id: transaction.id,
               deleted: transaction.deleted,
             },
+            updated_balance: account.balance,
+            updated_cleared_balance: account.cleared_balance,
           }),
         },
       ],

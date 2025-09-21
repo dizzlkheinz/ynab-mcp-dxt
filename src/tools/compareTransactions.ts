@@ -33,6 +33,7 @@ export const CompareTransactionsSchema = z
       .optional()
       .default(() => ({
         date_column: 'Date',
+        amount_column: 'Amount',
         description_column: 'Description',
         date_format: 'MM/DD/YYYY',
         has_header: true,
@@ -95,17 +96,17 @@ function parseDate(dateStr: string, format: string): Date {
   const cleanDate = dateStr.trim();
 
   // Handle common formats
-  if (format === 'MM/DD/YYYY' || format === 'M/D/YYYY') {
+  if ((format === 'MM/DD/YYYY' || format === 'M/D/YYYY') && cleanDate.includes('/')) {
     const parts = cleanDate.split('/');
     if (parts.length !== 3) throw new Error(`Invalid date format: ${dateStr}`);
     return new Date(parseInt(parts[2]!), parseInt(parts[0]!) - 1, parseInt(parts[1]!));
-  } else if (format === 'DD/MM/YYYY' || format === 'D/M/YYYY') {
+  } else if ((format === 'DD/MM/YYYY' || format === 'D/M/YYYY') && cleanDate.includes('/')) {
     const parts = cleanDate.split('/');
     if (parts.length !== 3) throw new Error(`Invalid date format: ${dateStr}`);
     return new Date(parseInt(parts[2]!), parseInt(parts[1]!) - 1, parseInt(parts[0]!));
-  } else if (format === 'YYYY-MM-DD') {
+  } else if (format === 'YYYY-MM-DD' && /^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanDate)) {
     return new Date(cleanDate);
-  } else if (format === 'MM-DD-YYYY') {
+  } else if (format === 'MM-DD-YYYY' && cleanDate.includes('-')) {
     const parts = cleanDate.split('-');
     if (parts.length !== 3) throw new Error(`Invalid date format: ${dateStr}`);
     return new Date(parseInt(parts[2]!), parseInt(parts[0]!) - 1, parseInt(parts[1]!));
@@ -464,26 +465,29 @@ export async function handleCompareTransactions(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
+      // Parse and apply defaults/validation
+      const parsed = CompareTransactionsSchema.parse(params);
+
       // Get CSV data
       let csvContent: string;
-      if (params.csv_file_path) {
+      if (parsed.csv_file_path) {
         try {
-          csvContent = readFileSync(params.csv_file_path, 'utf-8');
+          csvContent = readFileSync(parsed.csv_file_path, 'utf-8');
         } catch (error) {
           throw new Error(
             `Unable to read CSV file: ${error instanceof Error ? error.message : 'Unknown error'}`,
           );
         }
       } else {
-        csvContent = params.csv_data!;
+        csvContent = parsed.csv_data!;
       }
 
       // Auto-detect format if requested
-      let csvFormat = params.csv_format;
-      if (params.auto_detect_format) {
+      let csvFormat = parsed.csv_format;
+      if (parsed.auto_detect_format) {
         try {
           csvFormat = autoDetectCSVFormat(csvContent);
-          console.log('Auto-detected CSV format:', csvFormat);
+          console.warn('Auto-detected CSV format:', csvFormat);
         } catch (error) {
           console.warn('Auto-detection failed, using provided format:', error);
         }
@@ -507,15 +511,15 @@ export async function handleCompareTransactions(
 
       // Add tolerance to date range
       const startDate = new Date(minDate);
-      startDate.setDate(startDate.getDate() - params.date_tolerance_days!);
+      startDate.setDate(startDate.getDate() - parsed.date_tolerance_days!);
       const endDate = new Date(maxDate);
-      endDate.setDate(endDate.getDate() + params.date_tolerance_days!);
+      endDate.setDate(endDate.getDate() + parsed.date_tolerance_days!);
 
       // Get YNAB transactions for the account in the date range
       const sinceDate = startDate.toISOString().split('T')[0];
       const response = await ynabAPI.transactions.getTransactionsByAccount(
-        params.budget_id,
-        params.account_id,
+        parsed.budget_id,
+        parsed.account_id,
         sinceDate,
       );
 
@@ -539,8 +543,8 @@ export async function handleCompareTransactions(
       const { matches, unmatched_bank, unmatched_ynab } = findMatches(
         bankTransactions,
         ynabTransactions,
-        params.amount_tolerance!,
-        params.date_tolerance_days!,
+        parsed.amount_tolerance!,
+        parsed.date_tolerance_days!,
       );
 
       // Format results
@@ -555,8 +559,8 @@ export async function handleCompareTransactions(
           end: maxDate.toISOString().split('T')[0],
         },
         parameters: {
-          amount_tolerance: params.amount_tolerance,
-          date_tolerance_days: params.date_tolerance_days,
+          amount_tolerance: parsed.amount_tolerance,
+          date_tolerance_days: parsed.date_tolerance_days,
         },
       };
 
