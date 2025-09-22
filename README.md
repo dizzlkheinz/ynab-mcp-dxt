@@ -29,7 +29,6 @@ A Model Context Protocol (MCP) server that provides AI assistants with secure ac
 
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
 - **Advanced Bank Reconciliation**: Smart duplicate matching, automatic date adjustment, exact balance matching, and comprehensive reporting
-- **Smart Financial Analysis**: Statistical spending trends, budget optimization insights, and AI-generated recommendations
 
 ## Quick Start
 
