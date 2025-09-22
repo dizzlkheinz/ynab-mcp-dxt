@@ -16,11 +16,12 @@ This document provides comprehensive documentation for all tools available in th
 - [Financial Analysis Tools](#financial-analysis-tools)
 - [Natural Language & AI Tools](#natural-language--ai-tools)
 - [Utility Tools](#utility-tools)
+- [Diagnostic Tools](#diagnostic-tools)
 - [Error Handling](#error-handling)
 
 ## Overview
 
-The YNAB MCP Server provides 19 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
+The YNAB MCP Server provides 27 tools that enable AI assistants to interact with YNAB data. All tools follow consistent patterns for parameters, responses, and error handling.
 
 ### Tool Naming Convention
 
@@ -382,6 +383,7 @@ Compares bank transactions from CSV files with YNAB transactions to identify mis
 - **Date matching** (40 points max): Exact dates get full points, nearby dates get partial points
 - **Amount matching** (50 points max): Exact amounts get full points, close amounts within tolerance get partial points
 - **Description matching** (10 points max): Similarity between bank description and YNAB payee/memo
+- **Smart Duplicate Handling**: Multiple transactions with identical amounts are matched using chronological order with chronology bonus (+15 points for same day, +10 for within 3 days)
 - **Minimum match score**: 30 points required for a valid match
 
 **Supported Date Formats:**
@@ -395,6 +397,62 @@ Compares bank transactions from CSV files with YNAB transactions to identify mis
 - **Duplicate detection**: Identify YNAB transactions that don't appear in bank statements
 - **Import verification**: Verify that imported transactions match your bank statement exactly
 - **Data cleanup**: Find and resolve discrepancies between bank and YNAB data
+
+### reconcile_account
+
+Performs comprehensive account reconciliation with bank statement data, including automatic transaction creation, smart duplicate matching, automatic date adjustment, and exact balance matching.
+
+**Parameters:**
+- `budget_id` (string, required): The ID of the budget to reconcile
+- `account_id` (string, required): The ID of the account to reconcile
+- `csv_file_path` (string, optional): Path to CSV file containing bank transactions
+- `csv_data` (string, optional): CSV data as string (alternative to csv_file_path)
+- `expected_bank_balance` (number, optional): Current bank account balance in dollars for verification
+- `auto_create_transactions` (boolean, optional): Automatically create missing transactions in YNAB (default: false)
+- `auto_update_cleared_status` (boolean, optional): Automatically mark matched transactions as cleared (default: false)
+- `auto_unclear_missing` (boolean, optional): Automatically unmark cleared transactions missing from bank (default: true)
+- `auto_adjust_dates` (boolean, optional): Automatically adjust YNAB dates to match bank processing dates (default: false)
+- `start_date` (string, optional): Start date for reconciliation period (YYYY-MM-DD)
+- `end_date` (string, optional): End date for reconciliation period (YYYY-MM-DD)
+- `amount_tolerance` (number, optional): Amount difference tolerance as decimal (default: 0.01)
+- `date_tolerance_days` (number, optional): Date difference tolerance in days (default: 5)
+- `dry_run` (boolean, optional): Preview changes without applying them (default: true)
+- `csv_format` (object, optional): CSV format configuration (same as compare_transactions)
+
+**Key Features:**
+- **Smart Duplicate Matching**: Handles multiple transactions with identical amounts using chronological order
+- **Automatic Date Adjustment**: Syncs YNAB dates with bank processing dates for perfect alignment
+- **Exact Balance Matching**: Zero tolerance validation ensures perfect reconciliation
+- **Comprehensive Actions**: Creates missing transactions, marks cleared status, adjusts dates automatically
+
+**Example Request:**
+```json
+{
+  "name": "reconcile_account",
+  "arguments": {
+    "budget_id": "12345678-1234-1234-1234-123456789012",
+    "account_id": "87654321-4321-4321-4321-210987654321",
+    "expected_bank_balance": 1234.56,
+    "csv_data": "Date,Amount,Description\n2024-01-01,100.00,Coffee Shop\n2024-01-02,-50.25,Gas Station",
+    "auto_create_transactions": true,
+    "auto_update_cleared_status": true,
+    "auto_adjust_dates": true,
+    "dry_run": false
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"summary\": {\n    \"bank_transactions_count\": 15,\n    \"ynab_transactions_count\": 12,\n    \"matches_found\": 10,\n    \"missing_in_ynab\": 2,\n    \"missing_in_bank\": 1,\n    \"transactions_created\": 2,\n    \"transactions_updated\": 8,\n    \"dates_adjusted\": 3,\n    \"dry_run\": false\n  },\n  \"date_range\": {\n    \"start_date\": \"2024-01-01\",\n    \"end_date\": \"2024-01-15\",\n    \"bank_statement_range\": {\n      \"earliest_transaction\": \"2024-01-01\",\n      \"latest_transaction\": \"2024-01-15\"\n    },\n    \"ynab_data_range\": {\n      \"earliest_transaction\": \"2024-01-01\",\n      \"latest_transaction\": \"2024-01-16\"\n    }\n  },\n  \"account_balance\": {\n    \"before\": {\n      \"balance\": 123456,\n      \"cleared_balance\": 100000,\n      \"uncleared_balance\": 23456\n    },\n    \"after\": {\n      \"balance\": 123456,\n      \"cleared_balance\": 123456,\n      \"uncleared_balance\": 0\n    }\n  },\n  \"balance_reconciliation\": {\n    \"expected_bank_balance\": 123456,\n    \"ynab_cleared_balance\": 123456,\n    \"difference\": 0,\n    \"reconciled\": true\n  },\n  \"actions_taken\": [\n    {\n      \"type\": \"create_transaction\",\n      \"transaction\": { \"id\": \"new-txn-123\", \"amount\": -5000 },\n      \"reason\": \"Created missing transaction: Gas Station\"\n    },\n    {\n      \"type\": \"update_transaction\",\n      \"transaction\": { \"id\": \"txn-456\", \"cleared\": \"cleared\" },\n      \"reason\": \"Updated transaction: marked as cleared, date adjusted from 2024-01-15 to 2024-01-16\"\n    }\n  ],\n  \"recommendations\": [\n    \"✅ Adjusted 3 transaction date(s) to match bank statement dates\",\n    \"✅ Balance reconciliation successful: Bank and YNAB cleared balances match!\"\n  ]\n}"
+    }
+  ]
+}
+```
 
 ### get_transaction
 
@@ -809,48 +867,60 @@ Converts between dollars and milliunits with integer arithmetic for precision.
 }
 ```
 
-## Server & Debug Tools
+## Diagnostic Tools
 
 These tools help inspect the server, environment, and performance. They do not modify YNAB data.
 
-### server_info
+### diagnostic_info
 
-Returns server metadata including version, runtime, uptime, and memory usage.
+Returns comprehensive diagnostic information about the MCP server with flexible parameter control.
 
-Parameters: none
+**Parameters:**
+- `include_memory` (boolean, optional): Include memory usage statistics (default: true)
+- `include_environment` (boolean, optional): Include environment and token status (default: true)
+- `include_server` (boolean, optional): Include server version and runtime info (default: true)
+- `include_security` (boolean, optional): Include security and rate limiting stats (default: true)
+- `include_cache` (boolean, optional): Include cache statistics (default: true)
 
-Example Request:
+**Example Request (all sections):**
 ```json
-{ "name": "server_info", "arguments": {} }
+{
+  "name": "diagnostic_info",
+  "arguments": {}
+}
 ```
 
-### security_stats
-
-Returns rate-limiting and request logging statistics (sanitized; no sensitive data).
-
-Parameters: none
-
-Example Request:
+**Example Request (selective sections):**
 ```json
-{ "name": "security_stats", "arguments": {} }
+{
+  "name": "diagnostic_info",
+  "arguments": {
+    "include_memory": true,
+    "include_server": true,
+    "include_security": false,
+    "include_cache": false,
+    "include_environment": false
+  }
+}
 ```
 
-### cache_stats
-
-Returns cache size and keys for the in-memory cache.
-
-Parameters: none
-
-Example Request:
+**Example Response:**
 ```json
-{ "name": "cache_stats", "arguments": {} }
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"timestamp\": \"2024-01-15T10:30:00.000Z\",\n  \"server\": {\n    \"name\": \"ynab-mcp-server\",\n    \"version\": \"0.6.0\",\n    \"node_version\": \"v20.10.0\",\n    \"platform\": \"win32\",\n    \"arch\": \"x64\",\n    \"pid\": 12345,\n    \"uptime_ms\": 3600000,\n    \"uptime_readable\": \"1h 0m 0s\",\n    \"env\": {\n      \"node_env\": \"development\",\n      \"minify_output\": \"true\"\n    }\n  },\n  \"memory\": {\n    \"rss_mb\": 45.2,\n    \"heap_used_mb\": 32.1,\n    \"heap_total_mb\": 40.5,\n    \"external_mb\": 2.1,\n    \"array_buffers_mb\": 0.5,\n    \"description\": {\n      \"rss\": \"Resident Set Size - total memory allocated for the process\",\n      \"heap_used\": \"Used heap memory (objects, closures, etc.)\",\n      \"heap_total\": \"Total heap memory allocated\",\n      \"external\": \"Memory used by C++ objects bound to JavaScript objects\",\n      \"array_buffers\": \"Memory allocated for ArrayBuffer and SharedArrayBuffer\"\n    }\n  },\n  \"environment\": {\n    \"token_present\": true,\n    \"token_length\": 64,\n    \"token_preview\": \"abcd...xyz\",\n    \"ynab_env_keys_present\": [\"YNAB_ACCESS_TOKEN\"],\n    \"working_directory\": \"/path/to/project\"\n  },\n  \"security\": {\n    \"requests_processed\": 1250,\n    \"rate_limit_hits\": 0,\n    \"errors_logged\": 2\n  },\n  \"cache\": {\n    \"entries\": 15,\n    \"estimated_size_kb\": 128,\n    \"keys\": [\"budget_123\", \"account_456\"]\n  }\n}"
+    }
+  ]
+}
 ```
 
 ### clear_cache
 
-Clears the in-memory cache. Safe; does not modify YNAB.
+Clears the in-memory cache. Safe; does not modify YNAB data.
 
-Parameters: none
+**Parameters:** None
 
 Example Request:
 ```json

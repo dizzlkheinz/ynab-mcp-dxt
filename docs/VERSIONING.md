@@ -43,7 +43,7 @@ Non‑breaking (MINOR):
 - Adding a new tool/resource/prompt
 - Adding optional arguments with safe defaults
 - Adding new fields to outputs without altering existing ones
-- Adding diagnostics like `get_env_status`
+- Adding diagnostics like `diagnostic_info`
 
 Non‑breaking (PATCH):
 - Bug fixes, performance improvements, docs updates, internal refactors
@@ -74,7 +74,7 @@ Use this list to determine your version bump and ensure stability:
   - [ ] `server.entry_point` and `mcp_config.env` remain compatible
 - Runtime behavior
   - [ ] Authentication and error semantics unchanged (e.g., messages/codes)
-  - [ ] `get_env_status` continues to work for diagnostics
+  - [ ] `diagnostic_info` continues to work for diagnostics
 - Versioning
   - [ ] Version bump proposed: PATCH / MINOR / MAJOR
   - [ ] Changelog entry drafted (Added/Changed/Fixed/Removed)
@@ -84,6 +84,6 @@ Use this list to determine your version bump and ensure stability:
 
 1. Bump versions in `package.json` and `manifest.json`
 2. Build and bundle: `npm run package:dxt`
-3. Verify DXT runs and `get_env_status` shows the token when set
+3. Verify DXT runs and `diagnostic_info` shows the token when set
 4. Tag: `git tag -a vX.Y.Z -m "..." && git push --tags`
 5. Create a GitHub release and attach the `.dxt`
