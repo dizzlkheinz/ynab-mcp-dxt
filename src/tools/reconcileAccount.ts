@@ -39,11 +39,20 @@ export const ReconcileAccountSchema = z
       })),
     auto_create_transactions: z.boolean().optional().default(false),
     auto_update_cleared_status: z.boolean().optional().default(false),
-    auto_unclear_missing: z.boolean().optional().default(false),
+    auto_unclear_missing: z.boolean().optional().default(true),
+    auto_adjust_dates: z.boolean().optional().default(false),
     dry_run: z.boolean().optional().default(true),
     amount_tolerance: z.number().min(0).max(1).optional().default(0.01),
     date_tolerance_days: z.number().min(0).max(7).optional().default(5),
     expected_bank_balance: z.number().optional(),
+    start_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
+    end_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .optional(),
   })
   .refine((data) => data.csv_file_path || data.csv_data, {
     message: 'Either csv_file_path or csv_data must be provided',
@@ -63,7 +72,20 @@ interface ReconciliationResult {
     missing_in_bank: number;
     transactions_created: number;
     transactions_updated: number;
+    dates_adjusted: number;
     dry_run: boolean;
+  };
+  date_range: {
+    start_date: string;
+    end_date: string;
+    bank_statement_range: {
+      earliest_transaction: string;
+      latest_transaction: string;
+    };
+    ynab_data_range: {
+      earliest_transaction: string;
+      latest_transaction: string;
+    };
   };
   account_balance: {
     before: {
@@ -132,6 +154,28 @@ export async function handleReconcileAccount(
       const comparisonResult = await handleCompareTransactions(ynabAPI, compareParams);
       const comparison = JSON.parse((comparisonResult.content[0]?.text as string) ?? '{}');
 
+      // Determine actual date range from the data
+      const bankTransactions = comparison.bank_transactions || [];
+      const ynabTransactions = comparison.ynab_transactions || [];
+
+      const bankDates = bankTransactions
+        .map((t: { date: string }) => t.date)
+        .filter(Boolean)
+        .sort();
+      const ynabDates = ynabTransactions
+        .map((t: { date: string }) => t.date)
+        .filter(Boolean)
+        .sort();
+
+      const bankEarliest = bankDates.length > 0 ? bankDates[0] : 'N/A';
+      const bankLatest = bankDates.length > 0 ? bankDates[bankDates.length - 1] : 'N/A';
+      const ynabEarliest = ynabDates.length > 0 ? ynabDates[0] : 'N/A';
+      const ynabLatest = ynabDates.length > 0 ? ynabDates[ynabDates.length - 1] : 'N/A';
+
+      // Use provided date range or determine from data
+      const startDate = parsed.start_date || bankEarliest;
+      const endDate = parsed.end_date || bankLatest;
+
       // Initialize result object
       const result: ReconciliationResult = {
         summary: {
@@ -142,7 +186,20 @@ export async function handleReconcileAccount(
           missing_in_bank: comparison.summary.missing_in_bank,
           transactions_created: 0,
           transactions_updated: 0,
+          dates_adjusted: 0,
           dry_run: parsed.dry_run,
+        },
+        date_range: {
+          start_date: startDate,
+          end_date: endDate,
+          bank_statement_range: {
+            earliest_transaction: bankEarliest,
+            latest_transaction: bankLatest,
+          },
+          ynab_data_range: {
+            earliest_transaction: ynabEarliest,
+            latest_transaction: ynabLatest,
+          },
         },
         account_balance: {
           before: {
@@ -206,42 +263,66 @@ export async function handleReconcileAccount(
         }
       }
 
-      // Step 3: Update transaction statuses (if enabled and not dry run)
-      if (parsed.auto_update_cleared_status && !parsed.dry_run) {
+      // Step 3: Update transaction statuses and dates (if enabled and not dry run)
+      if ((parsed.auto_update_cleared_status || parsed.auto_adjust_dates) && !parsed.dry_run) {
         for (const match of comparison.matches) {
-          // Mark matched YNAB transactions as cleared if not already
-          if (match.ynab_transaction && match.ynab_transaction.cleared !== 'cleared') {
-            try {
-              const updateParams: UpdateTransactionParams = {
-                budget_id: parsed.budget_id,
-                transaction_id: match.ynab_transaction.id,
-                cleared: 'cleared',
-              };
+          if (match.ynab_transaction && match.bank_transaction) {
+            const needsClearedUpdate = match.ynab_transaction.cleared !== 'cleared';
+            const needsDateUpdate =
+              parsed.auto_adjust_dates &&
+              match.ynab_transaction.date !== match.bank_transaction.date;
 
-              const updateResult = await handleUpdateTransaction(ynabAPI, updateParams);
-              const updatedTransaction = JSON.parse(
-                (updateResult.content[0]?.text as string) ?? '{}',
-              );
+            if (needsClearedUpdate || needsDateUpdate) {
+              try {
+                const updateParams: UpdateTransactionParams = {
+                  budget_id: parsed.budget_id,
+                  transaction_id: match.ynab_transaction.id,
+                };
 
-              result.actions_taken.push({
-                type: 'update_transaction',
-                transaction: updatedTransaction.transaction,
-                reason: `Marked transaction as cleared based on bank statement match`,
-              });
-              result.summary.transactions_updated++;
+                if (needsClearedUpdate && parsed.auto_update_cleared_status) {
+                  updateParams.cleared = 'cleared';
+                }
 
-              // Update final account balance from the last transaction update
-              if (updatedTransaction.updated_balance !== undefined) {
-                result.account_balance.after.balance = updatedTransaction.updated_balance;
-                result.account_balance.after.cleared_balance =
-                  updatedTransaction.updated_cleared_balance;
-                result.account_balance.after.uncleared_balance =
-                  updatedTransaction.updated_balance - updatedTransaction.updated_cleared_balance;
+                if (needsDateUpdate) {
+                  updateParams.date = match.bank_transaction.date;
+                }
+
+                const updateResult = await handleUpdateTransaction(ynabAPI, updateParams);
+                const updatedTransaction = JSON.parse(
+                  (updateResult.content[0]?.text as string) ?? '{}',
+                );
+
+                const reasons = [];
+                if (needsClearedUpdate && parsed.auto_update_cleared_status) {
+                  reasons.push('marked as cleared');
+                }
+                if (needsDateUpdate) {
+                  reasons.push(
+                    `date adjusted from ${match.ynab_transaction.date} to ${match.bank_transaction.date}`,
+                  );
+                  result.summary.dates_adjusted++;
+                }
+
+                result.actions_taken.push({
+                  type: 'update_transaction',
+                  transaction: updatedTransaction.transaction,
+                  reason: `Updated transaction: ${reasons.join(', ')}`,
+                });
+                result.summary.transactions_updated++;
+
+                // Update final account balance from the last transaction update
+                if (updatedTransaction.updated_balance !== undefined) {
+                  result.account_balance.after.balance = updatedTransaction.updated_balance;
+                  result.account_balance.after.cleared_balance =
+                    updatedTransaction.updated_cleared_balance;
+                  result.account_balance.after.uncleared_balance =
+                    updatedTransaction.updated_balance - updatedTransaction.updated_cleared_balance;
+                }
+              } catch (error) {
+                result.recommendations.push(
+                  `Failed to update transaction: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                );
               }
-            } catch (error) {
-              result.recommendations.push(
-                `Failed to update transaction status: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              );
             }
           }
         }
@@ -257,24 +338,33 @@ export async function handleReconcileAccount(
           ) || 0;
 
         const finalClearedBalance = result.account_balance.after.cleared_balance;
-        const difference = Math.abs(parsed.expected_bank_balance * 1000 - finalClearedBalance);
-        const reconciled = difference <= 1000; // Within $1.00 tolerance
+        const expectedMilliunits = Math.round(parsed.expected_bank_balance * 1000);
+        const difference = Math.abs(expectedMilliunits - finalClearedBalance);
+        const reconciled = difference === 0; // Must match exactly
 
         result.balance_reconciliation = {
-          expected_bank_balance: parsed.expected_bank_balance * 1000, // Convert to milliunits
+          expected_bank_balance: expectedMilliunits,
           ynab_cleared_balance: finalClearedBalance,
           difference: difference,
           reconciled: reconciled,
-          bank_statement_total: bankStatementTotal,
+          bank_statement_total: Math.round(bankStatementTotal * 1000),
         };
 
         if (!reconciled) {
+          result.recommendations.push(`⚠️  Balance mismatch detected:`);
           result.recommendations.push(
-            `Balance mismatch: Expected bank balance $${parsed.expected_bank_balance.toFixed(2)}, YNAB cleared balance $${(finalClearedBalance / 1000).toFixed(2)}, difference $${(difference / 1000).toFixed(2)}`,
+            `   Expected bank balance: $${parsed.expected_bank_balance.toFixed(2)}`,
+          );
+          result.recommendations.push(
+            `   YNAB cleared balance: $${(finalClearedBalance / 1000).toFixed(2)}`,
+          );
+          result.recommendations.push(`   Difference: $${(difference / 1000).toFixed(2)}`);
+          result.recommendations.push(
+            `   This suggests additional transactions may need to be cleared or created.`,
           );
         } else {
           result.recommendations.push(
-            'Balance reconciliation successful: Bank and YNAB cleared balances match within tolerance',
+            '✅ Balance reconciliation successful: Bank and YNAB cleared balances match!',
           );
         }
       }
@@ -312,9 +402,21 @@ export async function handleReconcileAccount(
       }
 
       // Step 6: Generate recommendations
+      if (result.summary.dates_adjusted > 0) {
+        result.recommendations.push(
+          `✅ Adjusted ${result.summary.dates_adjusted} transaction date(s) to match bank statement dates`,
+        );
+      }
+
       if (result.summary.missing_in_ynab > 0 && !parsed.auto_create_transactions) {
         result.recommendations.push(
           `Consider setting auto_create_transactions=true to automatically create ${result.summary.missing_in_ynab} missing transactions`,
+        );
+      }
+
+      if (!parsed.auto_adjust_dates && comparison.matches?.length > 0) {
+        result.recommendations.push(
+          `Consider setting auto_adjust_dates=true to automatically align YNAB dates with bank statement dates`,
         );
       }
 

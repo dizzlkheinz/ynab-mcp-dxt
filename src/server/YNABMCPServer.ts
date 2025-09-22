@@ -1242,52 +1242,38 @@ Convert milliunits to dollars for easy reading.`,
             },
           },
           {
-            name: 'get_memory_usage',
-            description: 'Get current memory usage statistics for the MCP server',
+            name: 'diagnostic_info',
+            description: 'Get comprehensive diagnostic information about the MCP server',
             inputSchema: {
               type: 'object',
               additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'get_env_status',
-            description: 'Debug: Show YNAB token presence and server environment info (masked)',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'server_info',
-            description: 'Return server version, runtime info, uptime, and basic capabilities',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'security_stats',
-            description: 'Return rate-limiting and request logging statistics (no sensitive data)',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'cache_stats',
-            description: 'Return cache keys and size statistics',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
+              properties: {
+                include_memory: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include memory usage statistics',
+                },
+                include_environment: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include environment and token status',
+                },
+                include_server: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include server version and runtime info',
+                },
+                include_security: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include security and rate limiting stats',
+                },
+                include_cache: {
+                  type: 'boolean',
+                  default: true,
+                  description: 'Include cache statistics',
+                },
+              },
               required: [],
             },
           },
@@ -1712,48 +1698,109 @@ Convert milliunits to dollars for easy reading.`,
             });
           }
 
-          case 'get_memory_usage':
-            return this.getMemoryUsage();
-
-          case 'server_info': {
-            const uptimeMs = Math.round(process.uptime() * 1000);
-            const mem = process.memoryUsage();
-            const payload = {
-              name: 'ynab-mcp-server',
-              version: this.serverVersion,
-              node_version: process.version,
-              platform: process.platform,
-              arch: process.arch,
-              pid: process.pid,
-              uptime_ms: uptimeMs,
-              uptime_readable: this.formatUptime(uptimeMs),
-              memory: {
-                rss: mem.rss,
-                heap_used: mem.heapUsed,
-                heap_total: mem.heapTotal,
-                external: mem.external,
-              },
-              env: {
-                node_env: process.env['NODE_ENV'] || 'development',
-                minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
-              },
+          case 'diagnostic_info': {
+            const args = (request.params.arguments || {}) as {
+              include_memory?: boolean;
+              include_environment?: boolean;
+              include_server?: boolean;
+              include_security?: boolean;
+              include_cache?: boolean;
             };
-            return {
-              content: [{ type: 'text', text: responseFormatter.format(payload) }],
-            };
-          }
 
-          case 'security_stats': {
-            const stats = SecurityMiddleware.getSecurityStats();
-            return {
-              content: [{ type: 'text', text: responseFormatter.format(stats) }],
-            };
-          }
+            // Default all to true if not specified
+            const includeMemory = args.include_memory !== false;
+            const includeEnvironment = args.include_environment !== false;
+            const includeServer = args.include_server !== false;
+            const includeSecurity = args.include_security !== false;
+            const includeCache = args.include_cache !== false;
 
-          case 'cache_stats': {
-            const stats = cacheManager.getStats();
+            const diagnostics: Record<string, unknown> = {
+              timestamp: new Date().toISOString(),
+            };
+
+            if (includeServer) {
+              const uptimeMs = Math.round(process.uptime() * 1000);
+              diagnostics['server'] = {
+                name: 'ynab-mcp-server',
+                version: this.serverVersion,
+                node_version: process.version,
+                platform: process.platform,
+                arch: process.arch,
+                pid: process.pid,
+                uptime_ms: uptimeMs,
+                uptime_readable: this.formatUptime(uptimeMs),
+                env: {
+                  node_env: process.env['NODE_ENV'] || 'development',
+                  minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
+                },
+              };
+            }
+
+            if (includeMemory) {
+              const memUsage = process.memoryUsage();
+              const formatBytes = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
+
+              diagnostics['memory'] = {
+                rss_mb: formatBytes(memUsage.rss),
+                heap_used_mb: formatBytes(memUsage.heapUsed),
+                heap_total_mb: formatBytes(memUsage.heapTotal),
+                external_mb: formatBytes(memUsage.external),
+                array_buffers_mb: formatBytes(memUsage.arrayBuffers || 0),
+                description: {
+                  rss: 'Resident Set Size - total memory allocated for the process',
+                  heap_used: 'Used heap memory (objects, closures, etc.)',
+                  heap_total: 'Total heap memory allocated',
+                  external: 'Memory used by C++ objects bound to JavaScript objects',
+                  array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
+                },
+              };
+            }
+
+            if (includeEnvironment) {
+              const token = process.env['YNAB_ACCESS_TOKEN'];
+              const masked =
+                token && token.length >= 8
+                  ? `${token.slice(0, 4)}...${token.slice(-4)}`
+                  : token
+                    ? `${token[0]}***`
+                    : null;
+
+              const envKeys = Object.keys(process.env || {});
+              const ynabEnvKeys = envKeys.filter((k) => k.toUpperCase().includes('YNAB'));
+
+              diagnostics['environment'] = {
+                token_present: !!token,
+                token_length: token ? token.length : 0,
+                token_preview: masked,
+                ynab_env_keys_present: ynabEnvKeys,
+                working_directory: process.cwd(),
+              };
+            }
+
+            if (includeSecurity) {
+              diagnostics['security'] = SecurityMiddleware.getSecurityStats();
+            }
+
+            if (includeCache) {
+              const cacheStats = cacheManager.getStats();
+              const estimateCacheSize = () => {
+                try {
+                  const serialized = JSON.stringify(Array.from(cacheManager['cache'].entries()));
+                  return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
+                } catch {
+                  return 0;
+                }
+              };
+
+              diagnostics['cache'] = {
+                entries: cacheStats.size,
+                estimated_size_kb: estimateCacheSize(),
+                keys: cacheStats.keys,
+              };
+            }
+
             return {
-              content: [{ type: 'text', text: responseFormatter.format(stats) }],
+              content: [{ type: 'text', text: responseFormatter.format(diagnostics) }],
             };
           }
 
@@ -1761,39 +1808,6 @@ Convert milliunits to dollars for easy reading.`,
             cacheManager.clear();
             return {
               content: [{ type: 'text', text: responseFormatter.format({ success: true }) }],
-            };
-          }
-
-          case 'get_env_status': {
-            const token = process.env['YNAB_ACCESS_TOKEN'];
-            const masked =
-              token && token.length >= 8
-                ? `${token.slice(0, 4)}...${token.slice(-4)}`
-                : token
-                  ? `${token[0]}***` // very short token, still mask
-                  : null;
-
-            const envKeys = Object.keys(process.env || {});
-            const ynabEnvKeys = envKeys.filter((k) => k.toUpperCase().includes('YNAB'));
-
-            const payload = {
-              token_present: !!token,
-              token_length: token ? token.length : 0,
-              token_preview: masked,
-              ynab_env_keys_present: ynabEnvKeys,
-              node_version: process.version,
-              platform: process.platform,
-              pid: process.pid,
-              cwd: process.cwd(),
-            };
-
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: responseFormatter.format(payload),
-                },
-              ],
             };
           }
 
@@ -1888,65 +1902,6 @@ Convert milliunits to dollars for easy reading.`,
     throw new Error(
       'No budget ID provided and no default budget set. Use set_default_budget first.',
     );
-  }
-
-  /**
-   * Gets current memory usage statistics for the MCP server process
-   */
-  private getMemoryUsage() {
-    const memUsage = process.memoryUsage();
-    const uptimeMs = process.uptime() * 1000;
-    const cacheStats = cacheManager.getStats();
-
-    // Convert bytes to MB for readability
-    const formatBytes = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
-
-    // Estimate cache memory usage by serializing and measuring size
-    const estimateCacheSize = () => {
-      try {
-        const serialized = JSON.stringify(Array.from(cacheManager['cache'].entries()));
-        return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
-      } catch {
-        return 0;
-      }
-    };
-
-    const stats = {
-      pid: process.pid,
-      uptime_ms: Math.round(uptimeMs),
-      uptime_readable: this.formatUptime(uptimeMs),
-      memory: {
-        rss: formatBytes(memUsage.rss),
-        heap_used: formatBytes(memUsage.heapUsed),
-        heap_total: formatBytes(memUsage.heapTotal),
-        external: formatBytes(memUsage.external),
-        array_buffers: formatBytes(memUsage.arrayBuffers || 0),
-      },
-      cache: {
-        entries: cacheStats.size,
-        estimated_size_kb: estimateCacheSize(),
-        keys: cacheStats.keys,
-      },
-      memory_description: {
-        rss: 'Resident Set Size - total memory allocated for the process',
-        heap_used: 'Used heap memory (objects, closures, etc.)',
-        heap_total: 'Total heap memory allocated',
-        external: 'Memory used by C++ objects bound to JavaScript objects',
-        array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
-      },
-      node_version: process.version,
-      platform: process.platform,
-      arch: process.arch,
-    };
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: responseFormatter.format(stats),
-        },
-      ],
-    };
   }
 
   /**

@@ -199,8 +199,8 @@ The server provides 25 core tools for budgets, accounts, transactions, categorie
 
 ### Diagnostics
 
-- `get_memory_usage` - Current server memory usage stats
-- `get_env_status` - Debug info about environment (token masked)
+- `diagnostic_info` - Comprehensive server diagnostic information (memory, environment, server info, security stats, cache stats)
+- `clear_cache` - Clear the in-memory cache
 
 ## Documentation
 
