@@ -153,3 +153,6 @@ ynab-mcp-dxt-updated/
 
 # MCP configuration (local development)
 .mcp.json
+
+# CSV files (test data)
+*.csv

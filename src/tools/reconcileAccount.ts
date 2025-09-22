@@ -39,9 +39,11 @@ export const ReconcileAccountSchema = z
       })),
     auto_create_transactions: z.boolean().optional().default(false),
     auto_update_cleared_status: z.boolean().optional().default(false),
+    auto_unclear_missing: z.boolean().optional().default(false),
     dry_run: z.boolean().optional().default(true),
     amount_tolerance: z.number().min(0).max(1).optional().default(0.01),
     date_tolerance_days: z.number().min(0).max(7).optional().default(5),
+    expected_bank_balance: z.number().optional(),
   })
   .refine((data) => data.csv_file_path || data.csv_data, {
     message: 'Either csv_file_path or csv_data must be provided',
@@ -74,6 +76,13 @@ interface ReconciliationResult {
       cleared_balance: number;
       uncleared_balance: number;
     };
+  };
+  balance_reconciliation?: {
+    expected_bank_balance: number;
+    ynab_cleared_balance: number;
+    difference: number;
+    reconciled: boolean;
+    bank_statement_total: number;
   };
   actions_taken: {
     type: 'create_transaction' | 'update_transaction';
@@ -238,7 +247,71 @@ export async function handleReconcileAccount(
         }
       }
 
-      // Step 4: Generate recommendations
+      // Step 4: Balance reconciliation (if expected bank balance provided)
+      if (parsed.expected_bank_balance !== undefined) {
+        // Calculate total from bank transactions
+        const bankStatementTotal =
+          comparison.bank_transactions?.reduce(
+            (sum: number, txn: { amount: string }) => sum + parseFloat(txn.amount),
+            0,
+          ) || 0;
+
+        const finalClearedBalance = result.account_balance.after.cleared_balance;
+        const difference = Math.abs(parsed.expected_bank_balance * 1000 - finalClearedBalance);
+        const reconciled = difference <= 1000; // Within $1.00 tolerance
+
+        result.balance_reconciliation = {
+          expected_bank_balance: parsed.expected_bank_balance * 1000, // Convert to milliunits
+          ynab_cleared_balance: finalClearedBalance,
+          difference: difference,
+          reconciled: reconciled,
+          bank_statement_total: bankStatementTotal,
+        };
+
+        if (!reconciled) {
+          result.recommendations.push(
+            `Balance mismatch: Expected bank balance $${parsed.expected_bank_balance.toFixed(2)}, YNAB cleared balance $${(finalClearedBalance / 1000).toFixed(2)}, difference $${(difference / 1000).toFixed(2)}`,
+          );
+        } else {
+          result.recommendations.push(
+            'Balance reconciliation successful: Bank and YNAB cleared balances match within tolerance',
+          );
+        }
+      }
+
+      // Step 5: Handle cleared YNAB transactions missing from bank (if enabled and not dry run)
+      if (parsed.auto_unclear_missing && !parsed.dry_run) {
+        for (const missingTxn of comparison.missing_in_bank) {
+          // Only unclear transactions that are currently cleared (not reconciled)
+          if (missingTxn.cleared === 'cleared') {
+            try {
+              const updateParams: UpdateTransactionParams = {
+                budget_id: parsed.budget_id,
+                transaction_id: missingTxn.id,
+                cleared: 'uncleared',
+              };
+
+              const updateResult = await handleUpdateTransaction(ynabAPI, updateParams);
+              const updatedTransaction = JSON.parse(
+                (updateResult.content[0]?.text as string) ?? '{}',
+              );
+
+              result.actions_taken.push({
+                type: 'update_transaction',
+                transaction: updatedTransaction.transaction,
+                reason: `Marked as uncleared - cleared transaction not found in bank statement`,
+              });
+              result.summary.transactions_updated++;
+            } catch (error) {
+              result.recommendations.push(
+                `Failed to unclear transaction "${missingTxn.payee_name}": ${error instanceof Error ? error.message : 'Unknown error'}`,
+              );
+            }
+          }
+        }
+      }
+
+      // Step 6: Generate recommendations
       if (result.summary.missing_in_ynab > 0 && !parsed.auto_create_transactions) {
         result.recommendations.push(
           `Consider setting auto_create_transactions=true to automatically create ${result.summary.missing_in_ynab} missing transactions`,

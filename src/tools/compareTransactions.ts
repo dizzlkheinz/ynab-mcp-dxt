@@ -606,6 +606,10 @@ export async function handleCompareTransactions(
                 ynab_date: match.ynab_transaction.date.toISOString().split('T')[0],
                 ynab_amount: (match.ynab_transaction.amount / 1000).toFixed(2),
                 ynab_payee: match.ynab_transaction.payee_name,
+                ynab_transaction: {
+                  id: match.ynab_transaction.id,
+                  cleared: match.ynab_transaction.cleared,
+                },
                 match_score: match.match_score,
                 match_reasons: match.match_reasons,
               })),
