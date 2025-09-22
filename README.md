@@ -16,23 +16,20 @@
 
 A Model Context Protocol (MCP) server that provides AI assistants with secure access to You Need A Budget (YNAB) data and functionality. This server enables AI applications to help users manage their personal finances by interacting with YNAB budgets, accounts, transactions, and categories through a comprehensive set of tools.
 
-## 🎉 What's New in v0.5.0
+## 🎉 What's New in v0.6.0
 
-- **🚀 Full Account Reconciliation Workflow**: New `reconcile_account` tool provides end-to-end bank statement reconciliation
-- **🤖 Automatic Transaction Creation**: Missing transactions are automatically created with intelligent payee detection
-- **📊 Enhanced Reporting**: Comprehensive reconciliation reports with before/after balance tracking
-- **🔧 Smart Transaction Matching**: Improved comparison algorithms with configurable tolerance settings
-- **🛡️ Dry-Run Safety**: Preview all changes before applying them with built-in dry-run mode
+- **🔧 Consolidated Debug Tools**: Streamlined 5 debug tools into a single comprehensive `diagnostic_info` tool with flexible parameters
+- **🏦 Enhanced Bank Reconciliation**: Smart duplicate amount matching with chronological order preference (fixes multiple identical transactions)
+- **📅 Automatic Date Adjustment**: Sync YNAB transaction dates with bank processing dates for perfect alignment
+- **🎯 Exact Balance Matching**: Zero tolerance reconciliation ensures perfect balance alignment
+- **📊 Improved Date Range Reporting**: Clear visibility into reconciliation time periods and data ranges
+- **⚡ Better Tool Organization**: Cleaner MCP interface with 80% reduction in debug tool clutter
 
 ## Features
 
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
-- **Advanced Bank Statement Reconciliation**: Full-featured reconciliation workflow with automatic transaction creation, status updates, and comprehensive reporting
-- **Smart Financial Analysis (work in progress)**: Statistical spending trends using linear regression, accurate overspending detection, comprehensive budget optimization insights, and AI-generated recommendations
-- **Secure Authentication**: Uses YNAB Personal Access Tokens with proper security practices
-- **Comprehensive Error Handling**: Robust error handling with detailed feedback and security-conscious error messages
-- **Type Safety**: Built with TypeScript for enhanced reliability and developer experience
-- **Extensive Testing**: Unit, integration, end-to-end, and performance tests with high coverage
+- **Advanced Bank Reconciliation**: Smart duplicate matching, automatic date adjustment, exact balance matching, and comprehensive reporting
+- **Smart Financial Analysis**: Statistical spending trends, budget optimization insights, and AI-generated recommendations
 
 ## Quick Start
 
@@ -144,7 +141,7 @@ YNAB_EXPORT_PATH=/home/user/exports
 
 ## Available Tools
 
-The server provides 25 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 4 diagnostics and utilities (29 total):
+The server provides 25 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 2 streamlined diagnostic tools (27 total):
 
 ### Budget Management
 
@@ -164,7 +161,7 @@ The server provides 25 core tools for budgets, accounts, transactions, categorie
 - `list_transactions` - List transactions with filtering options (auto-suggests export for large results)
 - `export_transactions` - Export all transactions to JSON file with descriptive filename and platform-specific default paths
 - `compare_transactions` - Compare bank transactions from CSV with YNAB transactions to find missing entries and reconcile accounts
-- `reconcile_account` - **NEW**: Comprehensive account reconciliation with automatic transaction creation, status updates, and detailed reporting
+- `reconcile_account` - Comprehensive account reconciliation with smart duplicate matching, automatic date adjustment, exact balance matching, and detailed reporting
 - `get_transaction` - Get specific transaction details
 - `create_transaction` - Create new transaction
 - `update_transaction` - Update existing transaction
