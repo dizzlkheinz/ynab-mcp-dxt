@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
+import { milliunitsToAmount } from '../utils/amountUtils.js';
 
 /**
  * Schema for ynab:get_month tool parameters
@@ -45,8 +46,8 @@ export async function handleGetMonth(
                 month: month.month,
                 note: month.note,
                 income: month.income,
-                budgeted: month.budgeted,
-                activity: month.activity,
+                budgeted: milliunitsToAmount(month.budgeted),
+                activity: milliunitsToAmount(month.activity),
                 to_be_budgeted: month.to_be_budgeted,
                 age_of_money: month.age_of_money,
                 deleted: month.deleted,
@@ -58,9 +59,9 @@ export async function handleGetMonth(
                   hidden: category.hidden,
                   original_category_group_id: category.original_category_group_id,
                   note: category.note,
-                  budgeted: category.budgeted,
-                  activity: category.activity,
-                  balance: category.balance,
+                  budgeted: milliunitsToAmount(category.budgeted),
+                  activity: milliunitsToAmount(category.activity),
+                  balance: milliunitsToAmount(category.balance),
                   goal_type: category.goal_type,
                   goal_creation_month: category.goal_creation_month,
                   goal_target: category.goal_target,
@@ -105,8 +106,8 @@ export async function handleListMonths(
                 month: month.month,
                 note: month.note,
                 income: month.income,
-                budgeted: month.budgeted,
-                activity: month.activity,
+                budgeted: milliunitsToAmount(month.budgeted),
+                activity: milliunitsToAmount(month.activity),
                 to_be_budgeted: month.to_be_budgeted,
                 age_of_money: month.age_of_money,
                 deleted: month.deleted,

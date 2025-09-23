@@ -253,7 +253,7 @@ describe('Category Tools', () => {
       expect(result.content[0].type).toBe('text');
 
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.category.budgeted).toBe(60000);
+      expect(parsedContent.category.budgeted).toBe(60);
       expect(parsedContent.updated_month).toMatch(/^\d{4}-\d{2}-01$/);
 
       // Verify the API was called with correct parameters
@@ -347,7 +347,7 @@ describe('Category Tools', () => {
         });
         expect(result.budget_id).toBe('budget-1');
         expect(result.category_id).toBe('category-1');
-        expect(result.budgeted).toBe(50000);
+        expect(result.budgeted).toBe(50);
       });
 
       it('should reject non-integer budgeted amount', () => {
@@ -375,7 +375,7 @@ describe('Category Tools', () => {
           category_id: 'category-1',
           budgeted: -10000,
         });
-        expect(result.budgeted).toBe(-10000);
+        expect(result.budgeted).toBe(-10);
       });
 
       it('should accept zero budgeted amount', () => {

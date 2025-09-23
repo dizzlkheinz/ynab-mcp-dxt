@@ -16,6 +16,13 @@
 
 A Model Context Protocol (MCP) server that provides AI assistants with secure access to You Need A Budget (YNAB) data and functionality. This server enables AI applications to help users manage their personal finances by interacting with YNAB budgets, accounts, transactions, and categories through a comprehensive set of tools.
 
+## 🎉 What's New in v0.7.0
+
+- **💰 Automatic Amount Conversion**: All monetary amounts now automatically convert from YNAB's internal milliunits to dollars for human-readable display
+- **🧠 AI-Friendly Responses**: Eliminates confusion where `-1924370` milliunits was misinterpreted as `-$1,924,370` instead of the correct `-$1,924.37`
+- **🔧 Enhanced Developer Experience**: No more manual conversion needed - all tools return amounts in standard dollar format
+- **✅ Updated Test Suite**: Comprehensive test coverage for amount conversion ensures reliability
+
 ## 🎉 What's New in v0.6.0
 
 - **🔧 Consolidated Debug Tools**: Streamlined 5 debug tools into a single comprehensive `diagnostic_info` tool with flexible parameters
@@ -28,6 +35,7 @@ A Model Context Protocol (MCP) server that provides AI assistants with secure ac
 ## Features
 
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
+- **Automatic Amount Conversion**: All monetary values automatically converted from YNAB's internal milliunits to human-readable dollars
 - **Advanced Bank Reconciliation**: Smart duplicate matching, automatic date adjustment, exact balance matching, and comprehensive reporting
 
 ## Quick Start

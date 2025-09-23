@@ -42,10 +42,18 @@ YNAB_ACCESS_TOKEN=your_personal_access_token_here
 
 ### Monetary Amounts
 
-All monetary amounts in YNAB are represented in **milliunits** (1/1000th of the currency unit):
-- $1.00 = 1000 milliunits
-- $-50.25 = -50250 milliunits (negative for outflows)
-- Use the `convert_amount` tool for conversions
+**📢 New in v0.7.0**: All monetary amounts are automatically converted to standard dollar format for human readability.
+
+The server automatically converts YNAB's internal milliunits to dollars in all responses:
+- Account balances: `-1924.37` (instead of `-1924370` milliunits)
+- Transaction amounts: `50.25` (instead of `50250` milliunits)
+- Budget amounts: `150.00` (instead of `150000` milliunits)
+
+**Input formats**:
+- When creating transactions, amounts should be provided in milliunits (as per YNAB API requirements)
+- Use the `convert_amount` tool to convert between dollars and milliunits if needed
+
+**Legacy behavior**: YNAB's internal representation uses milliunits (1/1000th of currency unit), but this is now transparent to users
 
 ### Dates
 

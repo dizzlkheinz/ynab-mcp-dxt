@@ -340,7 +340,7 @@ describe('transactionTools', () => {
 
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('transaction-123');
-      expect(response.transaction.amount).toBe(-50000);
+      expect(response.transaction.amount).toBe(-50);
       expect(response.transaction.account_name).toBe('Test Account');
       expect(response.transaction.payee_name).toBe('Test Payee');
       expect(response.transaction.category_name).toBe('Test Category');
@@ -564,7 +564,7 @@ describe('transactionTools', () => {
 
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('new-transaction-123');
-      expect(response.transaction.amount).toBe(-50000);
+      expect(response.transaction.amount).toBe(-50);
     });
 
     it('should create transaction with all optional fields', async () => {
@@ -831,7 +831,7 @@ describe('transactionTools', () => {
 
       const response = JSON.parse(result.content[0].text);
       expect(response.transaction.id).toBe('transaction-456');
-      expect(response.transaction.amount).toBe(-60000);
+      expect(response.transaction.amount).toBe(-60);
     });
 
     it('should update transaction with multiple fields', async () => {

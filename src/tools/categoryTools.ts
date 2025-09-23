@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
+import { milliunitsToAmount } from '../utils/amountUtils.js';
 
 /**
  * Schema for ynab:list_categories tool parameters
@@ -58,9 +59,9 @@ export async function handleListCategories(
           hidden: category.hidden,
           original_category_group_id: category.original_category_group_id,
           note: category.note,
-          budgeted: category.budgeted,
-          activity: category.activity,
-          balance: category.balance,
+          budgeted: milliunitsToAmount(category.budgeted),
+          activity: milliunitsToAmount(category.activity),
+          balance: milliunitsToAmount(category.balance),
           goal_type: category.goal_type,
           goal_creation_month: category.goal_creation_month,
           goal_target: category.goal_target,
@@ -155,7 +156,7 @@ export async function handleUpdateCategory(
               request: {
                 budget_id: params.budget_id,
                 category_id: params.category_id,
-                budgeted: params.budgeted,
+                budgeted: milliunitsToAmount(params.budgeted),
                 month: currentMonth,
               },
             }),

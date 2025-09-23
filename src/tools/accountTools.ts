@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
+import { milliunitsToAmount } from '../utils/amountUtils.js';
 
 /**
  * Schema for ynab:list_accounts tool parameters
@@ -69,9 +70,9 @@ export async function handleListAccounts(
                 on_budget: account.on_budget,
                 closed: account.closed,
                 note: account.note,
-                balance: account.balance,
-                cleared_balance: account.cleared_balance,
-                uncleared_balance: account.uncleared_balance,
+                balance: milliunitsToAmount(account.balance),
+                cleared_balance: milliunitsToAmount(account.cleared_balance),
+                uncleared_balance: milliunitsToAmount(account.uncleared_balance),
                 transfer_payee_id: account.transfer_payee_id,
                 direct_import_linked: account.direct_import_linked,
                 direct_import_in_error: account.direct_import_in_error,
@@ -111,9 +112,9 @@ export async function handleGetAccount(
                 on_budget: account.on_budget,
                 closed: account.closed,
                 note: account.note,
-                balance: account.balance,
-                cleared_balance: account.cleared_balance,
-                uncleared_balance: account.uncleared_balance,
+                balance: milliunitsToAmount(account.balance),
+                cleared_balance: milliunitsToAmount(account.cleared_balance),
+                uncleared_balance: milliunitsToAmount(account.uncleared_balance),
                 transfer_payee_id: account.transfer_payee_id,
                 direct_import_linked: account.direct_import_linked,
                 direct_import_in_error: account.direct_import_in_error,
@@ -181,9 +182,9 @@ export async function handleCreateAccount(
                 on_budget: account.on_budget,
                 closed: account.closed,
                 note: account.note,
-                balance: account.balance,
-                cleared_balance: account.cleared_balance,
-                uncleared_balance: account.uncleared_balance,
+                balance: milliunitsToAmount(account.balance),
+                cleared_balance: milliunitsToAmount(account.cleared_balance),
+                uncleared_balance: milliunitsToAmount(account.uncleared_balance),
                 transfer_payee_id: account.transfer_payee_id,
                 direct_import_linked: account.direct_import_linked,
                 direct_import_in_error: account.direct_import_in_error,

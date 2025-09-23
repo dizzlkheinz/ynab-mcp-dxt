@@ -4,6 +4,7 @@ import { SaveTransaction } from 'ynab/dist/models/SaveTransaction.js';
 import { z } from 'zod';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
+import { milliunitsToAmount } from '../utils/amountUtils.js';
 
 /**
  * Utility function to ensure transaction is not null/undefined
@@ -154,7 +155,7 @@ export async function handleListTransactions(
                 preview_transactions: preview.map((transaction) => ({
                   id: transaction.id,
                   date: transaction.date,
-                  amount: transaction.amount,
+                  amount: milliunitsToAmount(transaction.amount),
                   memo: transaction.memo,
                   payee_name: transaction.payee_name,
                   category_name: transaction.category_name,
@@ -174,7 +175,7 @@ export async function handleListTransactions(
               transactions: transactions.map((transaction) => ({
                 id: transaction.id,
                 date: transaction.date,
-                amount: transaction.amount,
+                amount: milliunitsToAmount(transaction.amount),
                 memo: transaction.memo,
                 cleared: transaction.cleared,
                 approved: transaction.approved,
@@ -222,7 +223,7 @@ export async function handleGetTransaction(
             transaction: {
               id: transaction.id,
               date: transaction.date,
-              amount: transaction.amount,
+              amount: milliunitsToAmount(transaction.amount),
               memo: transaction.memo,
               cleared: transaction.cleared,
               approved: transaction.approved,
@@ -306,7 +307,7 @@ export async function handleCreateTransaction(
             transaction: {
               id: transaction.id,
               date: transaction.date,
-              amount: transaction.amount,
+              amount: milliunitsToAmount(transaction.amount),
               memo: transaction.memo,
               cleared: transaction.cleared,
               approved: transaction.approved,
@@ -415,7 +416,7 @@ export async function handleUpdateTransaction(
             transaction: {
               id: transaction.id,
               date: transaction.date,
-              amount: transaction.amount,
+              amount: milliunitsToAmount(transaction.amount),
               memo: transaction.memo,
               cleared: transaction.cleared,
               approved: transaction.approved,
