@@ -197,7 +197,9 @@ describe('RateLimiter', () => {
 
   describe('logging', () => {
     it('should log when logging is enabled', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       const loggingLimiter = new RateLimiter({
         maxRequests: 2,
@@ -215,7 +217,9 @@ describe('RateLimiter', () => {
     });
 
     it('should not log when logging is disabled', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       rateLimiter.isAllowed(testIdentifier);
       rateLimiter.recordRequest(testIdentifier);
@@ -276,7 +280,9 @@ describe('RateLimiter', () => {
 
   describe('security considerations', () => {
     it('should hash identifiers in logs to avoid token exposure', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       const loggingLimiter = new RateLimiter({
         maxRequests: 2,

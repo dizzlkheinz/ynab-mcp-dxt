@@ -39,18 +39,16 @@ export default [
       'no-var': 'error',
     },
   },
+  // Specific configuration for test files
+  {
+    files: ['**/*.test.ts', '**/__tests__/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off', // Allow 'any' in test mocks
+    },
+  },
   // Turn off formatting-related rules to defer to Prettier
   eslintConfigPrettier,
   {
-    ignores: [
-      'dist/**/*',
-      'node_modules/**/*',
-      'scripts/**/*',
-      '**/__tests__/**/*',
-      '**/*.test.ts',
-      '**/*.test.js',
-      '*.js',
-      'eslint.config.js',
-    ],
+    ignores: ['dist/**/*', 'node_modules/**/*', 'scripts/**/*', '*.js', 'eslint.config.js'],
   },
 ];

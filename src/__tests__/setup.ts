@@ -29,7 +29,7 @@ beforeAll(async () => {
     };
   }
 
-  console.log('🧪 Test environment initialized');
+  console.warn('🧪 Test environment initialized');
 });
 
 /**
@@ -37,7 +37,7 @@ beforeAll(async () => {
  */
 afterAll(async () => {
   // Clean up any global resources
-  console.log('🧹 Test environment cleaned up');
+  console.warn('🧹 Test environment cleaned up');
 });
 
 /**
@@ -49,8 +49,11 @@ beforeEach(async () => {
 
   // Clear any cached modules that might interfere (only if they exist)
   try {
-    delete require.cache[require.resolve('../server/YNABMCPServer.js')];
-  } catch (error) {
+    const modulePath = require.resolve('../server/YNABMCPServer.js');
+    if (require.cache[modulePath]) {
+      require.cache[modulePath] = undefined;
+    }
+  } catch {
     // Module doesn't exist yet, which is fine
   }
 });
@@ -85,7 +88,7 @@ export class TestEnvironment {
   restoreEnv(): void {
     for (const [key, value] of Object.entries(this.originalEnv)) {
       if (value === undefined) {
-        delete process.env[key];
+        process.env[key] = undefined;
       } else {
         process.env[key] = value;
       }
@@ -124,8 +127,8 @@ export class TestEnvironment {
  * Mock console methods for testing
  */
 export class MockConsole {
-  private originalMethods: Record<string, Function> = {};
-  private logs: Array<{ method: string; args: any[] }> = [];
+  private originalMethods: Record<string, (...args: any[]) => void> = {};
+  private logs: { method: string; args: any[] }[] = [];
 
   /**
    * Start mocking console methods
@@ -153,7 +156,7 @@ export class MockConsole {
   /**
    * Get captured logs
    */
-  getLogs(): Array<{ method: string; args: any[] }> {
+  getLogs(): { method: string; args: any[] }[] {
     return [...this.logs];
   }
 

@@ -24,6 +24,9 @@ const mockYnabAPI = {
     updateTransaction: vi.fn(),
     deleteTransaction: vi.fn(),
   },
+  accounts: {
+    getAccountById: vi.fn(),
+  },
 } as unknown as ynab.API;
 
 describe('transactionTools', () => {
@@ -191,7 +194,7 @@ describe('transactionTools', () => {
         since_date: '2024-01-01',
         type: 'uncategorized' as const,
       };
-      const result = await handleListTransactions(mockYnabAPI, params);
+      await handleListTransactions(mockYnabAPI, params);
 
       expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
         'budget-123',
@@ -523,7 +526,18 @@ describe('transactionTools', () => {
         },
       };
 
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 100000,
+            cleared_balance: 95000,
+          },
+        },
+      };
+
       (mockYnabAPI.transactions.createTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
 
       const params = {
         budget_id: 'budget-123',
@@ -560,7 +574,18 @@ describe('transactionTools', () => {
         },
       };
 
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 100000,
+            cleared_balance: 95000,
+          },
+        },
+      };
+
       (mockYnabAPI.transactions.createTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
 
       const params = {
         budget_id: 'budget-123',
@@ -774,7 +799,18 @@ describe('transactionTools', () => {
         },
       };
 
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-789',
+            balance: 150000,
+            cleared_balance: 140000,
+          },
+        },
+      };
+
       (mockYnabAPI.transactions.updateTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
 
       const params = {
         budget_id: 'budget-123',
@@ -805,7 +841,18 @@ describe('transactionTools', () => {
         },
       };
 
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-789',
+            balance: 150000,
+            cleared_balance: 140000,
+          },
+        },
+      };
+
       (mockYnabAPI.transactions.updateTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
 
       const params = {
         budget_id: 'budget-123',
@@ -947,7 +994,18 @@ describe('transactionTools', () => {
         },
       };
 
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 50000,
+            cleared_balance: 45000,
+          },
+        },
+      };
+
       (mockYnabAPI.transactions.deleteTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
 
       const params = {
         budget_id: 'budget-123',

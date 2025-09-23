@@ -33,7 +33,9 @@ describe('Security Integration', () => {
 
   describe('end-to-end security flow', () => {
     it('should handle a complete successful request flow', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       const context = {
         accessToken: testAccessToken,
@@ -80,7 +82,9 @@ describe('Security Integration', () => {
     });
 
     it('should handle validation failures with proper logging', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       const context = {
         accessToken: testAccessToken,
@@ -115,7 +119,9 @@ describe('Security Integration', () => {
     });
 
     it('should handle rate limiting with proper responses and logging', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       const context = {
         accessToken: testAccessToken,
@@ -283,7 +289,7 @@ describe('Security Integration', () => {
       // Make a failed request
       try {
         await SecurityMiddleware.withSecurity(context, testSchema, mockFailOperation);
-      } catch (error) {
+      } catch {
         // Expected
       }
 

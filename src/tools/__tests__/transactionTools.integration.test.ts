@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
-import {
-  handleListTransactions,
-  handleGetTransaction,
-  handleCreateTransaction,
-  handleUpdateTransaction,
-  handleDeleteTransaction,
-} from '../transactionTools.js';
+import { handleListTransactions, handleGetTransaction } from '../transactionTools.js';
 
 describe('Transaction Tools Integration', () => {
   let ynabAPI: ynab.API;
@@ -43,7 +37,7 @@ describe('Transaction Tools Integration', () => {
     expect(response.transactions).toBeDefined();
     expect(Array.isArray(response.transactions)).toBe(true);
 
-    console.log(`✅ Successfully listed ${response.transactions.length} transactions`);
+    console.warn(`✅ Successfully listed ${response.transactions.length} transactions`);
   });
 
   it('should successfully list transactions with account filter', async () => {
@@ -63,7 +57,7 @@ describe('Transaction Tools Integration', () => {
       expect(transaction.account_id).toBe(testAccountId);
     });
 
-    console.log(`✅ Successfully listed ${response.transactions.length} transactions for account`);
+    console.warn(`✅ Successfully listed ${response.transactions.length} transactions for account`);
   });
 
   it('should successfully list transactions with date filter', async () => {
@@ -78,7 +72,7 @@ describe('Transaction Tools Integration', () => {
     expect(response.transactions).toBeDefined();
     expect(Array.isArray(response.transactions)).toBe(true);
 
-    console.log(
+    console.warn(
       `✅ Successfully listed ${response.transactions.length} transactions since 2024-01-01`,
     );
   });
@@ -106,9 +100,9 @@ describe('Transaction Tools Integration', () => {
       expect(response.transaction).toBeDefined();
       expect(response.transaction.id).toBe(testTransactionId);
 
-      console.log(`✅ Successfully retrieved transaction: ${response.transaction.id}`);
+      console.warn(`✅ Successfully retrieved transaction: ${response.transaction.id}`);
     } else {
-      console.log('⚠️ No transactions found to test get transaction');
+      console.warn('⚠️ No transactions found to test get transaction');
     }
   });
 
@@ -123,7 +117,7 @@ describe('Transaction Tools Integration', () => {
     expect(response.error).toBeDefined();
     expect(response.error.message).toBeDefined();
 
-    console.log(`✅ Correctly handled invalid budget ID: ${response.error.message}`);
+    console.warn(`✅ Correctly handled invalid budget ID: ${response.error.message}`);
   });
 
   it('should handle invalid transaction ID gracefully', async () => {
@@ -138,7 +132,7 @@ describe('Transaction Tools Integration', () => {
     expect(response.error).toBeDefined();
     expect(response.error.message).toBeDefined();
 
-    console.log(`✅ Correctly handled invalid transaction ID: ${response.error.message}`);
+    console.warn(`✅ Correctly handled invalid transaction ID: ${response.error.message}`);
   });
 
   // Note: We're not testing create/update/delete operations in integration tests

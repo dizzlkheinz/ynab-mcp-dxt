@@ -4,7 +4,6 @@
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { z } from 'zod';
-import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { SecurityMiddleware, SecurityContext, withSecurityWrapper } from '../securityMiddleware.js';
 import { RateLimitError, globalRateLimiter, RateLimiter } from '../rateLimiter.js';
 import { globalRequestLogger } from '../requestLogger.js';
@@ -154,7 +153,7 @@ describe('SecurityMiddleware', () => {
 
       try {
         await SecurityMiddleware.withSecurity(context, testSchema, mockOperation);
-      } catch (error) {
+      } catch {
         // Expected to throw
       }
 

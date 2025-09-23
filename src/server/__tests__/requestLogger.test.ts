@@ -335,7 +335,9 @@ describe('RequestLogger', () => {
 
   describe('console output', () => {
     it('should output success logs at info level', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       logger.logSuccess('ynab:test', 'test operation', {}, 100);
 
@@ -348,7 +350,9 @@ describe('RequestLogger', () => {
     });
 
     it('should output error logs at error level', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       logger.logError('ynab:test', 'test operation', {}, 'Test error', 50);
 
@@ -361,7 +365,9 @@ describe('RequestLogger', () => {
     });
 
     it('should output rate limit warnings', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       logger.logSuccess('ynab:test', 'test', {}, 100, { remaining: 0, isLimited: true });
 
@@ -373,7 +379,9 @@ describe('RequestLogger', () => {
     });
 
     it('should respect log level configuration', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       const errorOnlyLogger = new RequestLogger({ logLevel: 'error' });
 

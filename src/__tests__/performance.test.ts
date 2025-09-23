@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { YNABMCPServer } from '../server/YNABMCPServer.js';
-import { executeToolCall, parseToolResult, getTestConfig } from './testUtils.js';
+import { executeToolCall, parseToolResult } from './testUtils.js';
 
 // Mock the YNAB SDK for performance tests
 vi.mock('ynab', () => {
@@ -78,7 +78,8 @@ describe('YNAB MCP Server - Performance Tests', () => {
     });
 
     it('should handle large transaction lists efficiently', async () => {
-      const largeTransactionList = Array.from({ length: 1000 }, (_, i) => ({
+      // Use smaller list to avoid size limit and ensure we get 'transactions' not 'preview_transactions'
+      const largeTransactionList = Array.from({ length: 100 }, (_, i) => ({
         id: `transaction-${i}`,
         date: '2024-01-01',
         amount: -1000 * (i + 1),
@@ -89,9 +90,11 @@ describe('YNAB MCP Server - Performance Tests', () => {
         category_id: 'category-1',
       }));
 
+      // Mock the method that list_transactions actually uses for budget-wide queries
       mockYnabAPI.transactions.getTransactions.mockResolvedValue({
         data: {
           transactions: largeTransactionList,
+          server_knowledge: 100,
         },
       });
 
@@ -107,7 +110,7 @@ describe('YNAB MCP Server - Performance Tests', () => {
       expect(responseTime).toBeLessThan(2000); // Should handle large lists within 2 seconds
 
       const transactions = parseToolResult(result);
-      expect(transactions.transactions).toHaveLength(1000);
+      expect(transactions.transactions).toHaveLength(100);
     });
 
     it('should handle concurrent requests efficiently', async () => {

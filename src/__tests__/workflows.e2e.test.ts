@@ -27,7 +27,7 @@ describe('YNAB MCP Server - End-to-End Workflows', () => {
     testConfig = getTestConfig();
 
     if (testConfig.skipE2ETests) {
-      console.log('Skipping E2E tests - no real API key or SKIP_E2E_TESTS=true');
+      console.warn('Skipping E2E tests - no real API key or SKIP_E2E_TESTS=true');
       return;
     }
 
@@ -288,7 +288,6 @@ describe('YNAB MCP Server - End-to-End Workflows', () => {
     it('should filter transactions by date and account', async () => {
       if (testConfig.skipE2ETests) return;
 
-      const today = new Date().toISOString().split('T')[0];
       const lastMonth = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
       // List transactions since last month

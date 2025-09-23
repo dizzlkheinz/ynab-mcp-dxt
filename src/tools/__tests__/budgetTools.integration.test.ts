@@ -42,7 +42,7 @@ describe('Budget Tools Integration', () => {
       expect(firstBudget.first_month).toBeDefined();
       expect(firstBudget.last_month).toBeDefined();
 
-      console.log(`✅ Successfully listed ${parsedContent.budgets.length} budgets`);
+      console.warn(`✅ Successfully listed ${parsedContent.budgets.length} budgets`);
     });
   });
 
@@ -65,9 +65,9 @@ describe('Budget Tools Integration', () => {
       expect(budget.categories).toBeDefined();
       expect(Array.isArray(budget.categories)).toBe(true);
 
-      console.log(`✅ Successfully retrieved budget: ${budget.name}`);
-      console.log(`   - ${budget.accounts.length} accounts`);
-      console.log(`   - ${budget.categories.length} categories`);
+      console.warn(`✅ Successfully retrieved budget: ${budget.name}`);
+      console.warn(`   - ${budget.accounts.length} accounts`);
+      console.warn(`   - ${budget.categories.length} categories`);
     });
 
     it('should handle invalid budget ID gracefully', async () => {
@@ -80,7 +80,7 @@ describe('Budget Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
   });
 });

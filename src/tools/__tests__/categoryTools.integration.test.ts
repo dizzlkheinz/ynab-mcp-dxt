@@ -68,12 +68,14 @@ describe('Category Tools Integration', () => {
       expect(typeof firstGroup.hidden).toBe('boolean');
       expect(typeof firstGroup.deleted).toBe('boolean');
 
-      console.log(
+      console.warn(
         `✅ Successfully listed ${parsedContent.categories.length} categories in ${parsedContent.category_groups.length} groups`,
       );
 
       if (parsedContent.categories.length === 0) {
-        console.log('ℹ️ No categories found in this budget - this is normal for new/empty budgets');
+        console.warn(
+          'ℹ️ No categories found in this budget - this is normal for new/empty budgets',
+        );
       }
     });
 
@@ -87,14 +89,14 @@ describe('Category Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
   });
 
   describe('handleGetCategory', () => {
     it('should successfully get category details from real API', async () => {
       if (!testCategoryId) {
-        console.log('⚠️ Skipping test - no test category ID available');
+        console.warn('⚠️ Skipping test - no test category ID available');
         return;
       }
 
@@ -118,10 +120,10 @@ describe('Category Tools Integration', () => {
       expect(typeof category.balance).toBe('number');
       expect(typeof category.hidden).toBe('boolean');
 
-      console.log(`✅ Successfully retrieved category: ${category.name}`);
-      console.log(`   - Budgeted: ${category.budgeted} milliunits`);
-      console.log(`   - Activity: ${category.activity} milliunits`);
-      console.log(`   - Balance: ${category.balance} milliunits`);
+      console.warn(`✅ Successfully retrieved category: ${category.name}`);
+      console.warn(`   - Budgeted: ${category.budgeted} milliunits`);
+      console.warn(`   - Activity: ${category.activity} milliunits`);
+      console.warn(`   - Balance: ${category.balance} milliunits`);
     });
 
     it('should handle invalid category ID gracefully', async () => {
@@ -137,14 +139,14 @@ describe('Category Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid category ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid category ID: ${parsedContent.error.message}`);
     });
   });
 
   describe('handleUpdateCategory', () => {
     it('should successfully update category budget from real API', async () => {
       if (!testCategoryId) {
-        console.log('⚠️ Skipping test - no test category ID available');
+        console.warn('⚠️ Skipping test - no test category ID available');
         return;
       }
 
@@ -164,10 +166,10 @@ describe('Category Tools Integration', () => {
 
       // Debug: Log the actual response if it's an error
       if (parsedContent.error) {
-        console.log('❌ Category update failed:', parsedContent.error.message);
-        console.log('   Budget ID:', testBudgetId);
-        console.log('   Category ID:', testCategoryId);
-        console.log('   Budgeted Amount:', testBudgetedAmount);
+        console.warn('❌ Category update failed:', parsedContent.error.message);
+        console.warn('   Budget ID:', testBudgetId);
+        console.warn('   Category ID:', testCategoryId);
+        console.warn('   Budgeted Amount:', testBudgetedAmount);
         // Skip the test if we get an error - this indicates API permissions or data issues
         return;
       }
@@ -182,8 +184,8 @@ describe('Category Tools Integration', () => {
       // Verify month format
       expect(parsedContent.updated_month).toMatch(/^\d{4}-\d{2}-01$/);
 
-      console.log(`✅ Successfully updated category budget to ${testBudgetedAmount} milliunits`);
-      console.log(`   - Updated month: ${parsedContent.updated_month}`);
+      console.warn(`✅ Successfully updated category budget to ${testBudgetedAmount} milliunits`);
+      console.warn(`   - Updated month: ${parsedContent.updated_month}`);
 
       // Restore original amount
       await handleUpdateCategory(ynabAPI, {
@@ -192,7 +194,7 @@ describe('Category Tools Integration', () => {
         budgeted: originalBudgetedAmount,
       });
 
-      console.log(`✅ Restored original budget amount: ${originalBudgetedAmount} milliunits`);
+      console.warn(`✅ Restored original budget amount: ${originalBudgetedAmount} milliunits`);
     });
 
     it('should handle invalid category ID gracefully', async () => {
@@ -209,12 +211,12 @@ describe('Category Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid category ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid category ID: ${parsedContent.error.message}`);
     });
 
     it('should handle negative budgeted amounts', async () => {
       if (!testCategoryId) {
-        console.log('⚠️ Skipping test - no test category ID available');
+        console.warn('⚠️ Skipping test - no test category ID available');
         return;
       }
 
@@ -234,10 +236,13 @@ describe('Category Tools Integration', () => {
 
       // Debug: Log the actual response if it's an error
       if (parsedContent.error) {
-        console.log('❌ Category update with negative amount failed:', parsedContent.error.message);
-        console.log('   Budget ID:', testBudgetId);
-        console.log('   Category ID:', testCategoryId);
-        console.log('   Budgeted Amount:', negativeBudgetedAmount);
+        console.warn(
+          '❌ Category update with negative amount failed:',
+          parsedContent.error.message,
+        );
+        console.warn('   Budget ID:', testBudgetId);
+        console.warn('   Category ID:', testCategoryId);
+        console.warn('   Budgeted Amount:', negativeBudgetedAmount);
         // Skip the test if we get an error - this indicates API permissions or data issues
         return;
       }
@@ -247,7 +252,7 @@ describe('Category Tools Integration', () => {
       const category = parsedContent.category;
       expect(category.budgeted).toBe(negativeBudgetedAmount);
 
-      console.log(
+      console.warn(
         `✅ Successfully set negative budget amount: ${negativeBudgetedAmount} milliunits`,
       );
 
@@ -258,7 +263,7 @@ describe('Category Tools Integration', () => {
         budgeted: originalBudgetedAmount,
       });
 
-      console.log(`✅ Restored original budget amount: ${originalBudgetedAmount} milliunits`);
+      console.warn(`✅ Restored original budget amount: ${originalBudgetedAmount} milliunits`);
     });
   });
 });

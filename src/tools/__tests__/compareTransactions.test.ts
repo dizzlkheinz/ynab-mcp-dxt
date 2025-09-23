@@ -103,6 +103,13 @@ describe('compareTransactions', () => {
         data: { transactions: mockTransactions },
       });
 
+      // Mock payees endpoint
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [{ id: 'payee-1', name: 'Test Payee' }] },
+        }),
+      };
+
       const params = {
         budget_id: 'budget-123',
         account_id: 'account-456',
@@ -131,6 +138,13 @@ describe('compareTransactions', () => {
         data: { transactions: mockTransactions },
       });
 
+      // Mock payees endpoint
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [{ id: 'payee-1', name: 'Test Payee' }] },
+        }),
+      };
+
       const params = {
         budget_id: 'budget-123',
         account_id: 'account-456',
@@ -149,6 +163,13 @@ describe('compareTransactions', () => {
       (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue({
         data: { transactions: mockTransactions },
       });
+
+      // Mock payees endpoint
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [{ id: 'payee-1', name: 'Test Payee' }] },
+        }),
+      };
 
       const params = {
         budget_id: 'budget-123',
@@ -177,6 +198,13 @@ describe('compareTransactions', () => {
       (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue({
         data: { transactions: mockTransactions },
       });
+
+      // Mock payees endpoint
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [{ id: 'payee-1', name: 'Test Payee' }] },
+        }),
+      };
 
       const params = {
         budget_id: 'budget-123',

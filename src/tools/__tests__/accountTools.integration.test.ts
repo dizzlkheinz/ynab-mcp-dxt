@@ -30,7 +30,7 @@ describe('Account Tools Integration', () => {
     expect(parsedContent.accounts).toBeDefined();
     expect(Array.isArray(parsedContent.accounts)).toBe(true);
 
-    console.log(`✅ Successfully listed ${parsedContent.accounts.length} accounts`);
+    console.warn(`✅ Successfully listed ${parsedContent.accounts.length} accounts`);
 
     // Verify account structure
     if (parsedContent.accounts.length > 0) {
@@ -48,7 +48,7 @@ describe('Account Tools Integration', () => {
     const parsedListContent = JSON.parse(listResult.content[0].text);
 
     if (parsedListContent.accounts.length === 0) {
-      console.log('⚠️ No accounts found in test budget, skipping account detail test');
+      console.warn('⚠️ No accounts found in test budget, skipping account detail test');
       return;
     }
 
@@ -69,7 +69,7 @@ describe('Account Tools Integration', () => {
     expect(parsedContent.account).toHaveProperty('type');
     expect(parsedContent.account).toHaveProperty('balance');
 
-    console.log(`✅ Successfully retrieved account: ${parsedContent.account.name}`);
+    console.warn(`✅ Successfully retrieved account: ${parsedContent.account.name}`);
   });
 
   it('should handle invalid budget ID gracefully', async () => {
@@ -80,7 +80,7 @@ describe('Account Tools Integration', () => {
     expect(parsedContent.error).toBeDefined();
     expect(parsedContent.error.message).toContain('Failed to list accounts');
 
-    console.log('✅ Correctly handled invalid budget ID:', parsedContent.error.message);
+    console.warn('✅ Correctly handled invalid budget ID:', parsedContent.error.message);
   });
 
   it('should handle invalid account ID gracefully', async () => {
@@ -94,6 +94,6 @@ describe('Account Tools Integration', () => {
     expect(parsedContent.error).toBeDefined();
     expect(parsedContent.error.message).toContain('Failed to get account');
 
-    console.log('✅ Correctly handled invalid account ID:', parsedContent.error.message);
+    console.warn('✅ Correctly handled invalid account ID:', parsedContent.error.message);
   });
 });

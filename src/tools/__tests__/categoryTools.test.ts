@@ -261,7 +261,7 @@ describe('Category Tools', () => {
         'budget-1',
         expect.stringMatching(/^\d{4}-\d{2}-01$/),
         'category-1',
-        { budgeted: 60000 },
+        { category: { budgeted: 60000 } },
       );
     });
 

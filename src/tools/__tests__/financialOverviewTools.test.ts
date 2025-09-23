@@ -1,5 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
-import * as ynab from 'ynab';
+import { describe, it, expect } from 'vitest';
 import {
   FinancialOverviewSchema,
   SpendingAnalysisSchema,

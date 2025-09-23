@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { YNABMCPServer } from '../YNABMCPServer';
 import { AuthenticationError, ConfigurationError } from '../../types/index';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+// StdioServerTransport import removed as it's not used in tests
 
 /**
  * Integration tests for server startup and transport setup
@@ -31,7 +31,7 @@ describe('Server Startup and Transport Integration', () => {
         if (originalEnv[key] !== undefined) {
           process.env[key] = originalEnv[key];
         } else {
-          delete process.env[key];
+          process.env[key] = undefined;
         }
       }
     });
@@ -190,7 +190,9 @@ describe('Server Startup and Transport Integration', () => {
 
     it('should attempt to connect with StdioServerTransport', async () => {
       // Mock console.error to capture startup messages
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       try {
         // The run method should validate token and attempt stdio connection
@@ -209,7 +211,9 @@ describe('Server Startup and Transport Integration', () => {
     });
 
     it('should handle transport connection errors gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       try {
         await server.run();
@@ -223,11 +227,13 @@ describe('Server Startup and Transport Integration', () => {
 
     it('should validate token before attempting transport connection', async () => {
       const validateTokenSpy = vi.spyOn(server, 'validateToken');
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       try {
         await server.run();
-      } catch (error) {
+      } catch {
         // Transport will fail in test environment, but token validation should be called
         expect(validateTokenSpy).toHaveBeenCalled();
       }
@@ -305,7 +311,9 @@ describe('Server Startup and Transport Integration', () => {
 
   describe('Full Startup Workflow', () => {
     it('should complete full startup sequence successfully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       try {
         // Create server
@@ -319,12 +327,12 @@ describe('Server Startup and Transport Integration', () => {
         // Attempt to run (will fail on transport in test environment)
         try {
           await server.run();
-        } catch (error) {
+        } catch {
           // Expected to fail on stdio transport in test environment
           // But authentication and initialization should succeed
         }
 
-        console.log('✅ Server startup workflow completed successfully');
+        console.warn('✅ Server startup workflow completed successfully');
       } finally {
         consoleSpy.mockRestore();
       }

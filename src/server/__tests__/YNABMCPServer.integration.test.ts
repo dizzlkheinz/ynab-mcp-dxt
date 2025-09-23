@@ -23,7 +23,7 @@ describe('YNABMCPServer', () => {
         if (originalEnv[key] !== undefined) {
           process.env[key] = originalEnv[key];
         } else {
-          delete process.env[key];
+          process.env[key] = undefined;
         }
       }
     });
@@ -102,7 +102,7 @@ describe('YNABMCPServer', () => {
 
       expect(userResponse.data.user).toBeDefined();
       expect(userResponse.data.user.id).toBeDefined();
-      console.log(`✅ Connected to YNAB user: ${userResponse.data.user.id}`);
+      console.warn(`✅ Connected to YNAB user: ${userResponse.data.user.id}`);
     });
 
     it('should successfully get budgets', async () => {
@@ -113,9 +113,9 @@ describe('YNABMCPServer', () => {
       expect(Array.isArray(budgetsResponse.data.budgets)).toBe(true);
       expect(budgetsResponse.data.budgets.length).toBeGreaterThan(0);
 
-      console.log(`✅ Found ${budgetsResponse.data.budgets.length} budget(s)`);
+      console.warn(`✅ Found ${budgetsResponse.data.budgets.length} budget(s)`);
       budgetsResponse.data.budgets.forEach((budget) => {
-        console.log(`   - ${budget.name} (${budget.id})`);
+        console.warn(`   - ${budget.name} (${budget.id})`);
       });
     });
 
@@ -137,7 +137,9 @@ describe('YNABMCPServer', () => {
       // Note: We can't fully test the stdio connection in a test environment,
       // but we can verify the server initializes without errors
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {
+        // Mock implementation for testing
+      });
 
       try {
         // The run method will validate the token and attempt to connect

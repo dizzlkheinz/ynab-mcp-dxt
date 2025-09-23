@@ -49,9 +49,9 @@ describe('Payee Tools Integration', () => {
       const transferPayees = parsedContent.payees.filter(
         (p: any) => p.transfer_account_id !== null,
       );
-      console.log(`✅ Successfully listed ${parsedContent.payees.length} payees`);
-      console.log(`   - ${transferPayees.length} transfer payees`);
-      console.log(`   - ${parsedContent.payees.length - transferPayees.length} regular payees`);
+      console.warn(`✅ Successfully listed ${parsedContent.payees.length} payees`);
+      console.warn(`   - ${transferPayees.length} transfer payees`);
+      console.warn(`   - ${parsedContent.payees.length - transferPayees.length} regular payees`);
     });
 
     it('should handle invalid budget ID gracefully', async () => {
@@ -64,7 +64,7 @@ describe('Payee Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
   });
 
@@ -88,11 +88,11 @@ describe('Payee Tools Integration', () => {
       expect(payee.deleted).toBeDefined();
       expect(typeof payee.deleted).toBe('boolean');
 
-      console.log(`✅ Successfully retrieved payee: ${payee.name}`);
+      console.warn(`✅ Successfully retrieved payee: ${payee.name}`);
       if (payee.transfer_account_id) {
-        console.log(`   - Transfer payee for account: ${payee.transfer_account_id}`);
+        console.warn(`   - Transfer payee for account: ${payee.transfer_account_id}`);
       } else {
-        console.log(`   - Regular payee`);
+        console.warn(`   - Regular payee`);
       }
     });
 
@@ -109,7 +109,7 @@ describe('Payee Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid payee ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid payee ID: ${parsedContent.error.message}`);
     });
 
     it('should handle invalid budget ID gracefully', async () => {
@@ -125,7 +125,7 @@ describe('Payee Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
   });
 });

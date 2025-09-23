@@ -3,7 +3,7 @@
  * These tests use mocked YNAB API responses to test complete workflows
  */
 
-import { describe, it, expect, beforeEach, vi, Mock } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { YNABMCPServer } from '../server/YNABMCPServer.js';
 import { executeToolCall, parseToolResult, validateToolResult } from './testUtils.js';
 
@@ -288,7 +288,6 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
     it('should handle complete transaction workflow', async () => {
       const budgetId = 'test-budget';
       const accountId = 'test-account';
-      const transactionId = 'test-transaction';
 
       // Mock transactions list
       const mockTransactions = {

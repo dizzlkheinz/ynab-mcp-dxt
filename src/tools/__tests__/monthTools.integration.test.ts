@@ -56,10 +56,10 @@ describe('Month Tools Integration', () => {
       expect(typeof firstMonth.to_be_budgeted).toBe('number');
       expect(typeof firstMonth.deleted).toBe('boolean');
 
-      console.log(`✅ Successfully listed ${parsedContent.months.length} months`);
-      console.log(`   - First month: ${firstMonth.month}`);
-      console.log(`   - Income: ${firstMonth.income} milliunits`);
-      console.log(`   - Budgeted: ${firstMonth.budgeted} milliunits`);
+      console.warn(`✅ Successfully listed ${parsedContent.months.length} months`);
+      console.warn(`   - First month: ${firstMonth.month}`);
+      console.warn(`   - Income: ${firstMonth.income} milliunits`);
+      console.warn(`   - Budgeted: ${firstMonth.budgeted} milliunits`);
     });
 
     it('should handle invalid budget ID gracefully', async () => {
@@ -72,7 +72,7 @@ describe('Month Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
   });
 
@@ -112,12 +112,12 @@ describe('Month Tools Integration', () => {
         expect(typeof firstCategory.deleted).toBe('boolean');
       }
 
-      console.log(`✅ Successfully retrieved month: ${month.month}`);
-      console.log(`   - Income: ${month.income} milliunits`);
-      console.log(`   - Budgeted: ${month.budgeted} milliunits`);
-      console.log(`   - Activity: ${month.activity} milliunits`);
-      console.log(`   - To be budgeted: ${month.to_be_budgeted} milliunits`);
-      console.log(`   - Categories: ${month.categories.length}`);
+      console.warn(`✅ Successfully retrieved month: ${month.month}`);
+      console.warn(`   - Income: ${month.income} milliunits`);
+      console.warn(`   - Budgeted: ${month.budgeted} milliunits`);
+      console.warn(`   - Activity: ${month.activity} milliunits`);
+      console.warn(`   - To be budgeted: ${month.to_be_budgeted} milliunits`);
+      console.warn(`   - Categories: ${month.categories.length}`);
     });
 
     it('should handle invalid budget ID gracefully', async () => {
@@ -133,7 +133,7 @@ describe('Month Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid budget ID: ${parsedContent.error.message}`);
     });
 
     it('should handle invalid month format gracefully', async () => {
@@ -149,7 +149,7 @@ describe('Month Tools Integration', () => {
       expect(parsedContent.error).toBeDefined();
       expect(parsedContent.error.message).toBeDefined();
 
-      console.log(`✅ Correctly handled invalid month: ${parsedContent.error.message}`);
+      console.warn(`✅ Correctly handled invalid month: ${parsedContent.error.message}`);
     });
   });
 });

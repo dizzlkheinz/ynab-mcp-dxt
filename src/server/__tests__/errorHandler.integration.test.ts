@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import * as ynab from 'ynab';
 import { handleListBudgets } from '../../tools/budgetTools.js';
 import { handleListAccounts } from '../../tools/accountTools.js';
 import { handleListTransactions } from '../../tools/transactionTools.js';

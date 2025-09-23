@@ -48,28 +48,28 @@ export class ComprehensiveTestRunner {
    * Run all test suites
    */
   async runAllTests(): Promise<TestResults> {
-    console.log('🚀 Starting comprehensive test suite...\n');
+    console.warn('🚀 Starting comprehensive test suite...\n');
     this.startTime = Date.now();
 
     try {
       // Run unit tests
-      console.log('📋 Running unit tests...');
+      console.warn('📋 Running unit tests...');
       this.results.unit = await this.runTestSuite('unit');
 
       // Run integration tests
-      console.log('🔗 Running integration tests...');
+      console.warn('🔗 Running integration tests...');
       this.results.integration = await this.runTestSuite('integration');
 
       // Run performance tests
-      console.log('⚡ Running performance tests...');
+      console.warn('⚡ Running performance tests...');
       this.results.performance = await this.runTestSuite('performance');
 
       // Run E2E tests (may be skipped if no API key)
-      console.log('🌐 Running end-to-end tests...');
+      console.warn('🌐 Running end-to-end tests...');
       this.results.e2e = await this.runTestSuite('e2e');
 
       // Generate coverage report
-      console.log('📊 Generating coverage report...');
+      console.warn('📊 Generating coverage report...');
       this.results.coverage = await this.generateCoverageReport();
 
       this.endTime = Date.now();
@@ -119,7 +119,7 @@ export class ComprehensiveTestRunner {
       const duration = Date.now() - startTime;
       const result = this.parseTestOutput(output, duration);
 
-      console.log(
+      console.warn(
         `✅ ${suite} tests completed: ${result.passed} passed, ${result.failed} failed, ${result.skipped} skipped (${duration}ms)\n`,
       );
 
@@ -132,11 +132,11 @@ export class ComprehensiveTestRunner {
       const result = this.parseTestOutput(output, duration);
 
       if (suite === 'e2e' && output.includes('Skipping E2E tests')) {
-        console.log(`⏭️  E2E tests skipped (no API key or SKIP_E2E_TESTS=true)\n`);
+        console.warn(`⏭️  E2E tests skipped (no API key or SKIP_E2E_TESTS=true)\n`);
         return { ...result, success: true }; // Don't fail overall suite for skipped E2E
       }
 
-      console.log(
+      console.warn(
         `❌ ${suite} tests failed: ${result.passed} passed, ${result.failed} failed, ${result.skipped} skipped (${duration}ms)\n`,
       );
       return result;
@@ -407,16 +407,16 @@ For detailed test results, check the individual test output files and coverage r
     writeFileSync('test-report.md', report);
 
     // Console output
-    console.log('\n' + '='.repeat(80));
-    console.log('📊 COMPREHENSIVE TEST REPORT');
-    console.log('='.repeat(80));
-    console.log(`Total Tests: ${totalTests} | Passed: ${totalPassed} | Failed: ${totalFailed}`);
-    console.log(`Coverage: ${results.coverage.overall}% | Duration: ${totalDuration}ms`);
-    console.log(`Status: ${overallSuccess ? '✅ ALL TESTS PASS' : '❌ SOME TESTS FAILED'}`);
-    console.log('='.repeat(80));
-    console.log(`📄 Detailed report saved to: test-report.md`);
-    console.log(`📊 Coverage report available at: coverage/index.html`);
-    console.log('='.repeat(80) + '\n');
+    console.warn('\n' + '='.repeat(80));
+    console.warn('📊 COMPREHENSIVE TEST REPORT');
+    console.warn('='.repeat(80));
+    console.warn(`Total Tests: ${totalTests} | Passed: ${totalPassed} | Failed: ${totalFailed}`);
+    console.warn(`Coverage: ${results.coverage.overall}% | Duration: ${totalDuration}ms`);
+    console.warn(`Status: ${overallSuccess ? '✅ ALL TESTS PASS' : '❌ SOME TESTS FAILED'}`);
+    console.warn('='.repeat(80));
+    console.warn(`📄 Detailed report saved to: test-report.md`);
+    console.warn(`📊 Coverage report available at: coverage/index.html`);
+    console.warn('='.repeat(80) + '\n');
   }
 }
 
