@@ -6,6 +6,7 @@ import { responseFormatter } from '../server/responseFormatter.js';
 import { readFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
 import { parse as parseDateFns } from 'date-fns';
+import { toMilli, Milli, inWindow } from '../utils/money.js';
 
 /**
  * Schema for ynab:compare_transactions tool parameters
@@ -19,6 +20,8 @@ export const CompareTransactionsSchema = z
     date_range_days: z.number().min(1).max(365).optional().default(30),
     amount_tolerance: z.number().min(0).max(1).optional().default(0.01),
     date_tolerance_days: z.number().min(0).max(7).optional().default(5),
+    statement_start_date: z.string().optional(),
+    statement_date: z.string().optional(),
     auto_detect_format: z.boolean().optional().default(false),
     csv_format: z
       .object({
@@ -123,29 +126,17 @@ function parseDate(dateStr: string, format: string): Date {
 /**
  * Convert dollar amount to milliunits
  */
-function amountToMilliunits(amountStr: string): number {
-  // Clean the amount string - remove currency symbols, commas, etc.
+function amountToMilliunits(amountStr: string): Milli {
   const cleaned = amountStr.replace(/[$,\s]/g, '').trim();
-
-  // Handle parentheses for negative amounts (common in bank statements)
-  let isNegative = false;
-  let finalAmount = cleaned;
-
-  if (cleaned.startsWith('(') && cleaned.endsWith(')')) {
-    isNegative = true;
-    finalAmount = cleaned.slice(1, -1);
-  } else if (cleaned.startsWith('-')) {
-    isNegative = true;
-    finalAmount = cleaned.slice(1);
+  let s = cleaned,
+    neg = false;
+  if (s.startsWith('(') && s.endsWith(')')) {
+    neg = true;
+    s = s.slice(1, -1);
   }
-
-  const amount = parseFloat(finalAmount);
-  if (isNaN(amount)) {
-    throw new Error(`Unable to parse amount: ${amountStr}`);
-  }
-
-  // Convert to milliunits and apply sign
-  return Math.round((isNegative ? -amount : amount) * 1000);
+  if (s.startsWith('+')) s = s.slice(1);
+  const n = Number(s);
+  return toMilli(neg ? -n : n);
 }
 
 /**
@@ -754,18 +745,34 @@ export async function handleCompareTransactions(
           original: txn,
         }));
 
+      // Filter candidates to statement window if provided
+      let filteredBankTransactions = bankTransactions;
+      let filteredYnabTransactions = ynabTransactions;
+
+      if (parsed.statement_start_date || parsed.statement_date) {
+        const startDate = parsed.statement_start_date || undefined;
+        const endDate = parsed.statement_date || undefined;
+
+        filteredBankTransactions = bankTransactions.filter((t) =>
+          inWindow(t.date.toISOString().split('T')[0], startDate, endDate),
+        );
+        filteredYnabTransactions = ynabTransactions.filter((t) =>
+          inWindow(t.date.toISOString().split('T')[0], startDate, endDate),
+        );
+      }
+
       // Find matches
       const { matches, unmatched_bank, unmatched_ynab } = findMatches(
-        bankTransactions,
-        ynabTransactions,
+        filteredBankTransactions,
+        filteredYnabTransactions,
         parsed.amount_tolerance!,
         parsed.date_tolerance_days!,
       );
 
       // Format results
       const summary = {
-        bank_transactions_count: bankTransactions.length,
-        ynab_transactions_count: ynabTransactions.length,
+        bank_transactions_count: filteredBankTransactions.length,
+        ynab_transactions_count: filteredYnabTransactions.length,
         matches_found: matches.length,
         missing_in_ynab: unmatched_bank.length,
         missing_in_bank: unmatched_ynab.length,
