@@ -1,3 +1,4 @@
+import type { ToolRegistry } from '../server/toolRegistry.js';
 /**
  * Test utilities for comprehensive testing suite
  */
@@ -50,121 +51,19 @@ export async function executeToolCall(
   toolName: string,
   args: Record<string, any> = {},
 ): Promise<CallToolResult> {
-  // Import the tool handlers directly for testing
-  const ynabAPI = server.getYNABAPI();
-
-  // Route to the appropriate tool handler based on tool name
-  switch (toolName) {
-    case 'ynab:list_budgets': {
-      const { handleListBudgets } = await import('../tools/budgetTools.js');
-      return await handleListBudgets(ynabAPI);
-    }
-    case 'ynab:get_budget': {
-      const { handleGetBudget, GetBudgetSchema } = await import('../tools/budgetTools.js');
-      const params = GetBudgetSchema.parse(args);
-      return await handleGetBudget(ynabAPI, params);
-    }
-    case 'ynab:list_accounts': {
-      const { handleListAccounts, ListAccountsSchema } = await import('../tools/accountTools.js');
-      const params = ListAccountsSchema.parse(args);
-      return await handleListAccounts(ynabAPI, params);
-    }
-    case 'ynab:get_account': {
-      const { handleGetAccount, GetAccountSchema } = await import('../tools/accountTools.js');
-      const params = GetAccountSchema.parse(args);
-      return await handleGetAccount(ynabAPI, params);
-    }
-    case 'ynab:create_account': {
-      const { handleCreateAccount, CreateAccountSchema } = await import('../tools/accountTools.js');
-      const params = CreateAccountSchema.parse(args);
-      return await handleCreateAccount(ynabAPI, params);
-    }
-    case 'ynab:list_transactions': {
-      const { handleListTransactions, ListTransactionsSchema } = await import(
-        '../tools/transactionTools.js'
-      );
-      const params = ListTransactionsSchema.parse(args);
-      return await handleListTransactions(ynabAPI, params);
-    }
-    case 'ynab:get_transaction': {
-      const { handleGetTransaction, GetTransactionSchema } = await import(
-        '../tools/transactionTools.js'
-      );
-      const params = GetTransactionSchema.parse(args);
-      return await handleGetTransaction(ynabAPI, params);
-    }
-    case 'ynab:create_transaction': {
-      const { handleCreateTransaction, CreateTransactionSchema } = await import(
-        '../tools/transactionTools.js'
-      );
-      const params = CreateTransactionSchema.parse(args);
-      return await handleCreateTransaction(ynabAPI, params);
-    }
-    case 'ynab:update_transaction': {
-      const { handleUpdateTransaction, UpdateTransactionSchema } = await import(
-        '../tools/transactionTools.js'
-      );
-      const params = UpdateTransactionSchema.parse(args);
-      return await handleUpdateTransaction(ynabAPI, params);
-    }
-    case 'ynab:delete_transaction': {
-      const { handleDeleteTransaction, DeleteTransactionSchema } = await import(
-        '../tools/transactionTools.js'
-      );
-      const params = DeleteTransactionSchema.parse(args);
-      return await handleDeleteTransaction(ynabAPI, params);
-    }
-    case 'ynab:list_categories': {
-      const { handleListCategories, ListCategoriesSchema } = await import(
-        '../tools/categoryTools.js'
-      );
-      const params = ListCategoriesSchema.parse(args);
-      return await handleListCategories(ynabAPI, params);
-    }
-    case 'ynab:get_category': {
-      const { handleGetCategory, GetCategorySchema } = await import('../tools/categoryTools.js');
-      const params = GetCategorySchema.parse(args);
-      return await handleGetCategory(ynabAPI, params);
-    }
-    case 'ynab:update_category': {
-      const { handleUpdateCategory, UpdateCategorySchema } = await import(
-        '../tools/categoryTools.js'
-      );
-      const params = UpdateCategorySchema.parse(args);
-      return await handleUpdateCategory(ynabAPI, params);
-    }
-    case 'ynab:list_payees': {
-      const { handleListPayees, ListPayeesSchema } = await import('../tools/payeeTools.js');
-      const params = ListPayeesSchema.parse(args);
-      return await handleListPayees(ynabAPI, params);
-    }
-    case 'ynab:get_payee': {
-      const { handleGetPayee, GetPayeeSchema } = await import('../tools/payeeTools.js');
-      const params = GetPayeeSchema.parse(args);
-      return await handleGetPayee(ynabAPI, params);
-    }
-    case 'ynab:get_month': {
-      const { handleGetMonth, GetMonthSchema } = await import('../tools/monthTools.js');
-      const params = GetMonthSchema.parse(args);
-      return await handleGetMonth(ynabAPI, params);
-    }
-    case 'ynab:list_months': {
-      const { handleListMonths, ListMonthsSchema } = await import('../tools/monthTools.js');
-      const params = ListMonthsSchema.parse(args);
-      return await handleListMonths(ynabAPI, params);
-    }
-    case 'ynab:get_user': {
-      const { handleGetUser } = await import('../tools/utilityTools.js');
-      return await handleGetUser(ynabAPI);
-    }
-    case 'ynab:convert_amount': {
-      const { handleConvertAmount, ConvertAmountSchema } = await import('../tools/utilityTools.js');
-      const params = ConvertAmountSchema.parse(args);
-      return await handleConvertAmount(params);
-    }
-    default:
-      throw new Error(`Unknown tool: ${toolName}`);
+  const accessToken = process.env['YNAB_ACCESS_TOKEN'];
+  if (!accessToken) {
+    throw new Error('YNAB_ACCESS_TOKEN is required for tool execution');
   }
+
+  const registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+  const normalizedName = toolName.startsWith('ynab:') ? toolName.slice(toolName.indexOf(':') + 1) : toolName;
+
+  return await registry.executeTool({
+    name: normalizedName,
+    accessToken,
+    arguments: args,
+  });
 }
 
 /**
@@ -198,7 +97,15 @@ export function parseToolResult<T = any>(result: CallToolResult): T {
   }
 
   try {
-    return JSON.parse(text) as T;
+    const parsed = JSON.parse(text) as Record<string, unknown> | T;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      if ('data' in record) {
+        return parsed as T;
+      }
+      return { data: parsed, ...record } as T;
+    }
+    return parsed as T;
   } catch (error) {
     throw new Error(`Failed to parse tool result as JSON: ${error}`);
   }
@@ -370,3 +277,7 @@ export const YNABAssertions = {
     expect(typeof payee.name).toBe('string');
   },
 };
+
+
+
+

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { YNABMCPServer } from '../YNABMCPServer.js';
 import { AuthenticationError, ConfigurationError } from '../../types/index.js';
+import { ToolRegistry } from '../toolRegistry.js';
+import { cacheManager } from '../../server/cacheManager.js';
+import { responseFormatter } from '../../server/responseFormatter.js';
 
 /**
  * Real YNAB API tests using token from .env (YNAB_ACCESS_TOKEN)
@@ -169,24 +172,131 @@ describe('YNABMCPServer', () => {
 
   describe('MCP Server Functionality', () => {
     let server: YNABMCPServer;
+    let registry: ToolRegistry;
+
+    const accessToken = () => {
+      const token = process.env['YNAB_ACCESS_TOKEN'];
+      if (!token) {
+        throw new Error('YNAB_ACCESS_TOKEN must be defined for integration tests');
+      }
+      return token;
+    };
 
     beforeEach(() => {
       server = new YNABMCPServer(false);
+      registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
     });
 
-    it('should return empty tools list initially', async () => {
-      const mcpServer = server.getServer();
-      expect(mcpServer).toBeDefined();
-
-      // The server should be initialized with empty tools
-      // (tools will be added in future tasks)
+    it('should expose registered tools via the registry', () => {
+      const tools = registry.listTools();
+      expect(tools.length).toBeGreaterThan(0);
+      const names = tools.map((tool) => tool.name);
+      expect(names).toContain('list_budgets');
+      expect(names).toContain('diagnostic_info');
     });
 
-    it('should provide access to YNAB API instance', () => {
-      const ynabAPI = server.getYNABAPI();
-      expect(ynabAPI).toBeDefined();
-      expect(typeof ynabAPI.budgets.getBudgets).toBe('function');
-      expect(typeof ynabAPI.user.getUser).toBe('function');
+    it('should execute get_user tool via the registry', async () => {
+      const result = await registry.executeTool({
+        name: 'get_user',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.user?.id).toBeDefined();
+    });
+
+    it('should set and retrieve default budget using tools', async () => {
+      const budgetsResult = await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const budgetsPayload = JSON.parse(budgetsResult.content?.[0]?.text ?? '{}');
+      const firstBudget = budgetsPayload.budgets?.[0];
+      expect(firstBudget).toBeDefined();
+
+      await registry.executeTool({
+        name: 'set_default_budget',
+        accessToken: accessToken(),
+        arguments: { budget_id: firstBudget.id },
+      });
+
+      const defaultResult = await registry.executeTool({
+        name: 'get_default_budget',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const defaultPayload = JSON.parse(defaultResult.content?.[0]?.text ?? '{}');
+      expect(defaultPayload.default_budget_id).toBe(firstBudget.id);
+      expect(defaultPayload.has_default).toBe(true);
+    });
+
+    it('should provide diagnostic info with requested sections', async () => {
+      const diagResult = await registry.executeTool({
+        name: 'diagnostic_info',
+        accessToken: accessToken(),
+        arguments: {
+          include_server: true,
+          include_security: true,
+          include_cache: true,
+          include_memory: false,
+          include_environment: false,
+        },
+      });
+      const diagnostics = JSON.parse(diagResult.content?.[0]?.text ?? '{}');
+      expect(diagnostics.timestamp).toBeDefined();
+      expect(diagnostics.server).toBeDefined();
+      expect(diagnostics.security).toBeDefined();
+      expect(diagnostics.cache).toBeDefined();
+      expect(diagnostics.memory).toBeUndefined();
+      expect(diagnostics.environment).toBeUndefined();
+    });
+
+    it('should clear cache using the clear_cache tool', async () => {
+      cacheManager.set('test:key', { value: 1 }, 1000);
+      expect(cacheManager.getStats().size).toBeGreaterThan(0);
+
+      await registry.executeTool({
+        name: 'clear_cache',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+
+      expect(cacheManager.getStats().size).toBe(0);
+    });
+
+    it('should configure output formatter via set_output_format tool', async () => {
+      const baseline = responseFormatter.format({ probe: true });
+
+      try {
+        await registry.executeTool({
+          name: 'set_output_format',
+          accessToken: accessToken(),
+          arguments: { default_minify: false, pretty_spaces: 4 },
+        });
+
+        const formatted = responseFormatter.format({ probe: true });
+        expect(formatted).not.toBe(baseline);
+        expect(formatted).toContain('\n');
+      } finally {
+        await registry.executeTool({
+          name: 'set_output_format',
+          accessToken: accessToken(),
+          arguments: { default_minify: true, pretty_spaces: 2 },
+        });
+      }
+    });
+
+    it('should surface validation errors for invalid inputs', async () => {
+      const result = await registry.executeTool({
+        name: 'get_budget',
+        accessToken: accessToken(),
+        arguments: {} as Record<string, unknown>,
+      });
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.error).toBeDefined();
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
     });
   });
+
 });

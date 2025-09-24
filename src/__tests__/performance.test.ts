@@ -278,25 +278,28 @@ describe('YNAB MCP Server - Performance Tests', () => {
         // Invalid parameters (should fail quickly)
         executeToolCall(server, 'ynab:get_budget', {
           budget_id: '', // Empty string should fail validation
-        }).catch(() => 'validation_error'),
+        }),
 
         executeToolCall(server, 'ynab:create_transaction', {
           budget_id: 'test',
           account_id: 'test',
           amount: 'not-a-number', // Invalid type
           date: '2024-01-01',
-        }).catch(() => 'validation_error'),
+        }),
       ];
 
       const results = await Promise.all(validationTests);
+      const parsed = results.map((result) => parseToolResult(result));
       const endTime = Date.now();
 
       const totalTime = endTime - startTime;
 
-      expect(results).toHaveLength(3);
-      expect(results[0]).toBeDefined(); // Valid call should succeed
-      expect(results[1]).toBe('validation_error'); // Invalid calls should fail
-      expect(results[2]).toBe('validation_error');
+      expect(parsed).toHaveLength(3);
+      expect(parsed[0]).toBeDefined(); // Valid call should succeed
+      const firstError = parsed[1].error ?? parsed[1].data?.error;
+      const secondError = parsed[2].error ?? parsed[2].data?.error;
+      expect(firstError?.code).toBe('VALIDATION_ERROR'); // Invalid calls should fail
+      expect(secondError?.code).toBe('VALIDATION_ERROR');
       expect(totalTime).toBeLessThan(1000); // Validation should be fast
     });
   });

@@ -37,24 +37,30 @@ describe('YNAB MCP Server - End-to-End Workflows', () => {
     // Get the first budget for testing
     const budgetsResult = await executeToolCall(server, 'ynab:list_budgets');
     const budgets = parseToolResult(budgetsResult);
+    const budgetList = budgets.data?.budgets ?? [];
 
-    if (!budgets.data?.budgets?.length) {
+    if (!budgetList.length && !testConfig.testBudgetId) {
       throw new Error('No budgets found for testing. Please create a test budget in YNAB.');
     }
 
-    testBudgetId = testConfig.testBudgetId || budgets.data.budgets[0].id;
+    testBudgetId = testConfig.testBudgetId ?? budgetList[0]?.id;
 
     // Get the first account for testing
     const accountsResult = await executeToolCall(server, 'ynab:list_accounts', {
       budget_id: testBudgetId,
     });
     const accounts = parseToolResult(accountsResult);
+    const accountList = accounts.data?.accounts ?? [];
 
-    if (!accounts.data?.accounts?.length) {
-      throw new Error('No accounts found for testing. Please create a test account in YNAB.');
+    if (!accountList.length) {
+      if (testConfig.testAccountId) {
+        testAccountId = testConfig.testAccountId;
+      } else {
+        throw new Error('No accounts found for testing. Please create a test account in YNAB.');
+      }
+    } else {
+      testAccountId = testConfig.testAccountId ?? accountList[0].id;
     }
-
-    testAccountId = testConfig.testAccountId || accounts.data.accounts[0].id;
   });
 
   afterAll(async () => {
@@ -457,8 +463,9 @@ describe('YNAB MCP Server - End-to-End Workflows', () => {
       });
       const milliunits = parseToolResult(toMilliunitsResult);
 
-      expect(milliunits.milliunits).toBe(25500);
-      expect(milliunits.formatted).toBe('25500 milliunits');
+      expect(milliunits.data?.conversion?.converted_amount).toBe(25500);
+      expect(milliunits.data?.conversion?.description).toContain('25500');
+      expect(milliunits.data?.conversion?.to_milliunits).toBe(true);
 
       // Convert milliunits to dollars
       const toDollarsResult = await executeToolCall(server, 'ynab:convert_amount', {
@@ -467,8 +474,9 @@ describe('YNAB MCP Server - End-to-End Workflows', () => {
       });
       const dollars = parseToolResult(toDollarsResult);
 
-      expect(dollars.dollars).toBe(25.5);
-      expect(dollars.formatted).toBe('$25.50');
+      expect(dollars.data?.conversion?.converted_amount).toBe(25.5);
+      expect(dollars.data?.conversion?.description).toContain('$25.50');
+      expect(dollars.data?.conversion?.to_milliunits).toBe(false);
     });
   });
 
