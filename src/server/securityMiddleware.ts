@@ -3,7 +3,7 @@
  */
 
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { globalRateLimiter, RateLimitError } from './rateLimiter.js';
 import { globalRequestLogger } from './requestLogger.js';
 import { ErrorHandler } from './errorHandler.js';

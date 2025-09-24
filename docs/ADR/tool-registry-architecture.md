@@ -32,6 +32,10 @@ Optional fields:
 - `metadata`: Provide `inputJsonSchema` overrides or arbitrary annotations for MCP clients.
 - `defaultArgumentResolver`: Lazy resolver that can supply missing arguments (e.g., default budget IDs) before validation. Values returned here are merged with explicit arguments, with explicit user input taking precedence.
 
+
+## JSON Schema Generation
+
+We rely on `zod/v4`'s native `toJSONSchema` helper to convert Zod schemas into MCP-compatible JSON Schemas. This keeps us aligned with upstream evolution (including annotations like `$schema`, minimum/maximum constraints, and OpenAPI compatibility) without maintaining custom walkers. Tool authors can still provide overrides via `metadata.inputJsonSchema` when they need bespoke output.
 ## Execution Flow
 
 1. Look up the registered tool. Unknown tools produce `ErrorHandler.createValidationError` responses.

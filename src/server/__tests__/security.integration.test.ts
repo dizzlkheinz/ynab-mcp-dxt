@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { SecurityMiddleware } from '../securityMiddleware.js';
 import { globalRateLimiter, RateLimiter } from '../rateLimiter.js';
 import { globalRequestLogger, RequestLogger } from '../requestLogger.js';

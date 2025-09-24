@@ -23,7 +23,7 @@
 - Create `src/server/toolRegistry.ts` with injectable dependencies (`withSecurityWrapper`, `ErrorHandler`, `responseFormatter`, cache helpers).
 - Define `ToolDefinition` (schema, description, handler, default argument resolver) and a registry class to emit MCP tool metadata and execute handlers through shared security + error flows.
 - Move the large switch in `YNABMCPServer` into registry registrations. Ensure `listTools`, prompt wiring, and execution paths reuse registry data so schemas/descriptions stay in sync.
-- Extend server tests to cover registry behaviour (unknown tool name, validation failures, minify overrides, security errors).
+- Extend server tests to cover registry behaviour (unknown tool name, validation failures, minify overrides, security errors) and assert JSON Schema output generated via `zod/v4`'s `toJSONSchema`.
 - Document the registry contract (required fields, return shapes, minify handling) in docs/ADR to guide future tool authors.
 
 ### Phase 2 – Modular Server Orchestration

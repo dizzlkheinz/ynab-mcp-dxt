@@ -1,11 +1,13 @@
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
-import { z, ZodArray, ZodBoolean, ZodDefault, ZodDiscriminatedUnion, ZodEffects, ZodEnum, ZodLiteral, ZodNullable, ZodObject, ZodOptional, ZodString, ZodTypeAny, ZodUnion, ZodNumber } from 'zod';
+import { z, toJSONSchema } from 'zod/v4';
 
 export type SecurityWrapperFactory = <T extends Record<string, unknown>>(
   namespace: string,
   operation: string,
   schema: z.ZodSchema<T>,
-) => (accessToken: string) => (
+) => (
+  accessToken: string,
+) => (
   params: Record<string, unknown>,
 ) => (handler: (validated: T) => Promise<CallToolResult>) => Promise<CallToolResult>;
 
@@ -110,28 +112,43 @@ export class ToolRegistry {
       },
     };
 
-    this.tools.set(definition.name, resolved as RegisteredTool<Record<string, unknown>>);
+    this.tools.set(definition.name, resolved as unknown as RegisteredTool<Record<string, unknown>>);
   }
 
   listTools(): Tool[] {
-    return Array.from(this.tools.values()).map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.metadata?.inputJsonSchema ?? this.generateJsonSchema(tool.inputSchema),
-      ...(tool.metadata?.annotations ? { annotations: tool.metadata.annotations } : {}),
-    }));
+    return Array.from(this.tools.values()).map((tool) => {
+      const inputSchema =
+        (tool.metadata?.inputJsonSchema as Tool['inputSchema'] | undefined) ??
+        (this.generateJsonSchema(tool.inputSchema) as Tool['inputSchema']);
+      const result: Tool = {
+        name: tool.name,
+        description: tool.description,
+        inputSchema,
+      };
+      if (tool.metadata?.annotations) {
+        result.annotations = tool.metadata.annotations;
+      }
+      return result;
+    });
   }
 
   getToolDefinitions(): ToolDefinition[] {
-    return Array.from(this.tools.values()).map((tool) => ({
-      name: tool.name,
-      description: tool.description,
-      inputSchema: tool.inputSchema,
-      handler: tool.handler,
-      security: tool.security,
-      metadata: tool.metadata,
-      defaultArgumentResolver: tool.defaultArgumentResolver,
-    }));
+    return Array.from(this.tools.values()).map((tool) => {
+      const definition: ToolDefinition = {
+        name: tool.name,
+        description: tool.description,
+        inputSchema: tool.inputSchema,
+        handler: tool.handler,
+        security: tool.security,
+      };
+      if (tool.metadata) {
+        definition.metadata = tool.metadata;
+      }
+      if (tool.defaultArgumentResolver) {
+        definition.defaultArgumentResolver = tool.defaultArgumentResolver;
+      }
+      return definition;
+    });
   }
 
   async executeTool(options: ToolExecutionOptions): Promise<CallToolResult> {
@@ -167,15 +184,18 @@ export class ToolRegistry {
 
         return await secured(async (validated) => {
           try {
+            const context: ToolExecutionContext = {
+              accessToken: options.accessToken,
+              name: tool.name,
+              operation: tool.security.operation,
+              rawArguments,
+            };
+            if (this.deps.cacheHelpers) {
+              context.cache = this.deps.cacheHelpers;
+            }
             return await tool.handler({
               input: validated,
-              context: {
-                accessToken: options.accessToken,
-                name: tool.name,
-                operation: tool.security.operation,
-                rawArguments,
-                cache: this.deps.cacheHelpers,
-              },
+              context,
             });
           } catch (handlerError) {
             return this.deps.errorHandler.handleError(
@@ -238,8 +258,8 @@ export class ToolRegistry {
     return undefined;
   }
 
-  private assertValidDefinition(
-    definition: ToolDefinition<Record<string, unknown>>,
+  private assertValidDefinition<TInput extends Record<string, unknown>>(
+    definition: ToolDefinition<TInput>,
   ): void {
     if (!definition || typeof definition !== 'object') {
       throw new Error('Tool definition must be an object');
@@ -271,119 +291,11 @@ export class ToolRegistry {
     }
   }
 
-  private generateJsonSchema(schema: ZodTypeAny): Record<string, unknown> {
+  private generateJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
     try {
-      return this.convertZodTypeToJsonSchema(schema);
+      return toJSONSchema(schema, { target: 'draft-2020-12', io: 'output' });
     } catch {
       return { type: 'object', additionalProperties: true };
     }
-  }
-
-  private convertZodTypeToJsonSchema(type: ZodTypeAny): Record<string, unknown> {
-    if (type instanceof ZodObject) {
-      const shape = type.shape;
-      const properties: Record<string, unknown> = {};
-      const required: string[] = [];
-
-      for (const [key, value] of Object.entries(shape)) {
-        const { schema: propertySchema, optional } = this.unwrapOptional(value);
-        properties[key] = this.convertZodTypeToJsonSchema(propertySchema);
-        if (!optional) {
-          required.push(key);
-        }
-      }
-
-      const base: Record<string, unknown> = {
-        type: 'object',
-        properties,
-      };
-
-      if (required.length > 0) {
-        base['required'] = required;
-      }
-
-      base['additionalProperties'] = false;
-      return base;
-    }
-
-    if (type instanceof ZodArray) {
-      return {
-        type: 'array',
-        items: this.convertZodTypeToJsonSchema(type.element),
-      };
-    }
-
-    if (type instanceof ZodString) {
-      return { type: 'string', ...(type.description ? { description: type.description } : {}) };
-    }
-
-    if (type instanceof ZodNumber) {
-      return { type: 'number' };
-    }
-
-    if (type instanceof ZodBoolean) {
-      return { type: 'boolean' };
-    }
-
-    if (type instanceof ZodEnum) {
-      return {
-        type: 'string',
-        enum: [...type.options],
-      };
-    }
-
-    if (type instanceof ZodLiteral) {
-      const literal = type.value;
-      return {
-        const: literal,
-        type: typeof literal,
-      };
-    }
-
-    if (type instanceof ZodUnion || type instanceof ZodDiscriminatedUnion) {
-      const options = 'options' in type._def ? type._def.options : type.options;
-      return {
-        anyOf: options.map((option: ZodTypeAny) => this.convertZodTypeToJsonSchema(option)),
-      };
-    }
-
-    if (type instanceof ZodEffects) {
-      return this.convertZodTypeToJsonSchema(type.innerType());
-    }
-
-    if (type instanceof ZodDefault) {
-      return this.convertZodTypeToJsonSchema(type.removeDefault());
-    }
-
-    if (type instanceof ZodNullable) {
-      return {
-        anyOf: [
-          this.convertZodTypeToJsonSchema(type.unwrap()),
-          { type: 'null' },
-        ],
-      };
-    }
-
-    if (type instanceof ZodOptional) {
-      return this.convertZodTypeToJsonSchema(type.unwrap());
-    }
-
-    return { type: 'object', additionalProperties: true };
-  }
-
-  private unwrapOptional(
-    value: ZodTypeAny,
-  ): { schema: ZodTypeAny; optional: boolean } {
-    if (value instanceof ZodOptional) {
-      const inner = this.unwrapOptional(value.unwrap());
-      return { schema: inner.schema, optional: true };
-    }
-
-    if (value instanceof ZodDefault) {
-      const inner = this.unwrapOptional(value.removeDefault());
-      return { schema: inner.schema, optional: true };
-    }
-
-    return { schema: value, optional: false };
   }
 }

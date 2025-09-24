@@ -1,7 +1,7 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { SaveTransaction } from 'ynab/dist/models/SaveTransaction.js';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
 import { milliunitsToAmount } from '../utils/amountUtils.js';

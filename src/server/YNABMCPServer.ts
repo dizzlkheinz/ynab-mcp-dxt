@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import fs from 'fs';
 import path from 'path';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,

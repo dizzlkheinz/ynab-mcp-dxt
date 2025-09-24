@@ -1,6 +1,6 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { cacheManager, CACHE_TTLS } from '../server/cacheManager.js';
 import { responseFormatter } from '../server/responseFormatter.js';
