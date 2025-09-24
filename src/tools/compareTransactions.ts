@@ -34,6 +34,7 @@ export const CompareTransactionsSchema = z
         has_header: z.boolean().optional().default(true),
         delimiter: z.string().optional().default(','),
       })
+      .strict()
       .optional()
       .default(() => ({
         date_column: 'Date',
@@ -44,6 +45,7 @@ export const CompareTransactionsSchema = z
         delimiter: ',',
       })),
   })
+  .strict()
   .refine((data) => data.csv_file_path || data.csv_data, {
     message: 'Either csv_file_path or csv_data must be provided',
   });

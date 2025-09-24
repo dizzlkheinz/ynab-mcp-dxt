@@ -9,7 +9,7 @@ import { responseFormatter } from '../server/responseFormatter.js';
  */
 export const ListPayeesSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
-});
+}).strict();
 
 export type ListPayeesParams = z.infer<typeof ListPayeesSchema>;
 
@@ -19,7 +19,7 @@ export type ListPayeesParams = z.infer<typeof ListPayeesSchema>;
 export const GetPayeeSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   payee_id: z.string().min(1, 'Payee ID is required'),
-});
+}).strict();
 
 export type GetPayeeParams = z.infer<typeof GetPayeeSchema>;
 

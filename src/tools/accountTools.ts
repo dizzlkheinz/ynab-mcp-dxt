@@ -10,7 +10,7 @@ import { milliunitsToAmount } from '../utils/amountUtils.js';
  */
 export const ListAccountsSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
-});
+}).strict();
 
 export type ListAccountsParams = z.infer<typeof ListAccountsSchema>;
 
@@ -20,7 +20,7 @@ export type ListAccountsParams = z.infer<typeof ListAccountsSchema>;
 export const GetAccountSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   account_id: z.string().min(1, 'Account ID is required'),
-});
+}).strict();
 
 export type GetAccountParams = z.infer<typeof GetAccountSchema>;
 
@@ -41,7 +41,7 @@ export const CreateAccountSchema = z.object({
   ]),
   balance: z.number().optional(),
   dry_run: z.boolean().optional(),
-});
+}).strict();
 
 export type CreateAccountParams = z.infer<typeof CreateAccountSchema>;
 

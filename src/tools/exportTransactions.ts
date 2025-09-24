@@ -22,7 +22,7 @@ export const ExportTransactionsSchema = z.object({
   type: z.enum(['uncategorized', 'unapproved']).optional(),
   filename: z.string().optional(),
   minimal: z.boolean().optional().default(true),
-});
+}).strict();
 
 export type ExportTransactionsParams = z.infer<typeof ExportTransactionsSchema>;
 

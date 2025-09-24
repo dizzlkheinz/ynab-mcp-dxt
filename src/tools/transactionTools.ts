@@ -28,7 +28,7 @@ export const ListTransactionsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
     .optional(),
   type: z.enum(['uncategorized', 'unapproved']).optional(),
-});
+}).strict();
 
 export type ListTransactionsParams = z.infer<typeof ListTransactionsSchema>;
 
@@ -38,7 +38,7 @@ export type ListTransactionsParams = z.infer<typeof ListTransactionsSchema>;
 export const GetTransactionSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   transaction_id: z.string().min(1, 'Transaction ID is required'),
-});
+}).strict();
 
 export type GetTransactionParams = z.infer<typeof GetTransactionSchema>;
 
@@ -58,7 +58,7 @@ export const CreateTransactionSchema = z.object({
   approved: z.boolean().optional(),
   flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
   dry_run: z.boolean().optional(),
-});
+}).strict();
 
 export type CreateTransactionParams = z.infer<typeof CreateTransactionSchema>;
 
@@ -82,7 +82,7 @@ export const UpdateTransactionSchema = z.object({
   approved: z.boolean().optional(),
   flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
   dry_run: z.boolean().optional(),
-});
+}).strict();
 
 export type UpdateTransactionParams = z.infer<typeof UpdateTransactionSchema>;
 
@@ -93,7 +93,7 @@ export const DeleteTransactionSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   transaction_id: z.string().min(1, 'Transaction ID is required'),
   dry_run: z.boolean().optional(),
-});
+}).strict();
 
 export type DeleteTransactionParams = z.infer<typeof DeleteTransactionSchema>;
 

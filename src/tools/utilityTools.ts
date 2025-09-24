@@ -10,7 +10,7 @@ import { responseFormatter } from '../server/responseFormatter.js';
 export const ConvertAmountSchema = z.object({
   amount: z.number().finite(),
   to_milliunits: z.boolean(),
-});
+}).strict();
 
 export type ConvertAmountParams = z.infer<typeof ConvertAmountSchema>;
 

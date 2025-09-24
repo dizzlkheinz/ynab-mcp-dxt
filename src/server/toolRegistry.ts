@@ -160,12 +160,23 @@ export class ToolRegistry {
       );
     }
 
-    const defaults = tool.defaultArgumentResolver
-      ? await tool.defaultArgumentResolver({
+    let defaults: Partial<Record<string, unknown>> | undefined;
+
+    if (tool.defaultArgumentResolver) {
+      try {
+        defaults = await tool.defaultArgumentResolver({
           name: tool.name,
           rawArguments: options.arguments ?? {},
-        })
-      : undefined;
+        });
+      } catch (error) {
+        return this.deps.errorHandler.createValidationError(
+          'Invalid parameters',
+          error instanceof Error
+            ? error.message
+            : 'Unknown error during default argument resolution',
+        );
+      }
+    }
 
     const rawArguments: Record<string, unknown> = {
       ...(defaults ?? {}),

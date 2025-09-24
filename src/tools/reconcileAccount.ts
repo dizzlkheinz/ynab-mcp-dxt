@@ -40,6 +40,7 @@ export const ReconcileAccountSchema = z
         has_header: z.boolean().optional().default(true),
         delimiter: z.string().optional().default(','),
       })
+      .strict()
       .optional()
       .default(() => ({
         date_column: 'Date',
@@ -77,6 +78,7 @@ export const ReconcileAccountSchema = z
     confidence_threshold: z.number().min(0).max(1).optional().default(0.8),
     max_resolution_attempts: z.number().int().min(1).max(10).optional().default(5),
   })
+  .strict()
   .refine((data) => data.csv_file_path || data.csv_data, {
     message: 'Either csv_file_path or csv_data must be provided',
   });

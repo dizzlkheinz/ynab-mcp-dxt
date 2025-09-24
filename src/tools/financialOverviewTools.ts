@@ -19,18 +19,18 @@ export const FinancialOverviewSchema = z.object({
   months: z.number().min(1).max(12).default(3),
   include_trends: z.boolean().default(true),
   include_insights: z.boolean().default(true),
-});
+}).strict();
 
 export const SpendingAnalysisSchema = z.object({
   budget_id: z.string().optional(),
   period_months: z.number().min(1).max(12).default(6),
   category_id: z.string().optional(),
-});
+}).strict();
 
 export const BudgetHealthSchema = z.object({
   budget_id: z.string().optional(),
   include_recommendations: z.boolean().default(true),
-});
+}).strict();
 
 export type FinancialOverviewParams = z.infer<typeof FinancialOverviewSchema>;
 export type SpendingAnalysisParams = z.infer<typeof SpendingAnalysisSchema>;

@@ -10,7 +10,7 @@ import { responseFormatter } from '../server/responseFormatter.js';
  */
 export const GetBudgetSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
-});
+}).strict();
 
 export type GetBudgetParams = z.infer<typeof GetBudgetSchema>;
 

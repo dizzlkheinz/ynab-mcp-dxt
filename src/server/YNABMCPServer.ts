@@ -11,6 +11,7 @@ import {
   ReadResourceRequestSchema,
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import {
   AuthenticationError,
@@ -75,8 +76,14 @@ import {
   SpendingAnalysisSchema,
   BudgetHealthSchema,
 } from '../tools/financialOverviewTools.js';
-import { cacheManager } from './cacheManager.js';
+import { cacheManager, CacheManager } from './cacheManager.js';
 import { responseFormatter } from './responseFormatter.js';
+import {
+  ToolRegistry,
+  type ToolDefinition,
+  type DefaultArgumentResolver,
+  type ToolExecutionPayload,
+} from './toolRegistry.js';
 
 /**
  * YNAB MCP Server class that provides integration with You Need A Budget API
@@ -88,6 +95,7 @@ export class YNABMCPServer {
   private exitOnError: boolean;
   private defaultBudgetId?: string;
   private serverVersion: string;
+  private toolRegistry: ToolRegistry;
 
   constructor(exitOnError: boolean = true) {
     this.exitOnError = exitOnError;
@@ -115,6 +123,35 @@ export class YNABMCPServer {
       },
     );
 
+    this.toolRegistry = new ToolRegistry({
+      withSecurityWrapper,
+      errorHandler: ErrorHandler,
+      responseFormatter,
+      cacheHelpers: {
+        generateKey: (...segments: unknown[]) => {
+          const normalized = segments.map((segment) => {
+            if (
+              typeof segment === 'string' ||
+              typeof segment === 'number' ||
+              typeof segment === 'boolean' ||
+              segment === undefined
+            ) {
+              return segment;
+            }
+            return JSON.stringify(segment);
+          }) as Array<string | number | boolean | undefined>;
+          return CacheManager.generateKey('tool', ...normalized);
+        },
+        invalidate: (key: string) => {
+          cacheManager.delete(key);
+        },
+        clear: () => {
+          cacheManager.clear();
+        },
+      },
+    });
+
+    this.setupToolRegistry();
     this.setupHandlers();
   }
 
@@ -460,1380 +497,487 @@ Convert milliunits to dollars for easy reading.`,
     // Handle list tools requests
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
-        tools: [
-          {
-            name: 'list_budgets',
-            description: "List all budgets associated with the user's account",
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'get_budget',
-            description: 'Get detailed information for a specific budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to retrieve',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'set_default_budget',
-            description: 'Set the default budget for subsequent operations',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to set as default',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'get_default_budget',
-            description: 'Get the currently set default budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'list_accounts',
-            description:
-              'List all accounts for a specific budget (uses default budget if not specified)',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description:
-                    'The ID of the budget to list accounts for (optional, uses default budget if not provided)',
-                },
-              },
-              required: [],
-            },
-          },
-          {
-            name: 'get_account',
-            description: 'Get detailed information for a specific account',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the account',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'The ID of the account to retrieve',
-                },
-              },
-              required: ['budget_id', 'account_id'],
-            },
-          },
-          {
-            name: 'create_account',
-            description: 'Create a new account in the specified budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to create the account in',
-                },
-                name: {
-                  type: 'string',
-                  description: 'The name of the new account',
-                },
-                type: {
-                  type: 'string',
-                  enum: [
-                    'checking',
-                    'savings',
-                    'creditCard',
-                    'cash',
-                    'lineOfCredit',
-                    'otherAsset',
-                    'otherLiability',
-                  ],
-                  description: 'The type of account to create',
-                },
-                balance: {
-                  type: 'number',
-                  description: 'The initial balance of the account in currency units (optional)',
-                },
-                dry_run: {
-                  type: 'boolean',
-                  description: 'If true, simulate the create without calling YNAB',
-                },
-              },
-              required: ['budget_id', 'name', 'type'],
-            },
-          },
-          {
-            name: 'list_transactions',
-            description: 'List transactions for a budget with optional filtering',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to list transactions for',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'Optional: Filter transactions by account ID',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'Optional: Filter transactions by category ID',
-                },
-                since_date: {
-                  type: 'string',
-                  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-                  description:
-                    'Optional: Only return transactions on or after this date (ISO format: YYYY-MM-DD)',
-                },
-                type: {
-                  type: 'string',
-                  enum: ['uncategorized', 'unapproved'],
-                  description: 'Optional: Filter by transaction type',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'export_transactions',
-            description: 'Export all transactions to a JSON file with descriptive filename',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to export transactions from',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'Optional: Filter transactions by account ID',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'Optional: Filter transactions by category ID',
-                },
-                since_date: {
-                  type: 'string',
-                  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-                  description:
-                    'Optional: Only export transactions on or after this date (ISO format: YYYY-MM-DD)',
-                },
-                type: {
-                  type: 'string',
-                  enum: ['uncategorized', 'unapproved'],
-                  description: 'Optional: Filter by transaction type',
-                },
-                filename: {
-                  type: 'string',
-                  description:
-                    'Optional: Custom filename for export (auto-generated if not provided)',
-                },
-                minimal: {
-                  type: 'boolean',
-                  description:
-                    'Optional: Export only essential fields (id, date, amount, payee_name, cleared) for smaller file size (default: true)',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'compare_transactions',
-            description:
-              'Compare bank transactions from CSV with YNAB transactions to find missing entries',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to compare against',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'The ID of the account to compare transactions for',
-                },
-                csv_file_path: {
-                  type: 'string',
-                  description: 'Optional: Path to CSV file containing bank transactions',
-                },
-                csv_data: {
-                  type: 'string',
-                  description: 'Optional: CSV data as string (alternative to csv_file_path)',
-                },
-                date_range_days: {
-                  type: 'number',
-                  minimum: 1,
-                  maximum: 365,
-                  description: 'Optional: Number of days to extend search range (default: 30)',
-                },
-                amount_tolerance: {
-                  type: 'number',
-                  minimum: 0,
-                  maximum: 1,
-                  description:
-                    'Optional: Amount difference tolerance as decimal (0.01 = 1%, default: 0.01)',
-                },
-                date_tolerance_days: {
-                  type: 'number',
-                  minimum: 0,
-                  maximum: 7,
-                  description: 'Optional: Date difference tolerance in days (default: 5)',
-                },
-                csv_format: {
-                  type: 'object',
-                  description: 'Optional: CSV format configuration',
-                  properties: {
-                    date_column: {
-                      type: 'string',
-                      description:
-                        'Column name for transaction date when has_header is true, or column index as string when has_header is false (default: "Date")',
-                    },
-                    amount_column: {
-                      type: 'string',
-                      description:
-                        'Column name for transaction amount when has_header is true, or column index as string when has_header is false (default: "Amount")',
-                    },
-                    description_column: {
-                      type: 'string',
-                      description:
-                        'Column name for transaction description when has_header is true, or column index as string when has_header is false (default: "Description")',
-                    },
-                    date_format: {
-                      type: 'string',
-                      description: 'Date format pattern (default: "MM/DD/YYYY")',
-                    },
-                    has_header: {
-                      type: 'boolean',
-                      description: 'Whether CSV has header row (default: true)',
-                    },
-                    delimiter: {
-                      type: 'string',
-                      description: 'CSV delimiter character (default: ",")',
-                    },
-                  },
-                },
-              },
-              required: ['budget_id', 'account_id'],
-            },
-          },
-          {
-            name: 'reconcile_account',
-            description:
-              'Perform comprehensive account reconciliation with bank statement data, including automatic transaction creation and status updates',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to reconcile',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'The ID of the account to reconcile',
-                },
-                csv_file_path: {
-                  type: 'string',
-                  description: 'Optional: Path to CSV file containing bank transactions',
-                },
-                csv_data: {
-                  type: 'string',
-                  description: 'Optional: CSV data as string (alternative to csv_file_path)',
-                },
-                auto_create_transactions: {
-                  type: 'boolean',
-                  description:
-                    'Optional: Automatically create missing transactions in YNAB (default: false)',
-                },
-                auto_update_cleared_status: {
-                  type: 'boolean',
-                  description:
-                    'Optional: Automatically mark matched transactions as cleared (default: false)',
-                },
-                dry_run: {
-                  type: 'boolean',
-                  description: 'Optional: Preview changes without making them (default: true)',
-                },
-                amount_tolerance: {
-                  type: 'number',
-                  minimum: 0,
-                  maximum: 1,
-                  description:
-                    'Optional: Amount difference tolerance as decimal (0.01 = 1%, default: 0.01)',
-                },
-                date_tolerance_days: {
-                  type: 'number',
-                  minimum: 0,
-                  maximum: 7,
-                  description: 'Optional: Date difference tolerance in days (default: 5)',
-                },
-                csv_format: {
-                  type: 'object',
-                  description: 'Optional: CSV format configuration (same as compare_transactions)',
-                  properties: {
-                    date_column: {
-                      type: 'string',
-                      description: 'Column name or index for transaction date (default: "Date")',
-                    },
-                    amount_column: {
-                      type: 'string',
-                      description:
-                        'Column name or index for transaction amount (default: "Amount")',
-                    },
-                    description_column: {
-                      type: 'string',
-                      description:
-                        'Column name or index for transaction description (default: "Description")',
-                    },
-                    date_format: {
-                      type: 'string',
-                      description: 'Date format pattern (default: "MM/DD/YYYY")',
-                    },
-                    has_header: {
-                      type: 'boolean',
-                      description: 'Whether CSV has header row (default: true)',
-                    },
-                    delimiter: {
-                      type: 'string',
-                      description: 'CSV delimiter character (default: ",")',
-                    },
-                  },
-                },
-              },
-              required: ['budget_id', 'account_id'],
-            },
-          },
-          {
-            name: 'get_transaction',
-            description: 'Get detailed information for a specific transaction',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the transaction',
-                },
-                transaction_id: {
-                  type: 'string',
-                  description: 'The ID of the transaction to retrieve',
-                },
-              },
-              required: ['budget_id', 'transaction_id'],
-            },
-          },
-          {
-            name: 'create_transaction',
-            description: 'Create a new transaction in the specified budget and account',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to create the transaction in',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'The ID of the account for the transaction',
-                },
-                amount: {
-                  type: 'integer',
-                  description: 'The transaction amount in milliunits (negative for outflows)',
-                },
-                date: {
-                  type: 'string',
-                  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-                  description: 'The transaction date in ISO format (YYYY-MM-DD)',
-                },
-                payee_name: {
-                  type: 'string',
-                  description: 'Optional: The payee name',
-                },
-                payee_id: {
-                  type: 'string',
-                  description: 'Optional: The payee ID',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'Optional: The category ID',
-                },
-                memo: {
-                  type: 'string',
-                  description: 'Optional: Transaction memo',
-                },
-                cleared: {
-                  type: 'string',
-                  enum: ['cleared', 'uncleared', 'reconciled'],
-                  description: 'Optional: Transaction cleared status',
-                },
-                approved: {
-                  type: 'boolean',
-                  description: 'Optional: Whether the transaction is approved',
-                },
-                flag_color: {
-                  type: 'string',
-                  enum: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
-                  description: 'Optional: Transaction flag color',
-                },
-                dry_run: {
-                  type: 'boolean',
-                  description: 'If true, simulate the create without calling YNAB',
-                },
-              },
-              required: ['budget_id', 'account_id', 'amount', 'date'],
-            },
-          },
-          {
-            name: 'update_transaction',
-            description: 'Update an existing transaction',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the transaction',
-                },
-                transaction_id: {
-                  type: 'string',
-                  description: 'The ID of the transaction to update',
-                },
-                account_id: {
-                  type: 'string',
-                  description: 'Optional: Update the account ID',
-                },
-                amount: {
-                  type: 'integer',
-                  description: 'Optional: Update the amount in milliunits',
-                },
-                date: {
-                  type: 'string',
-                  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-                  description: 'Optional: Update the date (ISO format: YYYY-MM-DD)',
-                },
-                payee_name: {
-                  type: 'string',
-                  description: 'Optional: Update the payee name',
-                },
-                payee_id: {
-                  type: 'string',
-                  description: 'Optional: Update the payee ID',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'Optional: Update the category ID',
-                },
-                memo: {
-                  type: 'string',
-                  description: 'Optional: Update the memo',
-                },
-                cleared: {
-                  type: 'string',
-                  enum: ['cleared', 'uncleared', 'reconciled'],
-                  description: 'Optional: Update the cleared status',
-                },
-                approved: {
-                  type: 'boolean',
-                  description: 'Optional: Update the approved status',
-                },
-                flag_color: {
-                  type: 'string',
-                  enum: ['red', 'orange', 'yellow', 'green', 'blue', 'purple'],
-                  description: 'Optional: Update the flag color',
-                },
-                dry_run: {
-                  type: 'boolean',
-                  description: 'If true, simulate the update without calling YNAB',
-                },
-              },
-              required: ['budget_id', 'transaction_id'],
-            },
-          },
-          {
-            name: 'delete_transaction',
-            description: 'Delete a transaction from the specified budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the transaction',
-                },
-                transaction_id: {
-                  type: 'string',
-                  description: 'The ID of the transaction to delete',
-                },
-                dry_run: {
-                  type: 'boolean',
-                  description: 'If true, simulate the deletion without calling YNAB',
-                },
-              },
-              required: ['budget_id', 'transaction_id'],
-            },
-          },
-          {
-            name: 'list_categories',
-            description: 'List all categories for a specific budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to list categories for',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'get_category',
-            description: 'Get detailed information for a specific category',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the category',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'The ID of the category to retrieve',
-                },
-              },
-              required: ['budget_id', 'category_id'],
-            },
-          },
-          {
-            name: 'update_category',
-            description: 'Update the budgeted amount for a category in the current month',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the category',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'The ID of the category to update',
-                },
-                budgeted: {
-                  type: 'integer',
-                  description: 'The budgeted amount in milliunits (1/1000th of currency unit)',
-                },
-                dry_run: {
-                  type: 'boolean',
-                  description: 'If true, simulate the update without calling YNAB',
-                },
-              },
-              required: ['budget_id', 'category_id', 'budgeted'],
-            },
-          },
-          {
-            name: 'list_payees',
-            description: 'List all payees for a specific budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to list payees for',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'get_payee',
-            description: 'Get detailed information for a specific payee',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget containing the payee',
-                },
-                payee_id: {
-                  type: 'string',
-                  description: 'The ID of the payee to retrieve',
-                },
-              },
-              required: ['budget_id', 'payee_id'],
-            },
-          },
-          {
-            name: 'get_month',
-            description: 'Get budget data for a specific month',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to get month data for',
-                },
-                month: {
-                  type: 'string',
-                  pattern: '^\\d{4}-\\d{2}-\\d{2}$',
-                  description: 'The month to retrieve in ISO format (YYYY-MM-DD)',
-                },
-              },
-              required: ['budget_id', 'month'],
-            },
-          },
-          {
-            name: 'list_months',
-            description: 'List all months summary data for a budget',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'The ID of the budget to list months for',
-                },
-              },
-              required: ['budget_id'],
-            },
-          },
-          {
-            name: 'get_user',
-            description: 'Get information about the authenticated user',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-          {
-            name: 'convert_amount',
-            description:
-              'Convert between dollars and milliunits with integer arithmetic for precision',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                amount: {
-                  type: 'number',
-                  description: 'The amount to convert',
-                },
-                to_milliunits: {
-                  type: 'boolean',
-                  description:
-                    'If true, convert from dollars to milliunits. If false, convert from milliunits to dollars',
-                },
-              },
-              required: ['amount', 'to_milliunits'],
-            },
-          },
-          {
-            name: 'financial_overview',
-            description: 'Get comprehensive financial overview with insights, trends, and analysis',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'Budget ID (optional, uses default budget if not specified)',
-                },
-                months: {
-                  type: 'number',
-                  minimum: 1,
-                  maximum: 12,
-                  default: 3,
-                  description: 'Number of months to analyze (1-12, default: 3)',
-                },
-                include_trends: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include spending trends analysis',
-                },
-                include_insights: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include AI-generated financial insights',
-                },
-              },
-              required: [],
-            },
-          },
-          {
-            name: 'spending_analysis',
-            description: 'Detailed spending analysis with category breakdowns and trends',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'Budget ID (optional)',
-                },
-                period_months: {
-                  type: 'number',
-                  minimum: 1,
-                  maximum: 12,
-                  default: 6,
-                  description: 'Analysis period in months (1-12, default: 6)',
-                },
-                category_id: {
-                  type: 'string',
-                  description: 'Optional: Focus on specific category',
-                },
-              },
-              required: [],
-            },
-          },
-          {
-            name: 'budget_health_check',
-            description: 'Comprehensive budget health assessment with recommendations',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                budget_id: {
-                  type: 'string',
-                  description: 'Budget ID (optional)',
-                },
-                include_recommendations: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include actionable recommendations',
-                },
-              },
-              required: [],
-            },
-          },
-          {
-            name: 'diagnostic_info',
-            description: 'Get comprehensive diagnostic information about the MCP server',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                include_memory: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include memory usage statistics',
-                },
-                include_environment: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include environment and token status',
-                },
-                include_server: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include server version and runtime info',
-                },
-                include_security: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include security and rate limiting stats',
-                },
-                include_cache: {
-                  type: 'boolean',
-                  default: true,
-                  description: 'Include cache statistics',
-                },
-              },
-              required: [],
-            },
-          },
-          {
-            name: 'clear_cache',
-            description: 'Clear the in-memory cache (safe, no YNAB data is modified)',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {},
-              required: [],
-            },
-          },
-        ],
+        tools: this.toolRegistry.listTools(),
       };
     });
 
     // Handle tool call requests
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const { name, arguments: args } = request.params;
+      const rawArgs = (request.params.arguments ?? undefined) as Record<string, unknown> | undefined;
+      const minifyOverride = this.extractMinifyOverride(rawArgs);
 
-      const perCallMinify = ((): boolean | undefined => {
-        if (!args || typeof args !== 'object') return undefined;
-        const anyArgs = args as Record<string, unknown>;
-        for (const key of ['minify', '_minify', '__minify']) {
-          if (key in anyArgs && typeof anyArgs[key] === 'boolean') {
-            return anyArgs[key] as boolean;
-          }
-        }
-        return undefined;
-      })();
+      const sanitizedArgs = rawArgs
+        ? (() => {
+            const clone: Record<string, unknown> = { ...rawArgs };
+            delete clone['minify'];
+            delete clone['_minify'];
+            delete clone['__minify'];
+            return clone;
+          })()
+        : undefined;
 
-      return await responseFormatter.runWithMinifyOverride(perCallMinify, async () => {
-        switch (name) {
-          case 'list_budgets': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'list_budgets',
-              z.object({}),
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async () => handleListBudgets(this.ynabAPI));
-          }
-
-          case 'get_budget': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_budget',
-              GetBudgetSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleGetBudget(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleGetBudget>[1],
-              ),
-            );
-          }
-
-          case 'set_default_budget': {
-            const SetDefaultBudgetSchema = z.object({ budget_id: z.string().min(1) });
-            const exec = withSecurityWrapper(
-              'ynab',
-              'set_default_budget',
-              SetDefaultBudgetSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) => {
-              const { budget_id } = validated as { budget_id: string };
-              await this.ynabAPI.budgets.getBudgetById(budget_id);
-              this.setDefaultBudget(budget_id);
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: responseFormatter.format({
-                      success: true,
-                      message: `Default budget set to: ${budget_id}`,
-                      default_budget_id: budget_id,
-                    }),
-                  },
-                ],
-              };
-            });
-          }
-
-          case 'get_default_budget':
-            try {
-              const defaultBudget = this.getDefaultBudget();
-
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: responseFormatter.format({
-                      default_budget_id: defaultBudget || null,
-                      has_default: !!defaultBudget,
-                      message: defaultBudget
-                        ? `Default budget is set to: ${defaultBudget}`
-                        : 'No default budget is currently set',
-                    }),
-                  },
-                ],
-              };
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Error getting default budget',
-                error instanceof Error ? error.message : 'Unknown error',
-              );
-            }
-
-          case 'list_accounts': {
-            const raw = (args || {}) as Record<string, unknown>;
-            const resolved = {
-              ...raw,
-              budget_id: this.getBudgetId(raw?.['budget_id'] as string | undefined),
-            };
-            const exec = withSecurityWrapper(
-              'ynab',
-              'list_accounts',
-              ListAccountsSchema,
-            )(this.config.accessToken)(resolved);
-            return exec(async (validated) =>
-              handleListAccounts(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleListAccounts>[1],
-              ),
-            );
-          }
-
-          case 'get_account': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_account',
-              GetAccountSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleGetAccount(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleGetAccount>[1],
-              ),
-            );
-          }
-
-          case 'create_account': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'create_account',
-              CreateAccountSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleCreateAccount(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleCreateAccount>[1],
-              ),
-            );
-          }
-
-          case 'list_transactions': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'list_transactions',
-              ListTransactionsSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleListTransactions(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleListTransactions>[1],
-              ),
-            );
-          }
-
-          case 'export_transactions': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'export_transactions',
-              ExportTransactionsSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleExportTransactions(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleExportTransactions>[1],
-              ),
-            );
-          }
-
-          case 'compare_transactions': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'compare_transactions',
-              CompareTransactionsSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleCompareTransactions(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleCompareTransactions>[1],
-              ),
-            );
-          }
-
-          case 'reconcile_account': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'reconcile_account',
-              ReconcileAccountSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleReconcileAccount(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleReconcileAccount>[1],
-              ),
-            );
-          }
-
-          case 'get_transaction': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_transaction',
-              GetTransactionSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleGetTransaction(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleGetTransaction>[1],
-              ),
-            );
-          }
-
-          case 'create_transaction': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'create_transaction',
-              CreateTransactionSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleCreateTransaction(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleCreateTransaction>[1],
-              ),
-            );
-          }
-
-          case 'update_transaction': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'update_transaction',
-              UpdateTransactionSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleUpdateTransaction(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleUpdateTransaction>[1],
-              ),
-            );
-          }
-
-          case 'delete_transaction': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'delete_transaction',
-              DeleteTransactionSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleDeleteTransaction(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleDeleteTransaction>[1],
-              ),
-            );
-          }
-
-          case 'list_categories': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'list_categories',
-              ListCategoriesSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleListCategories(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleListCategories>[1],
-              ),
-            );
-          }
-
-          case 'get_category': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_category',
-              GetCategorySchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleGetCategory(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleGetCategory>[1],
-              ),
-            );
-          }
-
-          case 'update_category': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'update_category',
-              UpdateCategorySchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleUpdateCategory(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleUpdateCategory>[1],
-              ),
-            );
-          }
-
-          case 'list_payees': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'list_payees',
-              ListPayeesSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleListPayees(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleListPayees>[1],
-              ),
-            );
-          }
-
-          case 'get_payee': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_payee',
-              GetPayeeSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleGetPayee(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleGetPayee>[1],
-              ),
-            );
-          }
-
-          case 'get_month': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_month',
-              GetMonthSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleGetMonth(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleGetMonth>[1],
-              ),
-            );
-          }
-
-          case 'list_months': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'list_months',
-              ListMonthsSchema,
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async (validated) =>
-              handleListMonths(
-                this.ynabAPI,
-                validated as unknown as Parameters<typeof handleListMonths>[1],
-              ),
-            );
-          }
-
-          case 'get_user': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'get_user',
-              z.object({}),
-            )(this.config.accessToken)(args as Record<string, unknown>);
-            return exec(async () => handleGetUser(this.ynabAPI));
-          }
-
-          case 'convert_amount':
-            try {
-              const params = ConvertAmountSchema.parse(args);
-              return await handleConvertAmount(params);
-            } catch (error) {
-              return ErrorHandler.createValidationError(
-                'Invalid parameters for ynab:convert_amount',
-                error instanceof Error ? error.message : 'Unknown validation error',
-              );
-            }
-
-          case 'financial_overview': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'financial_overview',
-              FinancialOverviewSchema,
-            )(this.config.accessToken)((args || {}) as Record<string, unknown>);
-            return exec(async (validated) => {
-              const params = validated as unknown as Parameters<typeof handleFinancialOverview>[1];
-              const budgetId = this.getBudgetId(params.budget_id);
-              return handleFinancialOverview(this.ynabAPI, { ...params, budget_id: budgetId });
-            });
-          }
-
-          case 'spending_analysis': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'spending_analysis',
-              SpendingAnalysisSchema,
-            )(this.config.accessToken)((args || {}) as Record<string, unknown>);
-            return exec(async (validated) => {
-              const params = validated as unknown as Parameters<typeof handleSpendingAnalysis>[1];
-              const budgetId = this.getBudgetId(params.budget_id);
-              return handleSpendingAnalysis(this.ynabAPI, { ...params, budget_id: budgetId });
-            });
-          }
-
-          case 'budget_health_check': {
-            const exec = withSecurityWrapper(
-              'ynab',
-              'budget_health_check',
-              BudgetHealthSchema,
-            )(this.config.accessToken)((args || {}) as Record<string, unknown>);
-            return exec(async (validated) => {
-              const params = validated as unknown as Parameters<typeof handleBudgetHealthCheck>[1];
-              const budgetId = this.getBudgetId(params.budget_id);
-              return handleBudgetHealthCheck(this.ynabAPI, { ...params, budget_id: budgetId });
-            });
-          }
-
-          case 'diagnostic_info': {
-            const args = (request.params.arguments || {}) as {
-              include_memory?: boolean;
-              include_environment?: boolean;
-              include_server?: boolean;
-              include_security?: boolean;
-              include_cache?: boolean;
-            };
-
-            // Default all to true if not specified
-            const includeMemory = args.include_memory !== false;
-            const includeEnvironment = args.include_environment !== false;
-            const includeServer = args.include_server !== false;
-            const includeSecurity = args.include_security !== false;
-            const includeCache = args.include_cache !== false;
-
-            const diagnostics: Record<string, unknown> = {
-              timestamp: new Date().toISOString(),
-            };
-
-            if (includeServer) {
-              const uptimeMs = Math.round(process.uptime() * 1000);
-              diagnostics['server'] = {
-                name: 'ynab-mcp-server',
-                version: this.serverVersion,
-                node_version: process.version,
-                platform: process.platform,
-                arch: process.arch,
-                pid: process.pid,
-                uptime_ms: uptimeMs,
-                uptime_readable: this.formatUptime(uptimeMs),
-                env: {
-                  node_env: process.env['NODE_ENV'] || 'development',
-                  minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
-                },
-              };
-            }
-
-            if (includeMemory) {
-              const memUsage = process.memoryUsage();
-              const formatBytes = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
-
-              diagnostics['memory'] = {
-                rss_mb: formatBytes(memUsage.rss),
-                heap_used_mb: formatBytes(memUsage.heapUsed),
-                heap_total_mb: formatBytes(memUsage.heapTotal),
-                external_mb: formatBytes(memUsage.external),
-                array_buffers_mb: formatBytes(memUsage.arrayBuffers || 0),
-                description: {
-                  rss: 'Resident Set Size - total memory allocated for the process',
-                  heap_used: 'Used heap memory (objects, closures, etc.)',
-                  heap_total: 'Total heap memory allocated',
-                  external: 'Memory used by C++ objects bound to JavaScript objects',
-                  array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
-                },
-              };
-            }
-
-            if (includeEnvironment) {
-              const token = process.env['YNAB_ACCESS_TOKEN'];
-              const masked =
-                token && token.length >= 8
-                  ? `${token.slice(0, 4)}...${token.slice(-4)}`
-                  : token
-                    ? `${token[0]}***`
-                    : null;
-
-              const envKeys = Object.keys(process.env || {});
-              const ynabEnvKeys = envKeys.filter((k) => k.toUpperCase().includes('YNAB'));
-
-              diagnostics['environment'] = {
-                token_present: !!token,
-                token_length: token ? token.length : 0,
-                token_preview: masked,
-                ynab_env_keys_present: ynabEnvKeys,
-                working_directory: process.cwd(),
-              };
-            }
-
-            if (includeSecurity) {
-              diagnostics['security'] = SecurityMiddleware.getSecurityStats();
-            }
-
-            if (includeCache) {
-              const cacheStats = cacheManager.getStats();
-              const estimateCacheSize = () => {
-                try {
-                  const serialized = JSON.stringify(Array.from(cacheManager['cache'].entries()));
-                  return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
-                } catch {
-                  return 0;
-                }
-              };
-
-              diagnostics['cache'] = {
-                entries: cacheStats.size,
-                estimated_size_kb: estimateCacheSize(),
-                keys: cacheStats.keys,
-              };
-            }
-
-            return {
-              content: [{ type: 'text', text: responseFormatter.format(diagnostics) }],
-            };
-          }
-
-          case 'clear_cache': {
-            cacheManager.clear();
-            return {
-              content: [{ type: 'text', text: responseFormatter.format({ success: true }) }],
-            };
-          }
-
-          case 'set_output_format': {
-            const raw = (args || {}) as { default_minify?: boolean; pretty_spaces?: number };
-            const options: { defaultMinify?: boolean; prettySpaces?: number } = {};
-            if (typeof raw.default_minify === 'boolean') options.defaultMinify = raw.default_minify;
-            if (typeof raw.pretty_spaces === 'number' && Number.isFinite(raw.pretty_spaces)) {
-              options.prettySpaces = Math.max(0, Math.min(10, Math.floor(raw.pretty_spaces)));
-            }
-            responseFormatter.configure(options);
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: responseFormatter.format({ success: true, options }),
-                },
-              ],
-            };
-          }
-
-          default:
-            throw new Error(`Unknown tool: ${name}`);
-        }
+      return await this.toolRegistry.executeTool({
+        name: request.params.name,
+        accessToken: this.config.accessToken,
+        arguments: sanitizedArgs,
+        minifyOverride,
       });
     });
+  }
+
+
+
+  /**
+   * Registers all tools with the registry to centralize handler execution
+   */
+  private setupToolRegistry(): void {
+    const register = <TInput extends Record<string, unknown>>(definition: ToolDefinition<TInput>): void => {
+      this.toolRegistry.register(definition);
+    };
+
+    const adapt =
+      <TInput extends Record<string, unknown>>(
+        handler: (ynabAPI: ynab.API, params: TInput) => Promise<CallToolResult>,
+      ) =>
+      async ({ input }: ToolExecutionPayload<TInput>): Promise<CallToolResult> =>
+        handler(this.ynabAPI, input);
+
+    const adaptNoInput = (
+      handler: (ynabAPI: ynab.API) => Promise<CallToolResult>,
+    ) =>
+      async (_payload: ToolExecutionPayload<Record<string, unknown>>): Promise<CallToolResult> =>
+        handler(this.ynabAPI);
+
+    const resolveBudgetId = <TInput extends { budget_id?: string }>(): DefaultArgumentResolver<TInput> => {
+      return ({ rawArguments }) => {
+        const provided =
+          typeof rawArguments['budget_id'] === 'string' && rawArguments['budget_id'].length > 0
+            ? (rawArguments['budget_id'] as string)
+            : undefined;
+        return { budget_id: this.getBudgetId(provided) } as Partial<TInput>;
+      };
+    };
+
+    const emptyObjectSchema = z.object({}).strict();
+    const setDefaultBudgetSchema = z.object({ budget_id: z.string().min(1) }).strict();
+    const diagnosticInfoSchema = z
+      .object({
+        include_memory: z.boolean().default(true),
+        include_environment: z.boolean().default(true),
+        include_server: z.boolean().default(true),
+        include_security: z.boolean().default(true),
+        include_cache: z.boolean().default(true),
+      })
+      .strict();
+    const setOutputFormatSchema = z
+      .object({
+        default_minify: z.boolean().optional(),
+        pretty_spaces: z.number().int().min(0).max(10).optional(),
+      })
+      .strict();
+
+    register({
+      name: 'list_budgets',
+      description: "List all budgets associated with the user's account",
+      inputSchema: emptyObjectSchema,
+      handler: adaptNoInput(handleListBudgets),
+    });
+
+    register({
+      name: 'get_budget',
+      description: 'Get detailed information for a specific budget',
+      inputSchema: GetBudgetSchema,
+      handler: adapt(handleGetBudget),
+    });
+
+    register({
+      name: 'set_default_budget',
+      description: 'Set the default budget for subsequent operations',
+      inputSchema: setDefaultBudgetSchema,
+      handler: async ({ input }) => {
+        const { budget_id } = input;
+        await this.ynabAPI.budgets.getBudgetById(budget_id);
+        this.setDefaultBudget(budget_id);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                success: true,
+                message: `Default budget set to: ${budget_id}`,
+                default_budget_id: budget_id,
+              }),
+            },
+          ],
+        };
+      },
+    });
+
+    register({
+      name: 'get_default_budget',
+      description: 'Get the currently set default budget',
+      inputSchema: emptyObjectSchema,
+      handler: async () => {
+        try {
+          const defaultBudget = this.getDefaultBudget();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: responseFormatter.format({
+                  default_budget_id: defaultBudget ?? null,
+                  has_default: !!defaultBudget,
+                  message: defaultBudget
+                    ? `Default budget is set to: ${defaultBudget}`
+                    : 'No default budget is currently set',
+                }),
+              },
+            ],
+          };
+        } catch (error) {
+          return ErrorHandler.createValidationError(
+            'Error getting default budget',
+            error instanceof Error ? error.message : 'Unknown error',
+          );
+        }
+      },
+    });
+
+    register({
+      name: 'list_accounts',
+      description: 'List all accounts for a specific budget (uses default budget if not specified)',
+      inputSchema: ListAccountsSchema,
+      handler: adapt(handleListAccounts),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ListAccountsSchema>>(),
+    });
+
+    register({
+      name: 'get_account',
+      description: 'Get detailed information for a specific account',
+      inputSchema: GetAccountSchema,
+      handler: adapt(handleGetAccount),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof GetAccountSchema>>(),
+    });
+
+    register({
+      name: 'create_account',
+      description: 'Create a new account in the specified budget',
+      inputSchema: CreateAccountSchema,
+      handler: adapt(handleCreateAccount),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof CreateAccountSchema>>(),
+    });
+
+    register({
+      name: 'list_transactions',
+      description: 'List transactions for a budget with optional filtering',
+      inputSchema: ListTransactionsSchema,
+      handler: adapt(handleListTransactions),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ListTransactionsSchema>>(),
+    });
+
+    register({
+      name: 'export_transactions',
+      description: 'Export all transactions to a JSON file with descriptive filename',
+      inputSchema: ExportTransactionsSchema,
+      handler: adapt(handleExportTransactions),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ExportTransactionsSchema>>(),
+    });
+
+    register({
+      name: 'compare_transactions',
+      description: 'Compare bank transactions from CSV with YNAB transactions to find missing entries',
+      inputSchema: CompareTransactionsSchema,
+      handler: adapt(handleCompareTransactions),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof CompareTransactionsSchema>>(),
+    });
+
+    register({
+      name: 'reconcile_account',
+      description:
+        'Perform comprehensive account reconciliation with bank statement data, including automatic transaction creation and status updates',
+      inputSchema: ReconcileAccountSchema,
+      handler: adapt(handleReconcileAccount),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ReconcileAccountSchema>>(),
+    });
+
+    register({
+      name: 'get_transaction',
+      description: 'Get detailed information for a specific transaction',
+      inputSchema: GetTransactionSchema,
+      handler: adapt(handleGetTransaction),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof GetTransactionSchema>>(),
+    });
+
+    register({
+      name: 'create_transaction',
+      description: 'Create a new transaction in the specified budget and account',
+      inputSchema: CreateTransactionSchema,
+      handler: adapt(handleCreateTransaction),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof CreateTransactionSchema>>(),
+    });
+
+    register({
+      name: 'update_transaction',
+      description: 'Update an existing transaction',
+      inputSchema: UpdateTransactionSchema,
+      handler: adapt(handleUpdateTransaction),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof UpdateTransactionSchema>>(),
+    });
+
+    register({
+      name: 'delete_transaction',
+      description: 'Delete a transaction from the specified budget',
+      inputSchema: DeleteTransactionSchema,
+      handler: adapt(handleDeleteTransaction),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof DeleteTransactionSchema>>(),
+    });
+
+    register({
+      name: 'list_categories',
+      description: 'List all categories for a specific budget',
+      inputSchema: ListCategoriesSchema,
+      handler: adapt(handleListCategories),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ListCategoriesSchema>>(),
+    });
+
+    register({
+      name: 'get_category',
+      description: 'Get detailed information for a specific category',
+      inputSchema: GetCategorySchema,
+      handler: adapt(handleGetCategory),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof GetCategorySchema>>(),
+    });
+
+    register({
+      name: 'update_category',
+      description: 'Update the budgeted amount for a category in the current month',
+      inputSchema: UpdateCategorySchema,
+      handler: adapt(handleUpdateCategory),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof UpdateCategorySchema>>(),
+    });
+
+    register({
+      name: 'list_payees',
+      description: 'List all payees for a specific budget',
+      inputSchema: ListPayeesSchema,
+      handler: adapt(handleListPayees),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ListPayeesSchema>>(),
+    });
+
+    register({
+      name: 'get_payee',
+      description: 'Get detailed information for a specific payee',
+      inputSchema: GetPayeeSchema,
+      handler: adapt(handleGetPayee),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof GetPayeeSchema>>(),
+    });
+
+    register({
+      name: 'get_month',
+      description: 'Get budget data for a specific month',
+      inputSchema: GetMonthSchema,
+      handler: adapt(handleGetMonth),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof GetMonthSchema>>(),
+    });
+
+    register({
+      name: 'list_months',
+      description: 'List all months summary data for a budget',
+      inputSchema: ListMonthsSchema,
+      handler: adapt(handleListMonths),
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof ListMonthsSchema>>(),
+    });
+
+    register({
+      name: 'get_user',
+      description: 'Get information about the authenticated user',
+      inputSchema: emptyObjectSchema,
+      handler: adaptNoInput(handleGetUser),
+    });
+
+    register({
+      name: 'convert_amount',
+      description: 'Convert between dollars and milliunits with integer arithmetic for precision',
+      inputSchema: ConvertAmountSchema,
+      handler: async ({ input }) => handleConvertAmount(input),
+    });
+
+    register({
+      name: 'financial_overview',
+      description: 'Get comprehensive financial overview with insights, trends, and analysis',
+      inputSchema: FinancialOverviewSchema,
+      handler: async ({ input }) => {
+        const budgetId = this.getBudgetId(input.budget_id);
+        return handleFinancialOverview(this.ynabAPI, { ...input, budget_id: budgetId });
+      },
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof FinancialOverviewSchema>>(),
+    });
+
+    register({
+      name: 'spending_analysis',
+      description: 'Detailed spending analysis with category breakdowns and trends',
+      inputSchema: SpendingAnalysisSchema,
+      handler: async ({ input }) => {
+        const budgetId = this.getBudgetId(input.budget_id);
+        return handleSpendingAnalysis(this.ynabAPI, { ...input, budget_id: budgetId });
+      },
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof SpendingAnalysisSchema>>(),
+    });
+
+    register({
+      name: 'budget_health_check',
+      description: 'Comprehensive budget health assessment with recommendations',
+      inputSchema: BudgetHealthSchema,
+      handler: async ({ input }) => {
+        const budgetId = this.getBudgetId(input.budget_id);
+        return handleBudgetHealthCheck(this.ynabAPI, { ...input, budget_id: budgetId });
+      },
+      defaultArgumentResolver: resolveBudgetId<z.infer<typeof BudgetHealthSchema>>(),
+    });
+
+    register({
+      name: 'diagnostic_info',
+      description: 'Get comprehensive diagnostic information about the MCP server',
+      inputSchema: diagnosticInfoSchema,
+      handler: async ({ input }) => {
+        const diagnostics: Record<string, unknown> = {
+          timestamp: new Date().toISOString(),
+        };
+
+        if (input.include_server) {
+          const uptimeMs = Math.round(process.uptime() * 1000);
+          diagnostics['server'] = {
+            name: 'ynab-mcp-server',
+            version: this.serverVersion,
+            node_version: process.version,
+            platform: process.platform,
+            arch: process.arch,
+            pid: process.pid,
+            uptime_ms: uptimeMs,
+            uptime_readable: this.formatUptime(uptimeMs),
+            env: {
+              node_env: process.env['NODE_ENV'] || 'development',
+              minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
+            },
+          };
+        }
+
+        if (input.include_memory) {
+          const memUsage = process.memoryUsage();
+          const formatBytes = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
+          diagnostics['memory'] = {
+            rss_mb: formatBytes(memUsage.rss),
+            heap_used_mb: formatBytes(memUsage.heapUsed),
+            heap_total_mb: formatBytes(memUsage.heapTotal),
+            external_mb: formatBytes(memUsage.external),
+            array_buffers_mb: formatBytes(memUsage.arrayBuffers ?? 0),
+            description: {
+              rss: 'Resident Set Size - total memory allocated for the process',
+              heap_used: 'Used heap memory (objects, closures, etc.)',
+              heap_total: 'Total heap memory allocated',
+              external: 'Memory used by C++ objects bound to JavaScript objects',
+              array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
+            },
+          };
+        }
+
+        if (input.include_environment) {
+          const token = process.env['YNAB_ACCESS_TOKEN'];
+          const masked =
+            token && token.length >= 8
+              ? `${token.slice(0, 4)}...${token.slice(-4)}`
+              : token
+                ? `${token.slice(0, 1)}***`
+                : null;
+          const envKeys = Object.keys(process.env ?? {});
+          const ynabEnvKeys = envKeys.filter((key) => key.toUpperCase().includes('YNAB'));
+          diagnostics['environment'] = {
+            token_present: !!token,
+            token_length: token ? token.length : 0,
+            token_preview: masked,
+            ynab_env_keys_present: ynabEnvKeys,
+            working_directory: process.cwd(),
+          };
+        }
+
+        if (input.include_security) {
+          diagnostics['security'] = SecurityMiddleware.getSecurityStats();
+        }
+
+        if (input.include_cache) {
+          const cacheStats = cacheManager.getStats();
+          const estimateCacheSize = () => {
+            try {
+              const serialized = JSON.stringify(Array.from(cacheManager['cache'].entries()));
+              return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
+            } catch {
+              return 0;
+            }
+          };
+
+          diagnostics['cache'] = {
+            entries: cacheStats.size,
+            estimated_size_kb: estimateCacheSize(),
+            keys: cacheStats.keys,
+          };
+        }
+
+        return {
+          content: [{ type: 'text', text: responseFormatter.format(diagnostics) }],
+        };
+      },
+    });
+
+    register({
+      name: 'clear_cache',
+      description: 'Clear the in-memory cache (safe, no YNAB data is modified)',
+      inputSchema: emptyObjectSchema,
+      handler: async () => {
+        cacheManager.clear();
+        return {
+          content: [{ type: 'text', text: responseFormatter.format({ success: true }) }],
+        };
+      },
+    });
+
+    register({
+      name: 'set_output_format',
+      description: 'Configure default JSON output formatting (minify or pretty spaces)',
+      inputSchema: setOutputFormatSchema,
+      handler: async ({ input }) => {
+        const options: { defaultMinify?: boolean; prettySpaces?: number } = {};
+        if (typeof input.default_minify === 'boolean') {
+          options.defaultMinify = input.default_minify;
+        }
+        if (typeof input.pretty_spaces === 'number') {
+          options.prettySpaces = Math.max(0, Math.min(10, Math.floor(input.pretty_spaces)));
+        }
+        responseFormatter.configure(options);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({ success: true, options }),
+            },
+          ],
+        };
+      },
+    });
+  }
+
+  private extractMinifyOverride(args: Record<string, unknown> | undefined): boolean | undefined {
+    if (!args) {
+      return undefined;
+    }
+
+    for (const key of ['minify', '_minify', '__minify'] as const) {
+      const value = args[key];
+      if (typeof value === 'boolean') {
+        return value;
+      }
+    }
+
+    return undefined;
   }
 
   /**

@@ -10,7 +10,7 @@ import { milliunitsToAmount } from '../utils/amountUtils.js';
  */
 export const ListCategoriesSchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
-});
+}).strict();
 
 export type ListCategoriesParams = z.infer<typeof ListCategoriesSchema>;
 
@@ -20,7 +20,7 @@ export type ListCategoriesParams = z.infer<typeof ListCategoriesSchema>;
 export const GetCategorySchema = z.object({
   budget_id: z.string().min(1, 'Budget ID is required'),
   category_id: z.string().min(1, 'Category ID is required'),
-});
+}).strict();
 
 export type GetCategoryParams = z.infer<typeof GetCategorySchema>;
 
@@ -32,7 +32,7 @@ export const UpdateCategorySchema = z.object({
   category_id: z.string().min(1, 'Category ID is required'),
   budgeted: z.number().int('Budgeted amount must be an integer in milliunits'),
   dry_run: z.boolean().optional(),
-});
+}).strict();
 
 export type UpdateCategoryParams = z.infer<typeof UpdateCategorySchema>;
 
