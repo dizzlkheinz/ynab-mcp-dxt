@@ -235,7 +235,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       const account = parseToolResult(getResult);
       expect(account.account.id).toBe('account-1');
       expect(account.account.name).toBe('Checking Account');
-      expect(account.account.balance).toBe(100000);
+      expect(account.account.balance).toBe(100);
 
       // Mock account creation
       const newAccount = {
@@ -356,7 +356,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       const transaction = parseToolResult(getResult);
       expect(transaction.transaction.id).toBe('transaction-1');
       expect(transaction.transaction.memo).toBe('Coffee shop');
-      expect(transaction.transaction.amount).toBe(-5000);
+      expect(transaction.transaction.amount).toBe(-5);
 
       // Mock transaction creation
       const newTransaction = {
@@ -396,7 +396,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
 
       const createdTransaction = parseToolResult(createResult);
       expect(createdTransaction.transaction.memo).toBe('Test transaction');
-      expect(createdTransaction.transaction.amount).toBe(-2500);
+      expect(createdTransaction.transaction.amount).toBe(-2.5);
 
       // Mock transaction update
       const updatedTransaction = { ...newTransaction, memo: 'Updated memo' };
@@ -605,7 +605,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       const category = parseToolResult(getResult);
       expect(category.category.id).toBe('category-1');
       expect(category.category.name).toBe('Rent/Mortgage');
-      expect(category.category.budgeted).toBe(150000);
+      expect(category.category.budgeted).toBe(150);
 
       // Mock category update
       const updatedCategory = {
@@ -630,7 +630,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       validateToolResult(updateResult);
 
       const updated = parseToolResult(updateResult);
-      expect(updated.category.budgeted).toBe(160000);
+      expect(updated.category.budgeted).toBe(160);
 
       // Verify API calls
       expect(mockYnabAPI.categories.getCategories).toHaveBeenCalledWith(budgetId);

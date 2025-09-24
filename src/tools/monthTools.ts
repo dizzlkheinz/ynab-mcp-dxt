@@ -45,10 +45,10 @@ export async function handleGetMonth(
               month: {
                 month: month.month,
                 note: month.note,
-                income: month.income,
+                income: milliunitsToAmount(month.income),
                 budgeted: milliunitsToAmount(month.budgeted),
                 activity: milliunitsToAmount(month.activity),
-                to_be_budgeted: month.to_be_budgeted,
+                to_be_budgeted: milliunitsToAmount(month.to_be_budgeted),
                 age_of_money: month.age_of_money,
                 deleted: month.deleted,
                 categories: month.categories?.map((category) => ({
@@ -105,10 +105,10 @@ export async function handleListMonths(
               months: months.map((month) => ({
                 month: month.month,
                 note: month.note,
-                income: month.income,
+                income: milliunitsToAmount(month.income),
                 budgeted: milliunitsToAmount(month.budgeted),
                 activity: milliunitsToAmount(month.activity),
-                to_be_budgeted: month.to_be_budgeted,
+                to_be_budgeted: milliunitsToAmount(month.to_be_budgeted),
                 age_of_money: month.age_of_money,
                 deleted: month.deleted,
               })),

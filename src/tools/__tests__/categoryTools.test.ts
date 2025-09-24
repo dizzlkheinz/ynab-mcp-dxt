@@ -114,8 +114,8 @@ describe('Category Tools', () => {
         hidden: false,
         original_category_group_id: null,
         note: 'Monthly housing payment',
-        budgeted: 150000,
-        activity: -150000,
+        budgeted: 150,
+        activity: -150,
         balance: 0,
         goal_type: null,
         goal_creation_month: null,
@@ -195,9 +195,9 @@ describe('Category Tools', () => {
         hidden: false,
         original_category_group_id: null,
         note: 'Food and household items',
-        budgeted: 50000,
-        activity: -45000,
-        balance: 5000,
+        budgeted: 50,
+        activity: -45,
+        balance: 5,
         goal_type: 'TBD',
         goal_creation_month: '2024-01-01',
         goal_target: 60000,
@@ -347,7 +347,7 @@ describe('Category Tools', () => {
         });
         expect(result.budget_id).toBe('budget-1');
         expect(result.category_id).toBe('category-1');
-        expect(result.budgeted).toBe(50);
+        expect(result.budgeted).toBe(50000);
       });
 
       it('should reject non-integer budgeted amount', () => {
@@ -375,7 +375,7 @@ describe('Category Tools', () => {
           category_id: 'category-1',
           budgeted: -10000,
         });
-        expect(result.budgeted).toBe(-10);
+        expect(result.budgeted).toBe(-10000);
       });
 
       it('should accept zero budgeted amount', () => {

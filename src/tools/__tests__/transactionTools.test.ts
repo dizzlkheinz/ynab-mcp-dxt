@@ -131,7 +131,7 @@ describe('transactionTools', () => {
         undefined,
       );
       expect(result.content[0].text).toContain('transaction-123');
-      expect(result.content[0].text).toContain('-50000');
+      expect(result.content[0].text).toContain('-50');
     });
 
     it('should filter by account_id when provided', async () => {

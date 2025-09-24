@@ -1,4 +1,5 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { responseFormatter } from './responseFormatter.js';
 
 /**
  * YNAB API error codes and their corresponding HTTP status codes
@@ -491,4 +492,3 @@ export async function withToolErrorHandling<T>(
 ): Promise<T | CallToolResult> {
   return ErrorHandler.withErrorHandling(operation, `executing ${toolName} - ${operationName}`);
 }
-import { responseFormatter } from './responseFormatter.js';

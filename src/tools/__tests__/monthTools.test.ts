@@ -72,10 +72,10 @@ describe('Month Tools', () => {
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.month.month).toBe('2024-01-01');
       expect(parsedContent.month.note).toBe('January budget');
-      expect(parsedContent.month.income).toBe(500000);
-      expect(parsedContent.month.budgeted).toBe(450000);
-      expect(parsedContent.month.activity).toBe(-400000);
-      expect(parsedContent.month.to_be_budgeted).toBe(50000);
+      expect(parsedContent.month.income).toBe(500);
+      expect(parsedContent.month.budgeted).toBe(450);
+      expect(parsedContent.month.activity).toBe(-400);
+      expect(parsedContent.month.to_be_budgeted).toBe(50);
       expect(parsedContent.month.age_of_money).toBe(30);
       expect(parsedContent.month.categories).toHaveLength(1);
       expect(parsedContent.month.categories[0].name).toBe('Rent');
@@ -203,20 +203,20 @@ describe('Month Tools', () => {
       expect(parsedContent.months[0]).toEqual({
         month: '2024-01-01',
         note: 'January budget',
-        income: 500000,
-        budgeted: 450000,
-        activity: -400000,
-        to_be_budgeted: 50000,
+        income: 500,
+        budgeted: 450,
+        activity: -400,
+        to_be_budgeted: 50,
         age_of_money: 30,
         deleted: false,
       });
       expect(parsedContent.months[1]).toEqual({
         month: '2024-02-01',
         note: 'February budget',
-        income: 520000,
-        budgeted: 470000,
-        activity: -420000,
-        to_be_budgeted: 50000,
+        income: 520,
+        budgeted: 470,
+        activity: -420,
+        to_be_budgeted: 50,
         age_of_money: 32,
         deleted: false,
       });

@@ -6,7 +6,7 @@ import { responseFormatter } from '../server/responseFormatter.js';
 import { readFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
 import { parse as parseDateFns } from 'date-fns';
-import { toMilli, Milli, inWindow } from '../utils/money.js';
+import { toMilli, Milli } from '../utils/money.js';
 
 /**
  * Schema for ynab:compare_transactions tool parameters
@@ -750,15 +750,17 @@ export async function handleCompareTransactions(
       let filteredYnabTransactions = ynabTransactions;
 
       if (parsed.statement_start_date || parsed.statement_date) {
-        const startDate = parsed.statement_start_date || undefined;
-        const endDate = parsed.statement_date || undefined;
+        const startDate = parsed.statement_start_date;
+        const endDate = parsed.statement_date;
 
-        filteredBankTransactions = bankTransactions.filter((t) =>
-          inWindow(t.date.toISOString().split('T')[0], startDate, endDate),
-        );
-        filteredYnabTransactions = ynabTransactions.filter((t) =>
-          inWindow(t.date.toISOString().split('T')[0], startDate, endDate),
-        );
+        filteredBankTransactions = bankTransactions.filter((t) => {
+          const dateStr = t.date.toISOString().split('T')[0];
+          return (!startDate || dateStr! >= startDate) && (!endDate || dateStr! <= endDate);
+        });
+        filteredYnabTransactions = ynabTransactions.filter((t) => {
+          const dateStr = t.date.toISOString().split('T')[0];
+          return (!startDate || dateStr! >= startDate) && (!endDate || dateStr! <= endDate);
+        });
       }
 
       // Find matches
