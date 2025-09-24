@@ -5,6 +5,7 @@ import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
 import { readFileSync } from 'fs';
 import { parse } from 'csv-parse/sync';
+import { parse as parseDateFns } from 'date-fns';
 
 /**
  * Schema for ynab:compare_transactions tool parameters
@@ -82,29 +83,36 @@ interface TransactionMatch {
 }
 
 /**
- * Parse date string using various common formats
+ * Parse date string using date-fns for better reliability
  */
 function parseDate(dateStr: string, format: string): Date {
   const cleanDate = dateStr.trim();
 
-  // Handle common formats
-  if ((format === 'MM/DD/YYYY' || format === 'M/D/YYYY') && cleanDate.includes('/')) {
-    const parts = cleanDate.split('/');
-    if (parts.length !== 3) throw new Error(`Invalid date format: ${dateStr}`);
-    return new Date(parseInt(parts[2]!), parseInt(parts[0]!) - 1, parseInt(parts[1]!));
-  } else if ((format === 'DD/MM/YYYY' || format === 'D/M/YYYY') && cleanDate.includes('/')) {
-    const parts = cleanDate.split('/');
-    if (parts.length !== 3) throw new Error(`Invalid date format: ${dateStr}`);
-    return new Date(parseInt(parts[2]!), parseInt(parts[1]!) - 1, parseInt(parts[0]!));
-  } else if (format === 'YYYY-MM-DD' && /^\d{4}-\d{1,2}-\d{1,2}$/.test(cleanDate)) {
-    return new Date(cleanDate);
-  } else if (format === 'MM-DD-YYYY' && cleanDate.includes('-')) {
-    const parts = cleanDate.split('-');
-    if (parts.length !== 3) throw new Error(`Invalid date format: ${dateStr}`);
-    return new Date(parseInt(parts[2]!), parseInt(parts[0]!) - 1, parseInt(parts[1]!));
+  // Map our format strings to date-fns format patterns
+  const formatMap: Record<string, string> = {
+    'MM/DD/YYYY': 'MM/dd/yyyy',
+    'M/D/YYYY': 'M/d/yyyy',
+    'DD/MM/YYYY': 'dd/MM/yyyy',
+    'D/M/YYYY': 'd/M/yyyy',
+    'YYYY-MM-DD': 'yyyy-MM-dd',
+    'MM-DD-YYYY': 'MM-dd-yyyy',
+    'MMM dd, yyyy': 'MMM dd, yyyy',
+    'MMM d, yyyy': 'MMM d, yyyy',
+  };
+
+  const dateFnsFormat = formatMap[format];
+  if (dateFnsFormat) {
+    try {
+      const parsed = parseDateFns(cleanDate, dateFnsFormat, new Date());
+      if (!isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    } catch {
+      // Fall through to generic parsing
+    }
   }
 
-  // Fallback to Date.parse
+  // Fallback to native Date parsing for any unrecognized formats
   const parsed = new Date(cleanDate);
   if (isNaN(parsed.getTime())) {
     throw new Error(`Unable to parse date: ${dateStr} with format: ${format}`);
@@ -200,6 +208,7 @@ function isDateLike(str: string): boolean {
     /^\d{1,2}\/\d{1,2}\/\d{4}$/, // MM/DD/YYYY
     /^\d{4}-\d{1,2}-\d{1,2}$/, // YYYY-MM-DD
     /^\d{1,2}-\d{1,2}-\d{4}$/, // MM-DD-YYYY
+    /^[A-Za-z]{3}\s+\d{1,2},\s+\d{4}$/, // MMM dd, yyyy (e.g., "Sep 18, 2025")
   ];
   return datePatterns.some((pattern) => pattern.test(str.trim()));
 }
@@ -219,8 +228,52 @@ function detectDateFormat(dateStr: string | undefined): string {
     } else {
       return 'MM-DD-YYYY';
     }
+  } else if (/^[A-Za-z]{3}\s+\d{1,2},\s+\d{4}$/.test(cleaned)) {
+    // Detect "Sep 18, 2025" format
+    return 'MMM dd, yyyy';
   }
   return 'MM/DD/YYYY';
+}
+
+/**
+ * Automatically fix common CSV issues like unquoted dates with commas
+ */
+function preprocessCSV(
+  csvContent: string,
+  format: NonNullable<CompareTransactionsParams['csv_format']>,
+): string {
+  // Check if we're dealing with MMM dd, yyyy format dates that might need quoting
+  if (format.date_format?.includes('MMM') && format.date_format?.includes(',')) {
+    const lines = csvContent.split('\n');
+    const fixedLines = lines.map((line, index) => {
+      // Skip header row
+      if (format.has_header && index === 0) return line;
+      if (!line.trim()) return line;
+
+      // Check if this line has unquoted dates (more commas than expected)
+      const parts = line.split(format.delimiter || ',');
+      const expectedColumns = format.has_header
+        ? lines[0]?.split(format.delimiter || ',').length || 3
+        : 3;
+
+      if (parts.length > expectedColumns) {
+        // Check if we have a date pattern split across first two parts (like "Sep 18, 2025")
+        const potentialDate = parts.slice(0, 2).join(',');
+        if (/^[A-Za-z]{3}\s+\d{1,2},\s+\d{4}/.test(potentialDate)) {
+          // This looks like "Sep 18, 2025" - quote it
+          const dateField = parts.slice(0, 2).join(','); // "Sep 18, 2025"
+          const remainingFields = parts.slice(2);
+          return `"${dateField}"${format.delimiter || ','}${remainingFields.join(format.delimiter || ',')}`;
+        }
+      }
+
+      return line;
+    });
+
+    return fixedLines.join('\n');
+  }
+
+  return csvContent;
 }
 
 /**
@@ -230,11 +283,21 @@ function parseBankCSV(
   csvContent: string,
   format: NonNullable<CompareTransactionsParams['csv_format']>,
 ): BankTransaction[] {
-  const records = parse(csvContent, {
+  // Preprocess CSV to fix common issues like unquoted dates
+  const processedCSV = preprocessCSV(csvContent, format);
+
+  const records = parse(processedCSV, {
     delimiter: format.delimiter,
     columns: format.has_header,
     skip_empty_lines: true,
     trim: true,
+    // Enhanced CSV parsing options for robust handling
+    quote: '"', // Handle quoted fields (for dates with commas)
+    escape: '"', // Handle escaped quotes within fields
+    relax_quotes: true, // Allow quotes within fields
+    relax_column_count: true, // Handle varying column counts
+    auto_parse: false, // Keep all values as strings for our custom parsing
+    auto_parse_date: false, // We handle dates with date-fns
   });
 
   const transactions: BankTransaction[] = [];

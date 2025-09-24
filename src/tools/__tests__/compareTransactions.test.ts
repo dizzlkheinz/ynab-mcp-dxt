@@ -226,5 +226,43 @@ describe('compareTransactions', () => {
       const response = JSON.parse(result.content[0].text);
       expect(response.summary.bank_transactions_count).toBe(2);
     });
+
+    it('should handle MMM dd, yyyy date format (bank statement format)', async () => {
+      const csvData =
+        'Date,Amount,Description\nSep 18, 2025,-62.82,Amazon.ca\nSep 17, 2025,-24.63,AMZN Mktp CA';
+
+      (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue({
+        data: { transactions: mockTransactions },
+      });
+
+      // Mock payees endpoint
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [{ id: 'payee-1', name: 'Amazon' }] },
+        }),
+      };
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        csv_data: csvData,
+        csv_format: {
+          date_column: 'Date',
+          amount_column: 'Amount',
+          description_column: 'Description',
+          delimiter: ',',
+          has_header: true,
+          date_format: 'MMM dd, yyyy',
+        },
+      };
+
+      const result = await handleCompareTransactions(mockYnabAPI, params);
+
+      expect(result.content).toHaveLength(1);
+      const response = JSON.parse(result.content[0].text);
+      expect(response.summary.bank_transactions_count).toBe(2);
+      // Should successfully parse the date format and process the transactions
+      expect(response.missing_in_ynab).toHaveLength(2); // No matches with mock transactions
+    });
   });
 });
