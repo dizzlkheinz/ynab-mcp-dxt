@@ -77,6 +77,13 @@ export interface DiagnosticData {
     entries: number;
     estimated_size_kb: number;
     keys: string[];
+    hits?: number;
+    misses?: number;
+    evictions?: number;
+    lastCleanup?: string | null;
+    maxEntries?: number;
+    hitRate?: string;
+    performance_summary?: string;
   };
 }
 
@@ -223,11 +230,57 @@ export class DiagnosticManager {
         }
       };
 
-      diagnostics['cache'] = {
+      // Build performance summary
+      const performanceParts = [];
+      if ('hitRate' in cacheStats) {
+        const hitRatePercent = (cacheStats.hitRate * 100).toFixed(1);
+        performanceParts.push(
+          `Hit rate: ${hitRatePercent}% (${cacheStats.hits} hits, ${cacheStats.misses} misses)`,
+        );
+      }
+      if ('evictions' in cacheStats && cacheStats.evictions > 0) {
+        performanceParts.push(`LRU evictions: ${cacheStats.evictions}`);
+      }
+      if ('lastCleanup' in cacheStats && cacheStats.lastCleanup) {
+        const lastCleanupDate = new Date(cacheStats.lastCleanup);
+        const minutesAgo = Math.round((Date.now() - lastCleanupDate.getTime()) / (60 * 1000));
+        performanceParts.push(`Last cleanup: ${minutesAgo} minutes ago`);
+      }
+
+      const cacheData: {
+        entries: number;
+        estimated_size_kb: number;
+        keys: string[];
+        hits?: number;
+        misses?: number;
+        evictions?: number;
+        lastCleanup?: string | null;
+        maxEntries?: number;
+        hitRate?: string;
+        performance_summary?: string;
+      } = {
         entries: cacheStats.size,
         estimated_size_kb: estimateCacheSize(),
         keys: cacheStats.keys,
       };
+
+      // Add enhanced metrics if available
+      if ('hits' in cacheStats) {
+        cacheData.hits = cacheStats.hits;
+        cacheData.misses = cacheStats.misses;
+        cacheData.evictions = cacheStats.evictions;
+        cacheData.lastCleanup = cacheStats.lastCleanup
+          ? new Date(cacheStats.lastCleanup).toISOString()
+          : null;
+        cacheData.maxEntries = cacheStats.maxEntries;
+        cacheData.hitRate = `${(cacheStats.hitRate * 100).toFixed(2)}%`;
+
+        if (performanceParts.length > 0) {
+          cacheData.performance_summary = performanceParts.join(', ');
+        }
+      }
+
+      diagnostics['cache'] = cacheData;
     }
 
     return {

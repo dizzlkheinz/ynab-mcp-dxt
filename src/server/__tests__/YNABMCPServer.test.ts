@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 import { YNABMCPServer } from '../YNABMCPServer.js';
-import { AuthenticationError, ConfigurationError } from '../../types/index.js';
+import { AuthenticationError, ConfigurationError, ValidationError } from '../../types/index.js';
 import { ToolRegistry } from '../toolRegistry.js';
 import { cacheManager } from '../../server/cacheManager.js';
 import { responseFormatter } from '../../server/responseFormatter.js';
@@ -313,7 +313,8 @@ describe('YNABMCPServer', () => {
 
     it('should clear cache using the clear_cache tool', async () => {
       cacheManager.set('test:key', { value: 1 }, 1000);
-      expect(cacheManager.getStats().size).toBeGreaterThan(0);
+      const statsBeforeClear = cacheManager.getStats();
+      expect(statsBeforeClear.size).toBeGreaterThan(0);
 
       await registry.executeTool({
         name: 'clear_cache',
@@ -321,7 +322,74 @@ describe('YNABMCPServer', () => {
         arguments: {},
       });
 
-      expect(cacheManager.getStats().size).toBe(0);
+      const statsAfterClear = cacheManager.getStats();
+      expect(statsAfterClear.size).toBe(0);
+      expect(statsAfterClear.hits).toBe(0);
+      expect(statsAfterClear.misses).toBe(0);
+      expect(statsAfterClear.evictions).toBe(0);
+      expect(statsAfterClear.lastCleanup).toBe(null);
+    });
+
+    it('should track cache hits and misses through tool execution', async () => {
+      const initialStats = cacheManager.getStats();
+      const initialHits = initialStats.hits;
+
+      // Execute a tool that should use caching
+      await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+
+      const statsAfterFirstCall = cacheManager.getStats();
+      expect(statsAfterFirstCall.size).toBeGreaterThan(initialStats.size);
+
+      // Execute the same tool again - should hit cache
+      await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+
+      const statsAfterSecondCall = cacheManager.getStats();
+      expect(statsAfterSecondCall.hits).toBeGreaterThan(initialHits);
+      expect(statsAfterSecondCall.hitRate).toBeGreaterThan(0);
+    });
+
+    it('should respect maxEntries configuration from environment', () => {
+      // Test that maxEntries is properly configured
+      const stats = cacheManager.getStats();
+      expect(stats.maxEntries).toEqual(expect.any(Number));
+      expect(stats.maxEntries).toBeGreaterThan(0);
+    });
+
+    it('should surface enhanced cache metrics in diagnostics', async () => {
+      // Generate some cache activity
+      cacheManager.set('test:metric1', { data: 'value1' }, 1000);
+      cacheManager.get('test:metric1'); // Hit
+      cacheManager.get('test:nonexistent'); // Miss
+
+      const result = await registry.executeTool({
+        name: 'diagnostic_info',
+        accessToken: accessToken(),
+        arguments: {
+          include_server: false,
+          include_memory: false,
+          include_environment: false,
+          include_security: false,
+          include_cache: true,
+        },
+      });
+
+      const diagnostics = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(diagnostics.cache).toBeDefined();
+      expect(diagnostics.cache.entries).toEqual(expect.any(Number));
+      expect(diagnostics.cache.hits).toEqual(expect.any(Number));
+      expect(diagnostics.cache.misses).toEqual(expect.any(Number));
+      expect(diagnostics.cache.evictions).toEqual(expect.any(Number));
+      expect(diagnostics.cache.maxEntries).toEqual(expect.any(Number));
+      expect(diagnostics.cache.hitRate).toEqual(expect.stringMatching(/^\d+\.\d{2}%$/));
+      expect(diagnostics.cache.performance_summary).toEqual(expect.any(String));
     });
 
     it('should configure output formatter via set_output_format tool', async () => {
@@ -609,6 +677,51 @@ describe('YNABMCPServer', () => {
       expect(diagnostics.environment).toBeUndefined();
       expect(diagnostics.security).toBeUndefined();
       expect(diagnostics.cache).toBeUndefined();
+    });
+  });
+
+  describe('Deprecated Methods', () => {
+    let server: YNABMCPServer;
+
+    beforeEach(() => {
+      // Create server with valid token for testing deprecated method
+      const originalToken = process.env['YNAB_ACCESS_TOKEN'];
+      if (!originalToken) {
+        throw new Error('YNAB_ACCESS_TOKEN must be defined for getBudgetId tests');
+      }
+      server = new YNABMCPServer(false);
+    });
+
+    describe('getBudgetId', () => {
+      it('should throw ValidationError when no budget ID provided and no default set', () => {
+        // Ensure no default budget is set
+        expect(server.getDefaultBudget()).toBeUndefined();
+
+        // Should throw ValidationError (not YNABAPIError)
+        expect(() => {
+          server.getBudgetId();
+        }).toThrow(ValidationError);
+
+        expect(() => {
+          server.getBudgetId();
+        }).toThrow('No budget ID provided and no default budget set');
+      });
+
+      it('should throw ValidationError for invalid budget ID format', () => {
+        expect(() => {
+          server.getBudgetId('invalid-id');
+        }).toThrow(ValidationError);
+
+        expect(() => {
+          server.getBudgetId('invalid-id');
+        }).toThrow(/Invalid budget ID format/);
+      });
+
+      it('should return valid budget ID when provided with valid UUID', () => {
+        const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+        const result = server.getBudgetId(validUuid);
+        expect(result).toBe(validUuid);
+      });
     });
   });
 });

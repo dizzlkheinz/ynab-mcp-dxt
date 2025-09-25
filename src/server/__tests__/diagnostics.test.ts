@@ -83,6 +83,12 @@ describe('diagnostics module', () => {
     mockCacheManager.getStats.mockReturnValue({
       size: 10,
       keys: ['key1', 'key2', 'key3'],
+      hits: 25,
+      misses: 5,
+      evictions: 2,
+      lastCleanup: Date.now() - 5 * 60 * 1000, // 5 minutes ago
+      maxEntries: 1000,
+      hitRate: 0.833,
     });
     mockCacheManager.getEntriesForSizeEstimation.mockReturnValue({
       key1: 'value1',
@@ -323,11 +329,18 @@ describe('diagnostics module', () => {
           expect(mockCacheManager.getEntriesForSizeEstimation).toHaveBeenCalledOnce();
           expect(mockResponseFormatter.format).toHaveBeenCalledWith(
             expect.objectContaining({
-              cache: {
+              cache: expect.objectContaining({
                 entries: 10,
                 estimated_size_kb: expect.any(Number),
                 keys: ['key1', 'key2', 'key3'],
-              },
+                hits: 25,
+                misses: 5,
+                evictions: 2,
+                lastCleanup: expect.any(String),
+                maxEntries: 1000,
+                hitRate: '83.30%',
+                performance_summary: expect.stringContaining('Hit rate: 83.3%'),
+              }),
             }),
           );
         });
@@ -346,6 +359,181 @@ describe('diagnostics module', () => {
             expect.objectContaining({
               cache: expect.objectContaining({
                 estimated_size_kb: 0,
+              }),
+            }),
+          );
+        });
+
+        it('should include enhanced cache metrics when available', async () => {
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                hits: 25,
+                misses: 5,
+                evictions: 2,
+                lastCleanup: expect.any(String),
+                maxEntries: 1000,
+                hitRate: '83.30%',
+              }),
+            }),
+          );
+        });
+
+        it('should handle missing enhanced metrics gracefully', async () => {
+          // Mock old cache manager that only returns basic stats
+          mockCacheManager.getStats.mockReturnValue({
+            size: 5,
+            keys: ['key1', 'key2'],
+          });
+
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                entries: 5,
+                keys: ['key1', 'key2'],
+                estimated_size_kb: expect.any(Number),
+              }),
+            }),
+          );
+
+          // Should not include enhanced metrics
+          expect(mockResponseFormatter.format).not.toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                hits: expect.any(Number),
+              }),
+            }),
+          );
+        });
+
+        it('should format lastCleanup timestamp correctly', async () => {
+          const testTimestamp = Date.now() - 3 * 60 * 1000; // 3 minutes ago
+          mockCacheManager.getStats.mockReturnValue({
+            size: 5,
+            keys: ['key1'],
+            hits: 10,
+            misses: 2,
+            evictions: 1,
+            lastCleanup: testTimestamp,
+            maxEntries: 1000,
+            hitRate: 0.833,
+          });
+
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                lastCleanup: new Date(testTimestamp).toISOString(),
+              }),
+            }),
+          );
+        });
+
+        it('should handle null lastCleanup timestamp', async () => {
+          mockCacheManager.getStats.mockReturnValue({
+            size: 5,
+            keys: ['key1'],
+            hits: 10,
+            misses: 2,
+            evictions: 0,
+            lastCleanup: null,
+            maxEntries: 1000,
+            hitRate: 0.833,
+          });
+
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                lastCleanup: null,
+              }),
+            }),
+          );
+        });
+
+        it('should calculate and display hit rate percentage', async () => {
+          mockCacheManager.getStats.mockReturnValue({
+            size: 3,
+            keys: ['key1'],
+            hits: 85,
+            misses: 15,
+            evictions: 0,
+            lastCleanup: null,
+            maxEntries: 1000,
+            hitRate: 0.85,
+          });
+
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                hitRate: '85.00%',
+                performance_summary: expect.stringContaining(
+                  'Hit rate: 85.0% (85 hits, 15 misses)',
+                ),
+              }),
+            }),
+          );
+        });
+
+        it('should include performance summary with evictions', async () => {
+          mockCacheManager.getStats.mockReturnValue({
+            size: 1000,
+            keys: Array.from({ length: 1000 }, (_, i) => `key${i}`),
+            hits: 75,
+            misses: 25,
+            evictions: 15,
+            lastCleanup: Date.now() - 10 * 60 * 1000, // 10 minutes ago
+            maxEntries: 1000,
+            hitRate: 0.75,
+          });
+
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                performance_summary: expect.stringMatching(
+                  /Hit rate: 75\.0%.*LRU evictions: 15.*Last cleanup: 10 minutes ago/,
+                ),
+              }),
+            }),
+          );
+        });
+
+        it('should handle zero requests for hit rate calculation', async () => {
+          mockCacheManager.getStats.mockReturnValue({
+            size: 0,
+            keys: [],
+            hits: 0,
+            misses: 0,
+            evictions: 0,
+            lastCleanup: null,
+            maxEntries: 1000,
+            hitRate: 0,
+          });
+
+          const options: DiagnosticOptions = { include_cache: true };
+          await diagnosticManager.collectDiagnostics(options);
+
+          expect(mockResponseFormatter.format).toHaveBeenCalledWith(
+            expect.objectContaining({
+              cache: expect.objectContaining({
+                hitRate: '0.00%',
+                performance_summary: expect.stringContaining('Hit rate: 0.0% (0 hits, 0 misses)'),
               }),
             }),
           );

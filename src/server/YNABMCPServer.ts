@@ -19,6 +19,7 @@ import {
   ServerConfig,
   ErrorHandler,
   YNABErrorCode,
+  ValidationError,
 } from '../types/index.js';
 import { BudgetResolver } from './budgetResolver.js';
 import { SecurityMiddleware, withSecurityWrapper } from './securityMiddleware.js';
@@ -740,11 +741,7 @@ export class YNABMCPServer {
     })();
 
     const message = parsedError.error?.message || 'Budget resolution failed';
-    throw ErrorHandler.createYNABError(
-      YNABErrorCode.VALIDATION,
-      'resolving budget ID',
-      new Error(message),
-    );
+    throw new ValidationError(message);
   }
 
   /**

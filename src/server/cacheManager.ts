@@ -7,11 +7,30 @@ interface CacheEntry<T> {
   data: T;
   timestamp: number;
   ttl: number;
+  staleWhileRevalidate?: number;
+}
+
+interface CacheSetOptions {
+  ttl?: number;
+  staleWhileRevalidate?: number;
 }
 
 export class CacheManager {
   private cache = new Map<string, CacheEntry<unknown>>();
   private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  private hits = 0;
+  private misses = 0;
+  private evictions = 0;
+  private lastCleanup: number | null = null;
+  private maxEntries: number;
+  private defaultStaleWindow: number;
+  private pendingFetches = new Map<string, Promise<unknown>>();
+  private pendingRefresh = new Set<string>();
+
+  constructor() {
+    this.maxEntries = this.parseEnvInt('YNAB_MCP_CACHE_MAX_ENTRIES', 1000);
+    this.defaultStaleWindow = this.parseEnvInt('YNAB_MCP_CACHE_STALE_MS', 2 * 60 * 1000);
+  }
 
   /**
    * Get cached data if valid, null if expired or not found
@@ -20,26 +39,65 @@ export class CacheManager {
     const entry = this.cache.get(key);
 
     if (!entry) {
+      this.misses++;
       return null;
     }
 
     const now = Date.now();
-    if (now - entry.timestamp > entry.ttl) {
+    const age = now - entry.timestamp;
+
+    // Check if entry is expired
+    if (age > entry.ttl) {
+      // Check if we're within stale-while-revalidate window
+      const staleWindow = entry.staleWhileRevalidate || 0;
+      if (staleWindow > 0 && age <= entry.ttl + staleWindow) {
+        this.hits++;
+        // Update access order for LRU
+        this.cache.delete(key);
+        this.cache.set(key, entry);
+        // Mark for background refresh
+        this.pendingRefresh.add(key);
+        return entry.data as T;
+      }
+
       this.cache.delete(key);
+      this.misses++;
       return null;
     }
 
+    this.hits++;
+    // Update access order for LRU
+    this.cache.delete(key);
+    this.cache.set(key, entry);
     return entry.data as T;
   }
 
   /**
-   * Set cache entry with optional TTL
+   * Set cache entry with optional TTL or options
    */
-  set<T>(key: string, data: T, ttl?: number): void {
+  set<T>(key: string, data: T, ttlOrOptions?: number | CacheSetOptions): void {
+    // Don't cache anything if maxEntries is 0
+    if (this.maxEntries <= 0) {
+      return;
+    }
+
+    this.evictIfNeeded();
+
+    let ttl: number;
+    let staleWhileRevalidate: number | undefined;
+
+    if (typeof ttlOrOptions === 'number') {
+      ttl = ttlOrOptions || this.defaultTTL;
+    } else {
+      ttl = ttlOrOptions?.ttl || this.defaultTTL;
+      staleWhileRevalidate = ttlOrOptions?.staleWhileRevalidate;
+    }
+
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
-      ttl: ttl || this.defaultTTL,
+      ttl,
+      staleWhileRevalidate,
     };
 
     this.cache.set(key, entry);
@@ -57,15 +115,37 @@ export class CacheManager {
    */
   clear(): void {
     this.cache.clear();
+    this.hits = 0;
+    this.misses = 0;
+    this.evictions = 0;
+    this.lastCleanup = null;
+    this.pendingFetches.clear();
+    this.pendingRefresh.clear();
   }
 
   /**
    * Get cache statistics
    */
-  getStats(): { size: number; keys: string[] } {
+  getStats(): {
+    size: number;
+    keys: string[];
+    hits: number;
+    misses: number;
+    evictions: number;
+    lastCleanup: number | null;
+    maxEntries: number;
+    hitRate: number;
+  } {
+    const totalRequests = this.hits + this.misses;
     return {
       size: this.cache.size,
       keys: Array.from(this.cache.keys()),
+      hits: this.hits,
+      misses: this.misses,
+      evictions: this.evictions,
+      lastCleanup: this.lastCleanup,
+      maxEntries: this.maxEntries,
+      hitRate: totalRequests > 0 ? this.hits / totalRequests : 0,
     };
   }
 
@@ -90,10 +170,101 @@ export class CacheManager {
       if (now - entry.timestamp > entry.ttl) {
         this.cache.delete(key);
         cleaned++;
+        this.evictions++;
       }
     }
 
+    this.lastCleanup = now;
     return cleaned;
+  }
+
+  /**
+   * Wrap a loader function with caching and concurrent deduplication
+   */
+  async wrap<T>(key: string, options: CacheSetOptions & { loader: () => Promise<T> }): Promise<T> {
+    // Check cache first
+    const cached = this.get<T>(key);
+    if (cached !== null) {
+      // Check if this key was marked for background refresh (stale-while-revalidate)
+      if (this.pendingRefresh.has(key) && !this.pendingFetches.has(key)) {
+        // Start background refresh
+        const refreshPromise = options.loader().then(
+          (result) => {
+            // Cache the successful result
+            this.set(key, result, options);
+            // Clean up
+            this.pendingFetches.delete(key);
+            this.pendingRefresh.delete(key);
+            return result;
+          },
+          (error) => {
+            // Clean up on error
+            this.pendingFetches.delete(key);
+            this.pendingRefresh.delete(key);
+            throw error;
+          },
+        );
+        this.pendingFetches.set(key, refreshPromise);
+      }
+      return cached;
+    }
+
+    // Check if there's already a pending fetch for this key
+    const existingFetch = this.pendingFetches.get(key) as Promise<T> | undefined;
+    if (existingFetch) {
+      return existingFetch;
+    }
+
+    // Execute the loader
+    const fetchPromise = options.loader().then(
+      (result) => {
+        // Cache the successful result
+        this.set(key, result, options);
+        // Clean up pending fetch
+        this.pendingFetches.delete(key);
+        this.pendingRefresh.delete(key);
+        return result;
+      },
+      (error) => {
+        // Clean up on error, don't cache failures
+        this.pendingFetches.delete(key);
+        this.pendingRefresh.delete(key);
+        throw error;
+      },
+    );
+
+    // Store the pending fetch
+    this.pendingFetches.set(key, fetchPromise);
+    return fetchPromise;
+  }
+
+  /**
+   * Evict least recently used entries if cache is at capacity
+   */
+  private evictIfNeeded(): void {
+    if (this.maxEntries <= 0) return;
+
+    while (this.cache.size >= this.maxEntries) {
+      // Get the first (oldest) entry
+      const firstKey = this.cache.keys().next().value;
+      if (firstKey) {
+        this.cache.delete(firstKey);
+        this.evictions++;
+      } else {
+        break;
+      }
+    }
+  }
+
+  /**
+   * Parse environment variable as integer with fallback
+   */
+  private parseEnvInt(key: string, defaultValue: number): number {
+    const value = process.env[key];
+    if (!value) return defaultValue;
+
+    const parsed = parseInt(value, 10);
+    return isNaN(parsed) ? defaultValue : parsed;
   }
 
   /**
