@@ -5,11 +5,21 @@
  * Extracted from YNABMCPServer to provide focused, testable diagnostics management.
  */
 
-import { SecurityMiddleware } from './securityMiddleware.js';
 import type { CacheManager } from './cacheManager.js';
-import { responseFormatter } from './responseFormatter.js';
 
-type ResponseFormatterType = typeof responseFormatter;
+/**
+ * Security stats provider interface
+ */
+export interface SecurityStatsProvider {
+  getSecurityStats(): unknown;
+}
+
+/**
+ * Response formatter interface to avoid direct dependency on concrete implementation
+ */
+interface ResponseFormatter {
+  format(data: unknown): string;
+}
 
 /**
  * Diagnostic options for configuring what diagnostics to include
@@ -74,9 +84,9 @@ export interface DiagnosticData {
  * Injectable dependencies for diagnostic manager
  */
 export interface DiagnosticDependencies {
-  securityMiddleware: typeof SecurityMiddleware;
+  securityStatsProvider: SecurityStatsProvider;
   cacheManager: CacheManager;
-  responseFormatter: ResponseFormatterType;
+  responseFormatter: ResponseFormatter;
   serverVersion: string;
 }
 
@@ -184,7 +194,7 @@ export class DiagnosticManager {
     }
 
     if (options.include_security) {
-      diagnostics['security'] = this.dependencies.securityMiddleware.getSecurityStats();
+      diagnostics['security'] = this.dependencies.securityStatsProvider.getSecurityStats();
     }
 
     if (options.include_cache) {

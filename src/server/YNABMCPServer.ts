@@ -167,7 +167,7 @@ export class YNABMCPServer {
     this.promptManager = new PromptManager();
 
     this.diagnosticManager = new DiagnosticManager({
-      securityMiddleware: SecurityMiddleware,
+      securityStatsProvider: SecurityMiddleware,
       cacheManager,
       responseFormatter,
       serverVersion: this.serverVersion,

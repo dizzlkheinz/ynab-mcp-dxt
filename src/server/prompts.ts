@@ -46,9 +46,9 @@ export type PromptHandler = (
 ) => Promise<PromptResponse>;
 
 /**
- * Prompt definitions
+ * Default prompt definitions
  */
-const promptDefinitions: PromptDefinition[] = [
+const defaultPromptDefinitions: PromptDefinition[] = [
   {
     name: 'create-transaction',
     description: 'Create a new transaction in YNAB',
@@ -121,9 +121,25 @@ const promptDefinitions: PromptDefinition[] = [
 ];
 
 /**
- * Prompt handlers
+ * Validates required arguments and returns validation messages
  */
-const promptHandlers: Record<string, PromptHandler> = {
+function validateRequiredArguments(
+  definition: PromptDefinition,
+  args: Record<string, unknown> | undefined,
+): string[] {
+  const missing: string[] = [];
+  for (const arg of definition.arguments) {
+    if (arg.required && (!args || args[arg.name] === undefined || args[arg.name] === '')) {
+      missing.push(arg.name);
+    }
+  }
+  return missing;
+}
+
+/**
+ * Default prompt handlers
+ */
+const defaultPromptHandlers: Record<string, PromptHandler> = {
   'create-transaction': async (_name, args) => {
     const budgetName = args?.['budget_name'] || 'first available budget';
     const accountName = args?.['account_name'] || '[ACCOUNT_NAME]';
@@ -242,12 +258,28 @@ Convert milliunits to dollars for easy reading.`,
  * PromptManager class that handles prompt registration and request handling
  */
 export class PromptManager {
+  private promptDefinitions: PromptDefinition[];
+  private promptHandlers: Record<string, PromptHandler>;
+
+  constructor() {
+    this.promptDefinitions = [...defaultPromptDefinitions];
+    this.promptHandlers = { ...defaultPromptHandlers };
+  }
+
+  /**
+   * Register a new prompt with its handler at runtime
+   */
+  registerPrompt(definition: PromptDefinition, handler: PromptHandler): void {
+    this.promptDefinitions.push(definition);
+    this.promptHandlers[definition.name] = handler;
+  }
+
   /**
    * Returns list of available prompts for MCP prompt listing
    */
   listPrompts(): { prompts: PromptDefinition[] } {
     return {
-      prompts: promptDefinitions,
+      prompts: this.promptDefinitions,
     };
   }
 
@@ -258,9 +290,31 @@ export class PromptManager {
     name: string,
     args: Record<string, unknown> | undefined,
   ): Promise<PromptResponse> {
-    const handler = promptHandlers[name];
+    const handler = this.promptHandlers[name];
     if (!handler) {
       throw new Error(`Unknown prompt: ${name}`);
+    }
+
+    const definition = this.promptDefinitions.find((p) => p.name === name);
+    if (!definition) {
+      throw new Error(`Prompt definition not found: ${name}`);
+    }
+
+    const missing = validateRequiredArguments(definition, args);
+    if (missing.length > 0) {
+      const response = await handler(name, args);
+      // Append validation note to the prompt text without changing response shape
+      const validationNote = `\n\n⚠️ Missing required arguments: ${missing.join(', ')}`;
+      return {
+        ...response,
+        messages: response.messages.map((message) => ({
+          ...message,
+          content: {
+            ...message.content,
+            text: message.content.text + validationNote,
+          },
+        })),
+      };
     }
 
     return await handler(name, args);

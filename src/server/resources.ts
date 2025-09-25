@@ -6,9 +6,13 @@
  */
 
 import type * as ynab from 'ynab';
-import { responseFormatter } from './responseFormatter.js';
 
-type ResponseFormatterType = typeof responseFormatter;
+/**
+ * Response formatter interface to avoid direct dependency on concrete implementation
+ */
+interface ResponseFormatter {
+  format(data: unknown): string;
+}
 
 /**
  * Resource handler function signature
@@ -39,65 +43,57 @@ export interface ResourceDefinition {
  */
 export interface ResourceDependencies {
   ynabAPI: ynab.API;
-  responseFormatter: ResponseFormatterType;
+  responseFormatter: ResponseFormatter;
 }
 
 /**
- * Resource handlers
+ * Default resource handlers
  */
-const resourceHandlers: Record<string, ResourceHandler> = {
+const defaultResourceHandlers: Record<string, ResourceHandler> = {
   'ynab://budgets': async (uri, { ynabAPI, responseFormatter }) => {
-    try {
-      const response = await ynabAPI.budgets.getBudgets();
-      const budgets = response.data.budgets.map((budget) => ({
-        id: budget.id,
-        name: budget.name,
-        last_modified_on: budget.last_modified_on,
-        first_month: budget.first_month,
-        last_month: budget.last_month,
-        currency_format: budget.currency_format,
-      }));
+    const response = await ynabAPI.budgets.getBudgets();
+    const budgets = response.data.budgets.map((budget) => ({
+      id: budget.id,
+      name: budget.name,
+      last_modified_on: budget.last_modified_on,
+      first_month: budget.first_month,
+      last_month: budget.last_month,
+      currency_format: budget.currency_format,
+    }));
 
-      return {
-        contents: [
-          {
-            uri: uri,
-            mimeType: 'application/json',
-            text: responseFormatter.format({ budgets }),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(`Failed to fetch budgets: ${error}`);
-    }
+    return {
+      contents: [
+        {
+          uri: uri,
+          mimeType: 'application/json',
+          text: responseFormatter.format({ budgets }),
+        },
+      ],
+    };
   },
 
   'ynab://user': async (uri, { ynabAPI, responseFormatter }) => {
-    try {
-      const response = await ynabAPI.user.getUser();
-      const user = {
-        id: response.data.user.id,
-      };
+    const response = await ynabAPI.user.getUser();
+    const user = {
+      id: response.data.user.id,
+    };
 
-      return {
-        contents: [
-          {
-            uri: uri,
-            mimeType: 'application/json',
-            text: responseFormatter.format({ user }),
-          },
-        ],
-      };
-    } catch (error) {
-      throw new Error(`Failed to fetch user info: ${error}`);
-    }
+    return {
+      contents: [
+        {
+          uri: uri,
+          mimeType: 'application/json',
+          text: responseFormatter.format({ user }),
+        },
+      ],
+    };
   },
 };
 
 /**
- * Resource definitions
+ * Default resource definitions
  */
-const resourceDefinitions: ResourceDefinition[] = [
+const defaultResourceDefinitions: ResourceDefinition[] = [
   {
     uri: 'ynab://budgets',
     name: 'YNAB Budgets',
@@ -117,9 +113,21 @@ const resourceDefinitions: ResourceDefinition[] = [
  */
 export class ResourceManager {
   private dependencies: ResourceDependencies;
+  private resourceHandlers: Record<string, ResourceHandler>;
+  private resourceDefinitions: ResourceDefinition[];
 
   constructor(dependencies: ResourceDependencies) {
     this.dependencies = dependencies;
+    this.resourceHandlers = { ...defaultResourceHandlers };
+    this.resourceDefinitions = [...defaultResourceDefinitions];
+  }
+
+  /**
+   * Register a new resource with its handler at runtime
+   */
+  registerResource(definition: ResourceDefinition, handler: ResourceHandler): void {
+    this.resourceDefinitions.push(definition);
+    this.resourceHandlers[definition.uri] = handler;
   }
 
   /**
@@ -127,7 +135,7 @@ export class ResourceManager {
    */
   listResources(): { resources: ResourceDefinition[] } {
     return {
-      resources: resourceDefinitions,
+      resources: this.resourceDefinitions,
     };
   }
 
@@ -141,7 +149,7 @@ export class ResourceManager {
       text: string;
     }[];
   }> {
-    const handler = resourceHandlers[uri];
+    const handler = this.resourceHandlers[uri];
     if (!handler) {
       throw new Error(`Unknown resource: ${uri}`);
     }
