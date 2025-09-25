@@ -15,11 +15,11 @@ export class BudgetResolver {
   /**
    * Special keywords that are allowed as budget IDs
    */
-  private static readonly ALLOWED_KEYWORDS = ['default', 'last-used'];
+  private static readonly ALLOWED_KEYWORDS = ['default'];
 
   /**
    * Resolves a budget ID using provided ID or default, with standardized error handling.
-   * Maps keywords ('default', 'last-used') to concrete budget IDs to prevent 404s from YNAB API.
+   * Maps keywords ('default') to concrete budget IDs to prevent 404s from YNAB API.
    *
    * @param providedId - The budget ID provided by the user (optional)
    * @param defaultId - The default budget ID to fall back to (optional)
@@ -122,14 +122,14 @@ export class BudgetResolver {
 
 Valid formats:
 - UUID format (versions 1-5, e.g., "123e4567-e89b-12d3-a456-426614174000")
-- Special keywords: "default", "last-used"
+- Special keywords: "default"
 
 You can use the list_budgets tool to see available budget IDs.`;
 
     return ErrorHandler.createValidationError('Invalid budget ID format', detailMessage, [
       'Use a valid UUID format (UUID v1-v5, e.g., 123e4567-e89b-12d3-a456-426614174000; standard UUID v4 format works as well)',
       'Run the list_budgets tool to view available budget IDs',
-      'You can also use the special keywords "default" or "last-used" for convenience',
+      'Use the special keyword "default" for convenience',
     ]);
   }
 
