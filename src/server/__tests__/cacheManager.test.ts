@@ -15,6 +15,7 @@ describe('CacheManager', () => {
     // Clear environment variables
     delete process.env.YNAB_MCP_CACHE_MAX_ENTRIES;
     delete process.env.YNAB_MCP_CACHE_STALE_MS;
+    delete process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS;
     cache = new CacheManager();
   });
 
@@ -358,6 +359,38 @@ describe('CacheManager', () => {
       // Should use cached value, not call loader2
       expect(loader2).not.toHaveBeenCalled();
     });
+
+    it('should preserve existing TTL/SWR when options omitted in background refresh', async () => {
+      const loader1 = vi.fn().mockResolvedValue('initial-value');
+      const loader2 = vi.fn().mockResolvedValue('refreshed-value');
+
+      // Initial load with specific TTL/SWR
+      await cache.wrap('key1', {
+        loader: loader1,
+        ttl: 2000,
+        staleWhileRevalidate: 3000,
+      });
+
+      // Move to stale period
+      vi.advanceTimersByTime(2500);
+
+      // Background refresh with no TTL/SWR specified - should preserve original values
+      await cache.wrap('key1', { loader: loader2 });
+
+      // Advance time to allow background refresh
+      vi.advanceTimersByTime(100);
+      await vi.runAllTimersAsync();
+
+      // Now check if the refreshed entry still has the original TTL
+      vi.advanceTimersByTime(1800); // Should still be within original TTL (2000ms)
+      const result = cache.get('key1');
+      expect(result).toBe('refreshed-value');
+
+      // Move past original TTL but within stale window
+      vi.advanceTimersByTime(300); // Total 2300ms past refresh, should be in stale window
+      const staleResult = cache.get('key1');
+      expect(staleResult).toBe('refreshed-value'); // Should still be available due to preserved SWR
+    });
   });
 
   describe('Cleanup Enhancement', () => {
@@ -395,6 +428,33 @@ describe('CacheManager', () => {
       const stats = cache.getStats();
       expect(stats.evictions).toBe(0);
     });
+
+    it('should provide detailed cleanup information', () => {
+      cache.set('key1', 'value1', 500);
+      cache.set('key2', 'value2', 1000);
+      cache.set('key3', 'value3', 5000);
+
+      vi.advanceTimersByTime(600);
+      const result = cache.cleanupDetailed();
+
+      expect(result.cleaned).toBe(1);
+      expect(result.evictions).toBe(1);
+      expect(cache.get('key1')).toBeNull();
+      expect(cache.get('key2')).toBe('value2');
+      expect(cache.get('key3')).toBe('value3');
+    });
+
+    it('should maintain backward compatibility with cleanup() method', () => {
+      cache.set('key1', 'value1', 500);
+      cache.set('key2', 'value2', 1000);
+
+      vi.advanceTimersByTime(600);
+      const cleaned = cache.cleanup();
+
+      expect(cleaned).toBe(1); // Should still return number of cleaned entries
+      const stats = cache.getStats();
+      expect(stats.evictions).toBe(1);
+    });
   });
 
   describe('Environment Variable Configuration', () => {
@@ -414,27 +474,60 @@ describe('CacheManager', () => {
 
       // The default stale window should be used from env var
       vi.advanceTimersByTime(15000); // Within default stale window from env
-      // This test would need access to private stale window to fully verify
+      expect(configuredCache.get('key1')).toBe('value1'); // Served as stale data
+
+      vi.advanceTimersByTime(16100); // Beyond stale window now (total 31100ms > 31000ms)
+      expect(configuredCache.get('key1')).toBeNull();
     });
 
     it('should fall back to defaults for invalid environment values', () => {
       process.env.YNAB_MCP_CACHE_MAX_ENTRIES = 'invalid';
       process.env.YNAB_MCP_CACHE_STALE_MS = 'not-a-number';
+      process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS = 'invalid-ttl';
 
       const configuredCache = new CacheManager();
       const stats = configuredCache.getStats();
 
       expect(stats.maxEntries).toBe(1000); // Default value
+
+      // Test that invalid default TTL falls back to 300000ms (5 minutes)
+      configuredCache.set('key1', 'value1');
+      vi.advanceTimersByTime(4 * 60 * 1000); // 4 minutes - within default TTL
+      expect(configuredCache.get('key1')).toBe('value1');
+
+      vi.advanceTimersByTime(2 * 60 * 1000); // 6 minutes total - past default TTL
+      expect(configuredCache.get('key1')).toBeNull();
+    });
+
+    it('should use environment variable for default TTL', () => {
+      process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS = '60000'; // 1 minute
+      const configuredCache = new CacheManager();
+
+      configuredCache.set('key1', 'value1'); // Use default TTL
+      vi.advanceTimersByTime(30000); // 30 seconds - within TTL
+      expect(configuredCache.get('key1')).toBe('value1');
+
+      vi.advanceTimersByTime(35000); // 65 seconds total - past TTL
+      expect(configuredCache.get('key1')).toBeNull();
     });
 
     it('should fall back to defaults when environment variables are missing', () => {
       delete process.env.YNAB_MCP_CACHE_MAX_ENTRIES;
       delete process.env.YNAB_MCP_CACHE_STALE_MS;
+      delete process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS;
 
       const configuredCache = new CacheManager();
       const stats = configuredCache.getStats();
 
       expect(stats.maxEntries).toBe(1000); // Default value
+
+      // Test default TTL (300000ms = 5 minutes)
+      configuredCache.set('key1', 'value1');
+      vi.advanceTimersByTime(4 * 60 * 1000); // 4 minutes - within default TTL
+      expect(configuredCache.get('key1')).toBe('value1');
+
+      vi.advanceTimersByTime(2 * 60 * 1000); // 6 minutes total - past default TTL
+      expect(configuredCache.get('key1')).toBeNull();
     });
   });
 

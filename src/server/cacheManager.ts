@@ -17,7 +17,7 @@ interface CacheSetOptions {
 
 export class CacheManager {
   private cache = new Map<string, CacheEntry<unknown>>();
-  private readonly defaultTTL = 5 * 60 * 1000; // 5 minutes in milliseconds
+  private readonly defaultTTL: number;
   private hits = 0;
   private misses = 0;
   private evictions = 0;
@@ -30,6 +30,7 @@ export class CacheManager {
   constructor() {
     this.maxEntries = this.parseEnvInt('YNAB_MCP_CACHE_MAX_ENTRIES', 1000);
     this.defaultStaleWindow = this.parseEnvInt('YNAB_MCP_CACHE_STALE_MS', 2 * 60 * 1000);
+    this.defaultTTL = this.parseEnvInt('YNAB_MCP_CACHE_DEFAULT_TTL_MS', 300000);
   }
 
   /**
@@ -87,12 +88,19 @@ export class CacheManager {
     let staleWhileRevalidate: number | undefined;
 
     if (typeof ttlOrOptions === 'number') {
-      ttl = ttlOrOptions || this.defaultTTL;
+      ttl = Number.isFinite(ttlOrOptions) ? ttlOrOptions : this.defaultTTL;
+      // When using simple number interface, don't apply default stale window
+      staleWhileRevalidate = undefined;
     } else {
-      ttl = ttlOrOptions?.ttl || this.defaultTTL;
-      staleWhileRevalidate = ttlOrOptions?.staleWhileRevalidate;
+      const providedTtl = ttlOrOptions?.ttl;
+      ttl = providedTtl !== undefined ? providedTtl : this.defaultTTL;
+      // Only use default stale window when staleWhileRevalidate property exists but is undefined
+      if (ttlOrOptions && 'staleWhileRevalidate' in ttlOrOptions) {
+        staleWhileRevalidate = ttlOrOptions.staleWhileRevalidate ?? this.defaultStaleWindow;
+      } else {
+        staleWhileRevalidate = ttlOrOptions?.staleWhileRevalidate;
+      }
     }
-
     const entry: CacheEntry<T> = {
       data,
       timestamp: Date.now(),
@@ -163,8 +171,17 @@ export class CacheManager {
    * Clean up expired entries
    */
   cleanup(): number {
+    const result = this.cleanupDetailed();
+    return result.cleaned;
+  }
+
+  /**
+   * Clean up expired entries with detailed information
+   */
+  cleanupDetailed(): { cleaned: number; evictions: number } {
     const now = Date.now();
     let cleaned = 0;
+    const initialEvictions = this.evictions;
 
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp > entry.ttl) {
@@ -175,14 +192,15 @@ export class CacheManager {
     }
 
     this.lastCleanup = now;
-    return cleaned;
+    return { cleaned, evictions: this.evictions - initialEvictions };
   }
 
   /**
    * Wrap a loader function with caching and concurrent deduplication
    */
   async wrap<T>(key: string, options: CacheSetOptions & { loader: () => Promise<T> }): Promise<T> {
-    // Check cache first
+    // Check cache first and preserve existing entry for background refresh
+    const existingEntry = this.cache.get(key);
     const cached = this.get<T>(key);
     if (cached !== null) {
       // Check if this key was marked for background refresh (stale-while-revalidate)
@@ -190,8 +208,14 @@ export class CacheManager {
         // Start background refresh
         const refreshPromise = options.loader().then(
           (result) => {
+            // Preserve existing TTL/SWR if not specified in options
+            const refreshOptions: CacheSetOptions = {
+              ttl: options.ttl ?? existingEntry?.ttl,
+              staleWhileRevalidate:
+                options.staleWhileRevalidate ?? existingEntry?.staleWhileRevalidate,
+            };
             // Cache the successful result
-            this.set(key, result, options);
+            this.set(key, result, refreshOptions);
             // Clean up
             this.pendingFetches.delete(key);
             this.pendingRefresh.delete(key);
@@ -218,7 +242,7 @@ export class CacheManager {
     // Execute the loader
     const fetchPromise = options.loader().then(
       (result) => {
-        // Cache the successful result
+        // Cache the successful result using provided options (no existing entry to preserve)
         this.set(key, result, options);
         // Clean up pending fetch
         this.pendingFetches.delete(key);
