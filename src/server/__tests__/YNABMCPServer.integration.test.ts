@@ -377,4 +377,172 @@ describe('YNABMCPServer', () => {
       }
     });
   });
+
+  describe('Budget Resolution Integration Tests', () => {
+    let server: YNABMCPServer;
+    let registry: ToolRegistry;
+
+    const accessToken = () => {
+      const token = process.env['YNAB_ACCESS_TOKEN'];
+      if (!token) {
+        throw new Error('YNAB_ACCESS_TOKEN must be defined for integration tests');
+      }
+      return token;
+    };
+
+    const getFirstAvailableBudgetId = async (): Promise<string> => {
+      const result = await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      const firstBudget = payload.budgets?.[0];
+      expect(firstBudget?.id).toBeDefined();
+      return firstBudget.id as string;
+    };
+
+    beforeEach(() => {
+      server = new YNABMCPServer(false);
+      registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+    });
+
+    it('should handle real YNAB API calls with budget resolution errors', async () => {
+      // Test with no default budget set - should get standardized error
+      const result = await registry.executeTool({
+        name: 'list_accounts',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.error).toBeDefined();
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+      expect(payload.error.message).toContain('No budget ID provided and no default budget set');
+      expect(payload.error.suggestions).toBeDefined();
+    });
+
+    it('should handle real YNAB API calls with invalid budget ID', async () => {
+      const invalidBudgetId = 'invalid-uuid-format';
+      const result = await registry.executeTool({
+        name: 'list_accounts',
+        accessToken: accessToken(),
+        arguments: { budget_id: invalidBudgetId },
+      });
+
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.error).toBeDefined();
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+      expect(payload.error.message).toContain('Invalid budget ID format');
+      expect(payload.error.suggestions).toBeDefined();
+      expect(payload.error.suggestions.some((s: string) => s.includes('UUID v4 format'))).toBe(
+        true,
+      );
+    });
+
+    it('should complete end-to-end workflow with real YNAB API after setting default budget', async () => {
+      // Step 1: Verify error with no default budget
+      let result = await registry.executeTool({
+        name: 'financial_overview',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+
+      let payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.error).toBeDefined();
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+
+      // Step 2: Get a valid budget ID and set as default
+      const budgetId = await getFirstAvailableBudgetId();
+      await registry.executeTool({
+        name: 'set_default_budget',
+        accessToken: accessToken(),
+        arguments: { budget_id: budgetId },
+      });
+
+      // Step 3: Verify financial overview now works with real API
+      result = await registry.executeTool({
+        name: 'financial_overview',
+        accessToken: accessToken(),
+        arguments: { months: 1, include_trends: false, include_insights: false },
+      });
+
+      payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.error).toBeUndefined();
+      expect(payload).toHaveProperty('overview');
+      expect(payload.overview).toHaveProperty('budgetName');
+    });
+
+    it('should handle real API errors properly with budget resolution', async () => {
+      // Use a UUID that is valid format but doesn't exist in YNAB
+      const nonExistentButValidUuid = '123e4567-e89b-12d3-a456-426614174000';
+
+      const result = await registry.executeTool({
+        name: 'list_accounts',
+        accessToken: accessToken(),
+        arguments: { budget_id: nonExistentButValidUuid },
+      });
+
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      // Should get a YNAB API error (404) not a validation error
+      expect(payload.error).toBeDefined();
+      expect(payload.error.code).toBe(404); // YNAB NOT_FOUND error
+    });
+
+    it('should maintain performance with real API calls and budget resolution', async () => {
+      const budgetId = await getFirstAvailableBudgetId();
+      await registry.executeTool({
+        name: 'set_default_budget',
+        accessToken: accessToken(),
+        arguments: { budget_id: budgetId },
+      });
+
+      const startTime = Date.now();
+
+      // Make multiple concurrent calls that use budget resolution
+      const promises = [
+        registry.executeTool({
+          name: 'list_accounts',
+          accessToken: accessToken(),
+          arguments: {},
+        }),
+        registry.executeTool({
+          name: 'list_categories',
+          accessToken: accessToken(),
+          arguments: {},
+        }),
+        registry.executeTool({
+          name: 'list_payees',
+          accessToken: accessToken(),
+          arguments: {},
+        }),
+      ];
+
+      const results = await Promise.all(promises);
+      const endTime = Date.now();
+
+      // All should succeed
+      results.forEach((result) => {
+        const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        expect(payload.error).toBeUndefined();
+      });
+
+      // Should complete reasonably quickly (accounting for network latency)
+      expect(endTime - startTime).toBeLessThan(10000); // 10 seconds max for 3 API calls
+    });
+
+    it('should handle security middleware with budget resolution errors', async () => {
+      // Test that security middleware still works with budget resolution
+      const result = await registry.executeTool({
+        name: 'list_accounts',
+        accessToken: 'invalid-token',
+        arguments: {},
+      });
+
+      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(payload.error).toBeDefined();
+      // Should get authentication error, not budget resolution error
+      expect(payload.error.code).toBe(401);
+    });
+  });
 });

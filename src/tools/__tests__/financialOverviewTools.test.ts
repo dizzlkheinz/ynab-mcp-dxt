@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import {
   FinancialOverviewSchema,
   SpendingAnalysisSchema,
@@ -126,6 +126,227 @@ describe('Financial Overview Tools', () => {
       expect(variance).toBe(0);
       expect(standardDeviation).toBe(0);
       expect(coefficientOfVariation).toBe(0); // Perfect consistency = 0% variability
+    });
+  });
+
+  describe('Budget Resolution Integration', () => {
+    let handleFinancialOverview: any;
+    let handleSpendingAnalysis: any;
+    let handleBudgetHealthCheck: any;
+
+    beforeAll(async () => {
+      const module = await import('../financialOverviewTools.js');
+      handleFinancialOverview = module.handleFinancialOverview;
+      handleSpendingAnalysis = module.handleSpendingAnalysis;
+      handleBudgetHealthCheck = module.handleBudgetHealthCheck;
+    });
+
+    // Mock YNAB API
+    const mockYnabAPI = {
+      budgets: {
+        getBudgetById: vi.fn(),
+      },
+      months: {
+        getBudgetMonth: vi.fn(),
+      },
+      transactions: {
+        getTransactions: vi.fn(),
+      },
+    } as any;
+
+    describe('Budget ID Validation', () => {
+      it('should handle valid UUID budget ID in handleFinancialOverview', async () => {
+        const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+
+        // Mock successful API responses
+        mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+          data: { budget: { name: 'Test Budget', id: validUuid } },
+        });
+        mockYnabAPI.months.getBudgetMonth.mockResolvedValue({
+          data: { month: { categories: [] } },
+        });
+
+        const params = {
+          budget_id: validUuid,
+          months: 1,
+          include_trends: false,
+          include_insights: false,
+        };
+
+        // Should not throw an error with valid UUID
+        await expect(handleFinancialOverview(mockYnabAPI, params)).resolves.toBeDefined();
+      });
+
+      it('should work with valid budget ID (validation handled by registry)', async () => {
+        const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+        const params = {
+          budget_id: validUuid,
+          months: 1,
+          include_trends: false,
+          include_insights: false,
+        };
+
+        // Mock successful API responses
+        mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+          data: { budget: { name: 'Test Budget', id: validUuid } },
+        });
+        mockYnabAPI.months.getBudgetMonth.mockResolvedValue({
+          data: { month: { categories: [] } },
+        });
+
+        // Should work since registry already validated the budget_id
+        const result = await handleFinancialOverview(mockYnabAPI, params);
+        expect(result.content).toBeDefined();
+      });
+
+      it('should handle errors from YNAB API calls', async () => {
+        const validUuid = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+        const params = {
+          budget_id: validUuid,
+          months: 1,
+          include_trends: false,
+          include_insights: false,
+        };
+
+        // Mock API error response
+        mockYnabAPI.budgets.getBudgetById.mockRejectedValue(new Error('Budget not found'));
+
+        // Should handle YNAB API errors gracefully
+        const result = await handleFinancialOverview(mockYnabAPI, params);
+        expect(result.content).toBeDefined();
+        // Should still return a CallToolResult, not throw
+      });
+
+      it('should handle valid budget ID in handleSpendingAnalysis', async () => {
+        const validUuid = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+
+        // Mock successful API responses
+        mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+          data: { budget: { name: 'Test Budget', categories: [] } },
+        });
+        mockYnabAPI.months.getBudgetMonth.mockResolvedValue({
+          data: { month: { categories: [] } },
+        });
+
+        const params = {
+          budget_id: validUuid,
+          period_months: 3,
+        };
+
+        // Should not throw an error with valid UUID
+        await expect(handleSpendingAnalysis(mockYnabAPI, params)).resolves.toBeDefined();
+      });
+
+      it('should handle valid budget ID in handleBudgetHealthCheck', async () => {
+        const validUuid = 'a1b2c3d4-e5f6-4789-a012-3456789abcde';
+
+        // Mock successful API responses
+        mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+          data: { budget: { name: 'Test Budget', categories: [] } },
+        });
+        mockYnabAPI.months.getBudgetMonth.mockResolvedValue({
+          data: { month: { categories: [] } },
+        });
+        mockYnabAPI.transactions.getTransactions.mockResolvedValue({
+          data: { transactions: [] },
+        });
+
+        const params = {
+          budget_id: validUuid,
+          include_recommendations: true,
+        };
+
+        // Should not throw an error with valid UUID
+        await expect(handleBudgetHealthCheck(mockYnabAPI, params)).resolves.toBeDefined();
+      });
+    });
+
+    describe('Consistency Across Tools', () => {
+      it('should handle valid budget IDs consistently across all financial overview tools', async () => {
+        const validBudgetId = 'a1b2c3d4-e5f6-4789-a012-3456789abcde';
+
+        // Mock successful API responses for all tools
+        mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+          data: { budget: { name: 'Test Budget', categories: [] } },
+        });
+        mockYnabAPI.months.getBudgetMonth.mockResolvedValue({
+          data: { month: { categories: [] } },
+        });
+        mockYnabAPI.transactions.getTransactions.mockResolvedValue({
+          data: { transactions: [] },
+        });
+
+        const results = await Promise.all([
+          handleFinancialOverview(mockYnabAPI, {
+            budget_id: validBudgetId,
+            months: 1,
+            include_trends: false,
+            include_insights: false,
+          }),
+          handleSpendingAnalysis(mockYnabAPI, {
+            budget_id: validBudgetId,
+            period_months: 3,
+          }),
+          handleBudgetHealthCheck(mockYnabAPI, {
+            budget_id: validBudgetId,
+            include_recommendations: true,
+          }),
+        ]);
+
+        // All should return successful results
+        results.forEach((result) => {
+          expect(result.content).toBeDefined();
+          expect(result.content?.[0]?.type).toBe('text');
+        });
+      });
+    });
+
+    describe('Backward Compatibility', () => {
+      it('should maintain the same interface as before budget resolver changes', async () => {
+        // Verify that the functions still accept the same parameters
+        const validUuid = '123e4567-e89b-12d3-a456-426614174000';
+
+        // Mock successful responses
+        mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+          data: { budget: { name: 'Test Budget', id: validUuid } },
+        });
+        mockYnabAPI.months.getBudgetMonth.mockResolvedValue({
+          data: { month: { categories: [] } },
+        });
+        mockYnabAPI.transactions.getTransactions.mockResolvedValue({
+          data: { transactions: [] },
+        });
+
+        // Test that all original parameter combinations still work
+        const financialOverviewParams = {
+          budget_id: validUuid,
+          months: 3,
+          include_trends: true,
+          include_insights: true,
+        };
+
+        const spendingAnalysisParams = {
+          budget_id: validUuid,
+          period_months: 6,
+          category_id: 'some-category-id',
+        };
+
+        const budgetHealthParams = {
+          budget_id: validUuid,
+          include_recommendations: false,
+        };
+
+        // All should work without throwing
+        await expect(
+          handleFinancialOverview(mockYnabAPI, financialOverviewParams),
+        ).resolves.toBeDefined();
+        await expect(
+          handleSpendingAnalysis(mockYnabAPI, spendingAnalysisParams),
+        ).resolves.toBeDefined();
+        await expect(
+          handleBudgetHealthCheck(mockYnabAPI, budgetHealthParams),
+        ).resolves.toBeDefined();
+      });
     });
   });
 });

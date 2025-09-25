@@ -18,7 +18,9 @@ import {
   ConfigurationError,
   ServerConfig,
   ErrorHandler,
+  YNABErrorCode,
 } from '../types/index.js';
+import { BudgetResolver } from './budgetResolver.js';
 import { SecurityMiddleware, withSecurityWrapper } from './securityMiddleware.js';
 import { handleListBudgets, handleGetBudget, GetBudgetSchema } from '../tools/budgetTools.js';
 import {
@@ -80,6 +82,7 @@ import { cacheManager, CacheManager } from './cacheManager.js';
 import { responseFormatter } from './responseFormatter.js';
 import {
   ToolRegistry,
+  DefaultArgumentResolutionError,
   type ToolDefinition,
   type DefaultArgumentResolver,
   type ToolExecutionPayload,
@@ -156,6 +159,24 @@ export class YNABMCPServer {
           cacheManager.clear();
         },
       },
+      validateAccessToken: (token: string) => {
+        const expected = this.config.accessToken.trim();
+        const provided = typeof token === 'string' ? token.trim() : '';
+        if (!provided) {
+          throw ErrorHandler.createYNABError(
+            YNABErrorCode.UNAUTHORIZED,
+            'validating access token',
+            new Error('Missing access token'),
+          );
+        }
+        if (provided !== expected) {
+          throw ErrorHandler.createYNABError(
+            YNABErrorCode.UNAUTHORIZED,
+            'validating access token',
+            new Error('Access token mismatch'),
+          );
+        }
+      },
     });
 
     // Initialize service modules
@@ -167,7 +188,7 @@ export class YNABMCPServer {
     this.promptManager = new PromptManager();
 
     this.diagnosticManager = new DiagnosticManager({
-      securityStatsProvider: SecurityMiddleware,
+      securityMiddleware: SecurityMiddleware,
       cacheManager,
       responseFormatter,
       serverVersion: this.serverVersion,
@@ -295,7 +316,11 @@ export class YNABMCPServer {
           typeof rawArguments['budget_id'] === 'string' && rawArguments['budget_id'].length > 0
             ? (rawArguments['budget_id'] as string)
             : undefined;
-        return { budget_id: this.getBudgetId(provided) } as Partial<TInput>;
+        const result = BudgetResolver.resolveBudgetId(provided, this.defaultBudgetId);
+        if (typeof result === 'string') {
+          return { budget_id: result } as Partial<TInput>;
+        }
+        throw new DefaultArgumentResolutionError(result);
       };
     };
 
@@ -549,8 +574,14 @@ export class YNABMCPServer {
       description: 'Get comprehensive financial overview with insights, trends, and analysis',
       inputSchema: FinancialOverviewSchema,
       handler: async ({ input }) => {
-        const budgetId = this.getBudgetId(input.budget_id);
-        return handleFinancialOverview(this.ynabAPI, { ...input, budget_id: budgetId });
+        const budgetIdResult = BudgetResolver.resolveBudgetId(
+          input.budget_id,
+          this.defaultBudgetId,
+        );
+        if (typeof budgetIdResult !== 'string') {
+          return budgetIdResult;
+        }
+        return handleFinancialOverview(this.ynabAPI, { ...input, budget_id: budgetIdResult });
       },
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof FinancialOverviewSchema>>(),
     });
@@ -560,8 +591,14 @@ export class YNABMCPServer {
       description: 'Detailed spending analysis with category breakdowns and trends',
       inputSchema: SpendingAnalysisSchema,
       handler: async ({ input }) => {
-        const budgetId = this.getBudgetId(input.budget_id);
-        return handleSpendingAnalysis(this.ynabAPI, { ...input, budget_id: budgetId });
+        const budgetIdResult = BudgetResolver.resolveBudgetId(
+          input.budget_id,
+          this.defaultBudgetId,
+        );
+        if (typeof budgetIdResult !== 'string') {
+          return budgetIdResult;
+        }
+        return handleSpendingAnalysis(this.ynabAPI, { ...input, budget_id: budgetIdResult });
       },
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof SpendingAnalysisSchema>>(),
     });
@@ -571,8 +608,14 @@ export class YNABMCPServer {
       description: 'Comprehensive budget health assessment with recommendations',
       inputSchema: BudgetHealthSchema,
       handler: async ({ input }) => {
-        const budgetId = this.getBudgetId(input.budget_id);
-        return handleBudgetHealthCheck(this.ynabAPI, { ...input, budget_id: budgetId });
+        const budgetIdResult = BudgetResolver.resolveBudgetId(
+          input.budget_id,
+          this.defaultBudgetId,
+        );
+        if (typeof budgetIdResult !== 'string') {
+          return budgetIdResult;
+        }
+        return handleBudgetHealthCheck(this.ynabAPI, { ...input, budget_id: budgetIdResult });
       },
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof BudgetHealthSchema>>(),
     });
@@ -695,15 +738,7 @@ export class YNABMCPServer {
    * Gets the budget ID to use - either provided or default
    */
   getBudgetId(providedBudgetId?: string): string {
-    if (providedBudgetId) {
-      return providedBudgetId;
-    }
-    if (this.defaultBudgetId) {
-      return this.defaultBudgetId;
-    }
-    throw new Error(
-      'No budget ID provided and no default budget set. Use set_default_budget first.',
-    );
+    return BudgetResolver.resolveBudgetIdOrThrow(providedBudgetId, this.defaultBudgetId);
   }
 
   /**

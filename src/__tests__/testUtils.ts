@@ -89,11 +89,13 @@ export function validateToolResult(result: CallToolResult): void {
 export function parseToolResult<T = any>(result: CallToolResult): T {
   validateToolResult(result);
   const content = result.content[0];
+  console.warn('[parseToolResult] text', typeof content === 'object' ? content.type : content);
   if (!content || content.type !== 'text') {
     throw new Error('No text content in tool result');
   }
 
   const text = content.text;
+  console.warn('[parseToolResult] raw', text);
   if (typeof text !== 'string') {
     throw new Error('Tool result text is not a string');
   }

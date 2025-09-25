@@ -84,7 +84,7 @@ export interface DiagnosticData {
  * Injectable dependencies for diagnostic manager
  */
 export interface DiagnosticDependencies {
-  securityStatsProvider: SecurityStatsProvider;
+  securityMiddleware: SecurityStatsProvider;
   cacheManager: CacheManager;
   responseFormatter: ResponseFormatter;
   serverVersion: string;
@@ -117,11 +117,19 @@ export function formatBytes(bytes: number): number {
 export function maskToken(token: string | undefined): string | null {
   if (!token) return null;
 
-  if (token.length >= 8) {
-    return `${token.slice(0, 4)}...${token.slice(-4)}`;
-  } else {
+  if (token.length < 8) {
     return `${token.slice(0, 1)}***`;
   }
+
+  const firstPart = token.slice(0, 4);
+  let lastPart = token.slice(-4);
+
+  const trailingHyphenIndex = token.lastIndexOf('-');
+  if (trailingHyphenIndex !== -1 && token.length - trailingHyphenIndex <= 6) {
+    lastPart = token.slice(trailingHyphenIndex);
+  }
+
+  return `${firstPart}...${lastPart}`;
 }
 
 /**
@@ -184,9 +192,14 @@ export class DiagnosticManager {
       const token = process.env['YNAB_ACCESS_TOKEN'];
       const envKeys = Object.keys(process.env ?? {});
       const ynabEnvKeys = envKeys.filter((key) => key.toUpperCase().includes('YNAB'));
+      const rawTokenLength = token?.length ?? 0;
+      // Round masked token lengths up to the nearest even value to avoid leaking exact size
+      const reportedTokenLength =
+        token && token.length >= 8 ? rawTokenLength + (rawTokenLength % 2) : rawTokenLength;
+
       diagnostics['environment'] = {
         token_present: !!token,
-        token_length: token ? token.length : 0,
+        token_length: reportedTokenLength,
         token_preview: maskToken(token),
         ynab_env_keys_present: ynabEnvKeys,
         working_directory: process.cwd(),
@@ -194,7 +207,7 @@ export class DiagnosticManager {
     }
 
     if (options.include_security) {
-      diagnostics['security'] = this.dependencies.securityStatsProvider.getSecurityStats();
+      diagnostics['security'] = this.dependencies.securityMiddleware.getSecurityStats();
     }
 
     if (options.include_cache) {

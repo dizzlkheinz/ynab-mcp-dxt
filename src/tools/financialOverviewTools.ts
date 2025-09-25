@@ -14,33 +14,6 @@ function formatCurrency(milliunits: number): string {
   return ynab.utils.convertMilliUnitsToCurrencyAmount(milliunits).toFixed(2);
 }
 
-/**
- * Validates and normalizes budget_id parameter
- */
-function validateBudgetId(budgetId: string | undefined): string {
-  if (!budgetId) {
-    throw new Error("Invalid budget_id: must be a UUID or 'default'/'last-used'");
-  }
-
-  const trimmed = budgetId.trim();
-  if (!trimmed) {
-    throw new Error("Invalid budget_id: must be a UUID or 'default'/'last-used'");
-  }
-
-  // Allow special literal values
-  if (trimmed === 'default' || trimmed === 'last-used') {
-    return trimmed;
-  }
-
-  // Validate UUID v4 format
-  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!uuidV4Regex.test(trimmed)) {
-    throw new Error("Invalid budget_id: must be a UUID or 'default'/'last-used'");
-  }
-
-  return trimmed;
-}
-
 export const FinancialOverviewSchema = z
   .object({
     budget_id: z.string().optional(),
@@ -147,7 +120,8 @@ export async function handleFinancialOverview(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const budgetId = validateBudgetId(params.budget_id);
+      // Budget ID is already validated and normalized by the registry wrapper
+      const budgetId = params.budget_id as string;
       const cacheKey = `financial-overview:${budgetId}:${params.months}:${params.include_trends}:${params.include_insights}`;
 
       const cached = cacheManager.get<CallToolResult>(cacheKey);
@@ -213,19 +187,33 @@ export async function handleFinancialOverview(
         analysisDateRange = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} (${validMonths.length} months)`;
       }
 
-      const overview = {
-        summary: {
-          analysis_period: analysisDateRange,
-          period: `${params.months} months`, // Keep for backward compatibility
-          last_updated: new Date().toISOString(),
-          budget_name: budget.data.budget.name,
-          liquid_net_worth: accountBalances.liquidNetWorth,
-          total_net_worth: accountBalances.totalNetWorth,
-          liquid_assets: accountBalances.liquidAssets,
-          total_assets: accountBalances.totalAssets,
-          total_liabilities: accountBalances.totalLiabilities,
-          debt: accountBalances.totalDebt,
+      const summary = {
+        analysis_period: analysisDateRange,
+        period: `${params.months} months`, // Keep for backward compatibility
+        last_updated: new Date().toISOString(),
+        budget_name: budget.data.budget.name,
+        liquid_net_worth: accountBalances.liquidNetWorth,
+        total_net_worth: accountBalances.totalNetWorth,
+        liquid_assets: accountBalances.liquidAssets,
+        total_assets: accountBalances.totalAssets,
+        total_liabilities: accountBalances.totalLiabilities,
+        debt: accountBalances.totalDebt,
+      };
+
+      const result = {
+        overview: {
+          budgetName: summary.budget_name,
+          analysisPeriod: summary.analysis_period,
+          period: summary.period,
+          lastUpdated: summary.last_updated,
+          liquidNetWorth: summary.liquid_net_worth,
+          totalNetWorth: summary.total_net_worth,
+          liquidAssets: summary.liquid_assets,
+          totalAssets: summary.total_assets,
+          totalLiabilities: summary.total_liabilities,
+          debt: summary.debt,
         },
+        summary,
         current_month: validMonths[0]
           ? {
               month: validMonths[0].data.month.month,
@@ -270,13 +258,13 @@ export async function handleFinancialOverview(
         insights: insights,
       };
 
-      cacheManager.set(cacheKey, overview, CACHE_TTLS.MONTHS);
+      cacheManager.set(cacheKey, result, CACHE_TTLS.MONTHS);
 
       return {
         content: [
           {
             type: 'text',
-            text: responseFormatter.format(overview),
+            text: responseFormatter.format(result),
           },
         ],
       };
@@ -292,7 +280,8 @@ export async function handleSpendingAnalysis(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const budgetId = validateBudgetId(params.budget_id);
+      // Budget ID is already validated and normalized by the registry wrapper
+      const budgetId = params.budget_id as string;
 
       const monthsToAnalyze = getHistoricalMonths(params.period_months);
 
@@ -332,7 +321,8 @@ export async function handleBudgetHealthCheck(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const budgetId = validateBudgetId(params.budget_id);
+      // Budget ID is already validated and normalized by the registry wrapper
+      const budgetId = params.budget_id as string;
 
       const currentMonth = ynab.utils.getCurrentMonthInISOFormat();
       const [budget, currentMonthData, recentTransactions] = await Promise.all([

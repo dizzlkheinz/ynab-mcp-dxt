@@ -28,7 +28,14 @@ export interface ToolRegistryCacheHelpers {
 
 export interface DefaultArgumentResolverContext {
   name: string;
+  accessToken: string;
   rawArguments: Record<string, unknown>;
+}
+export class DefaultArgumentResolutionError extends Error {
+  constructor(public readonly result: CallToolResult) {
+    super('Default argument resolution failed');
+    this.name = 'DefaultArgumentResolutionError';
+  }
 }
 
 export type DefaultArgumentResolver<TInput extends Record<string, unknown>> = (
@@ -88,6 +95,7 @@ export interface ToolRegistryDependencies {
   errorHandler: ErrorHandlerContract;
   responseFormatter: ResponseFormatterContract;
   cacheHelpers?: ToolRegistryCacheHelpers;
+  validateAccessToken?: (token: string) => Promise<void> | void;
 }
 
 const MINIFY_HINT_KEYS = ['minify', '_minify', '__minify'] as const;
@@ -160,15 +168,33 @@ export class ToolRegistry {
       );
     }
 
+    if (this.deps.validateAccessToken) {
+      try {
+        await this.deps.validateAccessToken(options.accessToken);
+      } catch (error) {
+        if (this.isCallToolResult(error)) {
+          return error;
+        }
+        return this.deps.errorHandler.handleError(error, `authenticating ${tool.name}`);
+      }
+    }
+
     let defaults: Partial<Record<string, unknown>> | undefined;
 
     if (tool.defaultArgumentResolver) {
       try {
         defaults = await tool.defaultArgumentResolver({
           name: tool.name,
+          accessToken: options.accessToken,
           rawArguments: options.arguments ?? {},
         });
       } catch (error) {
+        if (error instanceof DefaultArgumentResolutionError) {
+          return error.result;
+        }
+        if (this.isCallToolResult(error)) {
+          return error;
+        }
         return this.deps.errorHandler.createValidationError(
           'Invalid parameters',
           error instanceof Error
@@ -228,6 +254,15 @@ export class ToolRegistry {
         `formatting response for ${tool.name}`,
       );
     }
+  }
+
+  private isCallToolResult(value: unknown): value is CallToolResult {
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'content' in (value as Record<string, unknown>) &&
+      Array.isArray((value as { content?: unknown }).content)
+    );
   }
 
   private normalizeSecurityError(

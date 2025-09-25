@@ -356,6 +356,152 @@ describe('YNABMCPServer', () => {
       expect(payload.error).toBeDefined();
       expect(payload.error.code).toBe('VALIDATION_ERROR');
     });
+
+    describe('Budget Resolution Error Handling', () => {
+      let freshServer: YNABMCPServer;
+      let freshRegistry: ToolRegistry;
+
+      beforeEach(() => {
+        // Create a fresh server with no default budget set
+        freshServer = new YNABMCPServer(false);
+        freshRegistry = (freshServer as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+      });
+
+      const budgetDependentTools = [
+        'list_accounts',
+        'get_account',
+        'create_account',
+        'list_transactions',
+        'get_transaction',
+        'create_transaction',
+        'update_transaction',
+        'delete_transaction',
+        'list_categories',
+        'get_category',
+        'update_category',
+        'list_payees',
+        'get_payee',
+        'get_month',
+        'list_months',
+        'financial_overview',
+        'spending_analysis',
+        'budget_health_check',
+        'export_transactions',
+        'compare_transactions',
+        'reconcile_account',
+      ] as const;
+
+      budgetDependentTools.forEach((toolName) => {
+        it(`should return standardized error for ${toolName} when no default budget is set`, async () => {
+          const result = await freshRegistry.executeTool({
+            name: toolName,
+            accessToken: accessToken(),
+            arguments: {},
+          });
+
+          const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+          expect(payload.error).toBeDefined();
+          expect(payload.error.code).toBe('VALIDATION_ERROR');
+          expect(payload.error.message).toContain(
+            'No budget ID provided and no default budget set',
+          );
+          expect(payload.error.userMessage).toContain('invalid');
+          expect(payload.error.suggestions).toBeDefined();
+          expect(Array.isArray(payload.error.suggestions)).toBe(true);
+          expect(
+            payload.error.suggestions.some(
+              (suggestion: string) =>
+                suggestion.includes('set_default_budget') ||
+                suggestion.includes('budget_id parameter'),
+            ),
+          ).toBe(true);
+        });
+      });
+
+      it('should return standardized error for invalid budget ID format', async () => {
+        const invalidBudgetId = 'not-a-valid-uuid';
+        const result = await freshRegistry.executeTool({
+          name: 'list_accounts',
+          accessToken: accessToken(),
+          arguments: { budget_id: invalidBudgetId },
+        });
+
+        const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        expect(payload.error).toBeDefined();
+        expect(payload.error.code).toBe('VALIDATION_ERROR');
+        expect(payload.error.message).toContain('Invalid budget ID format');
+        expect(payload.error.userMessage).toContain('invalid');
+        expect(payload.error.suggestions).toBeDefined();
+        expect(Array.isArray(payload.error.suggestions)).toBe(true);
+        expect(
+          payload.error.suggestions.some(
+            (suggestion: string) =>
+              suggestion.includes('UUID v4 format') || suggestion.includes('list_budgets'),
+          ),
+        ).toBe(true);
+      });
+
+      it('should work normally after setting a default budget', async () => {
+        // First, ensure we get the "no default budget" error
+        let result = await freshRegistry.executeTool({
+          name: 'list_accounts',
+          accessToken: accessToken(),
+          arguments: {},
+        });
+
+        let payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        expect(payload.error).toBeDefined();
+        expect(payload.error.code).toBe('VALIDATION_ERROR');
+
+        // Now set a default budget
+        const defaultBudgetId = await ensureDefaultBudget();
+        await freshRegistry.executeTool({
+          name: 'set_default_budget',
+          accessToken: accessToken(),
+          arguments: { budget_id: defaultBudgetId },
+        });
+
+        // Now the same call should work
+        result = await freshRegistry.executeTool({
+          name: 'list_accounts',
+          accessToken: accessToken(),
+          arguments: {},
+        });
+
+        payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        // Should have accounts data or be valid response, not an error
+        expect(payload.error).toBeUndefined();
+      });
+
+      it('should have consistent error response structure across all budget-dependent tools', async () => {
+        const promises = budgetDependentTools.map((toolName) =>
+          freshRegistry.executeTool({
+            name: toolName,
+            accessToken: accessToken(),
+            arguments: {},
+          }),
+        );
+
+        const results = await Promise.all(promises);
+
+        results.forEach((result) => {
+          const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+
+          // All should have the same error structure
+          expect(payload).toHaveProperty(
+            'error',
+            expect.objectContaining({
+              code: 'VALIDATION_ERROR',
+              message: expect.stringContaining('No budget ID provided and no default budget set'),
+              userMessage: expect.any(String),
+              suggestions: expect.arrayContaining([
+                expect.stringMatching(/set_default_budget|budget_id parameter/),
+              ]),
+            }),
+          );
+        });
+      });
+    });
   });
 
   describe('Modular Architecture Integration', () => {
