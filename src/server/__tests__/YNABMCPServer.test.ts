@@ -174,6 +174,39 @@ describe('YNABMCPServer', () => {
     let server: YNABMCPServer;
     let registry: ToolRegistry;
 
+    const expectedToolNames = [
+      'list_budgets',
+      'get_budget',
+      'set_default_budget',
+      'get_default_budget',
+      'list_accounts',
+      'get_account',
+      'create_account',
+      'list_transactions',
+      'export_transactions',
+      'compare_transactions',
+      'reconcile_account',
+      'get_transaction',
+      'create_transaction',
+      'update_transaction',
+      'delete_transaction',
+      'list_categories',
+      'get_category',
+      'update_category',
+      'list_payees',
+      'get_payee',
+      'get_month',
+      'list_months',
+      'get_user',
+      'convert_amount',
+      'financial_overview',
+      'spending_analysis',
+      'budget_health_check',
+      'diagnostic_info',
+      'clear_cache',
+      'set_output_format',
+    ] as const;
+
     const accessToken = () => {
       const token = process.env['YNAB_ACCESS_TOKEN'];
       if (!token) {
@@ -182,17 +215,34 @@ describe('YNABMCPServer', () => {
       return token;
     };
 
+    const ensureDefaultBudget = async (): Promise<string> => {
+      const budgetsResult = await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const budgetsPayload = JSON.parse(budgetsResult.content?.[0]?.text ?? '{}');
+      const firstBudget = budgetsPayload.budgets?.[0];
+      expect(firstBudget?.id).toBeDefined();
+
+      await registry.executeTool({
+        name: 'set_default_budget',
+        accessToken: accessToken(),
+        arguments: { budget_id: firstBudget.id },
+      });
+
+      return firstBudget.id as string;
+    };
+
     beforeEach(() => {
       server = new YNABMCPServer(false);
       registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
     });
 
-    it('should expose registered tools via the registry', () => {
+    it('should expose the complete registered tool list via the registry', () => {
       const tools = registry.listTools();
-      expect(tools.length).toBeGreaterThan(0);
-      const names = tools.map((tool) => tool.name);
-      expect(names).toContain('list_budgets');
-      expect(names).toContain('diagnostic_info');
+      const names = tools.map((tool) => tool.name).sort();
+      expect(names).toEqual([...expectedToolNames].sort());
     });
 
     it('should execute get_user tool via the registry', async () => {
@@ -206,20 +256,7 @@ describe('YNABMCPServer', () => {
     });
 
     it('should set and retrieve default budget using tools', async () => {
-      const budgetsResult = await registry.executeTool({
-        name: 'list_budgets',
-        accessToken: accessToken(),
-        arguments: {},
-      });
-      const budgetsPayload = JSON.parse(budgetsResult.content?.[0]?.text ?? '{}');
-      const firstBudget = budgetsPayload.budgets?.[0];
-      expect(firstBudget).toBeDefined();
-
-      await registry.executeTool({
-        name: 'set_default_budget',
-        accessToken: accessToken(),
-        arguments: { budget_id: firstBudget.id },
-      });
+      const budgetId = await ensureDefaultBudget();
 
       const defaultResult = await registry.executeTool({
         name: 'get_default_budget',
@@ -227,8 +264,28 @@ describe('YNABMCPServer', () => {
         arguments: {},
       });
       const defaultPayload = JSON.parse(defaultResult.content?.[0]?.text ?? '{}');
-      expect(defaultPayload.default_budget_id).toBe(firstBudget.id);
+      expect(defaultPayload.default_budget_id).toBe(budgetId);
       expect(defaultPayload.has_default).toBe(true);
+    });
+
+    it('should execute list tools that rely on the default budget', async () => {
+      await ensureDefaultBudget();
+
+      const accountsResult = await registry.executeTool({
+        name: 'list_accounts',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const accountsPayload = JSON.parse(accountsResult.content?.[0]?.text ?? '{}');
+      expect(Array.isArray(accountsPayload.accounts)).toBe(true);
+
+      const categoriesResult = await registry.executeTool({
+        name: 'list_categories',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const categoriesPayload = JSON.parse(categoriesResult.content?.[0]?.text ?? '{}');
+      expect(Array.isArray(categoriesPayload.categories)).toBe(true);
     });
 
     it('should provide diagnostic info with requested sections', async () => {
