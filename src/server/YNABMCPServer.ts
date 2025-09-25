@@ -908,7 +908,7 @@ Convert milliunits to dollars for easy reading.`,
           const cacheStats = cacheManager.getStats();
           const estimateCacheSize = () => {
             try {
-              const serialized = JSON.stringify(Array.from(cacheManager['cache'].entries()));
+              const serialized = JSON.stringify(cacheManager.getEntriesForSizeEstimation());
               return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
             } catch {
               return 0;

@@ -69,6 +69,10 @@ export class CacheManager {
     };
   }
 
+  getEntriesForSizeEstimation(): Array<[string, CacheEntry<unknown>]> {
+    return Array.from(this.cache.entries());
+  }
+
   /**
    * Clean up expired entries
    */
