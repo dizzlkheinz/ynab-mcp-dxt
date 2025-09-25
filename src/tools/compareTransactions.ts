@@ -152,7 +152,13 @@ function autoDetectCSVFormat(
     throw new Error('CSV file is empty');
   }
 
-  const firstLine = lines[0]!.split(',');
+  // Safely handle the first line - check if it exists and is not empty after trimming
+  const firstLineRaw = lines[0];
+  if (!firstLineRaw || !firstLineRaw.trim()) {
+    throw new Error('CSV file contains empty first line');
+  }
+
+  const firstLine = firstLineRaw.split(',');
   const hasHeader = !isDateLike(firstLine[0] || '');
 
   // Check for separate debit/credit columns by looking for empty cells pattern
@@ -651,8 +657,8 @@ function findSuggestedPayee(
 
   // If no match, suggest the original description as the new payee name (cleaned up a bit)
   const suggested_name = description
-    .replace(/\d+/, '') // Remove numbers
-    .replace(/\s+/, ' ') // Consolidate whitespace
+    .replace(/\d+/g, '') // Remove numbers
+    .replace(/\s+/g, ' ') // Consolidate whitespace
     .trim();
 
   return {

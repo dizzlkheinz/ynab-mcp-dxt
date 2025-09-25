@@ -1,0 +1,214 @@
+/**
+ * Diagnostics module for YNAB MCP Server
+ *
+ * Handles comprehensive system diagnostics collection.
+ * Extracted from YNABMCPServer to provide focused, testable diagnostics management.
+ */
+
+import { SecurityMiddleware } from './securityMiddleware.js';
+import type { CacheManager } from './cacheManager.js';
+import { responseFormatter } from './responseFormatter.js';
+
+type ResponseFormatterType = typeof responseFormatter;
+
+/**
+ * Diagnostic options for configuring what diagnostics to include
+ */
+export interface DiagnosticOptions {
+  include_server?: boolean;
+  include_memory?: boolean;
+  include_environment?: boolean;
+  include_security?: boolean;
+  include_cache?: boolean;
+}
+
+/**
+ * Diagnostic data structure
+ */
+export interface DiagnosticData {
+  timestamp: string;
+  server?: {
+    name: string;
+    version: string;
+    node_version: string;
+    platform: string;
+    arch: string;
+    pid: number;
+    uptime_ms: number;
+    uptime_readable: string;
+    env: {
+      node_env: string;
+      minify_output: string;
+    };
+  };
+  memory?: {
+    rss_mb: number;
+    heap_used_mb: number;
+    heap_total_mb: number;
+    external_mb: number;
+    array_buffers_mb: number;
+    description: {
+      rss: string;
+      heap_used: string;
+      heap_total: string;
+      external: string;
+      array_buffers: string;
+    };
+  };
+  environment?: {
+    token_present: boolean;
+    token_length: number;
+    token_preview: string | null;
+    ynab_env_keys_present: string[];
+    working_directory: string;
+  };
+  security?: unknown;
+  cache?: {
+    entries: number;
+    estimated_size_kb: number;
+    keys: string[];
+  };
+}
+
+/**
+ * Injectable dependencies for diagnostic manager
+ */
+export interface DiagnosticDependencies {
+  securityMiddleware: typeof SecurityMiddleware;
+  cacheManager: CacheManager;
+  responseFormatter: ResponseFormatterType;
+  serverVersion: string;
+}
+
+/**
+ * Utility functions for formatting diagnostic data
+ */
+export function formatUptime(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s`;
+  } else if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
+export function formatBytes(bytes: number): number {
+  return Math.round((bytes / 1024 / 1024) * 100) / 100;
+}
+
+export function maskToken(token: string | undefined): string | null {
+  if (!token) return null;
+
+  if (token.length >= 8) {
+    return `${token.slice(0, 4)}...${token.slice(-4)}`;
+  } else {
+    return `${token.slice(0, 1)}***`;
+  }
+}
+
+/**
+ * DiagnosticManager class that handles diagnostic data collection
+ */
+export class DiagnosticManager {
+  private dependencies: DiagnosticDependencies;
+
+  constructor(dependencies: DiagnosticDependencies) {
+    this.dependencies = dependencies;
+  }
+
+  /**
+   * Collects comprehensive diagnostic information
+   */
+  async collectDiagnostics(options: DiagnosticOptions): Promise<{
+    content: { type: 'text'; text: string }[];
+  }> {
+    const diagnostics: Record<string, unknown> = {
+      timestamp: new Date().toISOString(),
+    };
+
+    if (options.include_server) {
+      const uptimeMs = Math.round(process.uptime() * 1000);
+      diagnostics['server'] = {
+        name: 'ynab-mcp-server',
+        version: this.dependencies.serverVersion,
+        node_version: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        pid: process.pid,
+        uptime_ms: uptimeMs,
+        uptime_readable: formatUptime(uptimeMs),
+        env: {
+          node_env: process.env['NODE_ENV'] || 'development',
+          minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
+        },
+      };
+    }
+
+    if (options.include_memory) {
+      const memUsage = process.memoryUsage();
+      diagnostics['memory'] = {
+        rss_mb: formatBytes(memUsage.rss),
+        heap_used_mb: formatBytes(memUsage.heapUsed),
+        heap_total_mb: formatBytes(memUsage.heapTotal),
+        external_mb: formatBytes(memUsage.external),
+        array_buffers_mb: formatBytes(memUsage.arrayBuffers ?? 0),
+        description: {
+          rss: 'Resident Set Size - total memory allocated for the process',
+          heap_used: 'Used heap memory (objects, closures, etc.)',
+          heap_total: 'Total heap memory allocated',
+          external: 'Memory used by C++ objects bound to JavaScript objects',
+          array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
+        },
+      };
+    }
+
+    if (options.include_environment) {
+      const token = process.env['YNAB_ACCESS_TOKEN'];
+      const envKeys = Object.keys(process.env ?? {});
+      const ynabEnvKeys = envKeys.filter((key) => key.toUpperCase().includes('YNAB'));
+      diagnostics['environment'] = {
+        token_present: !!token,
+        token_length: token ? token.length : 0,
+        token_preview: maskToken(token),
+        ynab_env_keys_present: ynabEnvKeys,
+        working_directory: process.cwd(),
+      };
+    }
+
+    if (options.include_security) {
+      diagnostics['security'] = this.dependencies.securityMiddleware.getSecurityStats();
+    }
+
+    if (options.include_cache) {
+      const cacheStats = this.dependencies.cacheManager.getStats();
+      const estimateCacheSize = () => {
+        try {
+          const serialized = JSON.stringify(
+            this.dependencies.cacheManager.getEntriesForSizeEstimation(),
+          );
+          return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
+        } catch {
+          return 0;
+        }
+      };
+
+      diagnostics['cache'] = {
+        entries: cacheStats.size,
+        estimated_size_kb: estimateCacheSize(),
+        keys: cacheStats.keys,
+      };
+    }
+
+    return {
+      content: [{ type: 'text', text: this.dependencies.responseFormatter.format(diagnostics) }],
+    };
+  }
+}

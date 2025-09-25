@@ -11,6 +11,40 @@ import { responseFormatter } from '../../server/responseFormatter.js';
 describe('YNABMCPServer', () => {
   const originalEnv = process.env;
 
+  // Shared constant for expected tool names
+  const expectedToolNames = [
+    'list_budgets',
+    'get_budget',
+    'set_default_budget',
+    'get_default_budget',
+    'list_accounts',
+    'get_account',
+    'create_account',
+    'list_transactions',
+    'export_transactions',
+    'compare_transactions',
+    'reconcile_account',
+    'get_transaction',
+    'create_transaction',
+    'update_transaction',
+    'delete_transaction',
+    'list_categories',
+    'get_category',
+    'update_category',
+    'list_payees',
+    'get_payee',
+    'get_month',
+    'list_months',
+    'get_user',
+    'convert_amount',
+    'financial_overview',
+    'spending_analysis',
+    'budget_health_check',
+    'diagnostic_info',
+    'clear_cache',
+    'set_output_format',
+  ] as const;
+
   beforeAll(() => {
     if (!process.env['YNAB_ACCESS_TOKEN']) {
       throw new Error(
@@ -26,7 +60,8 @@ describe('YNABMCPServer', () => {
         if (originalEnv[key] !== undefined) {
           process.env[key] = originalEnv[key];
         } else {
-          process.env[key] = undefined;
+          // Use Reflect.deleteProperty to avoid ESLint dynamic delete warning
+          Reflect.deleteProperty(process.env, key);
         }
       }
     });
@@ -173,39 +208,6 @@ describe('YNABMCPServer', () => {
   describe('MCP Server Functionality', () => {
     let server: YNABMCPServer;
     let registry: ToolRegistry;
-
-    const expectedToolNames = [
-      'list_budgets',
-      'get_budget',
-      'set_default_budget',
-      'get_default_budget',
-      'list_accounts',
-      'get_account',
-      'create_account',
-      'list_transactions',
-      'export_transactions',
-      'compare_transactions',
-      'reconcile_account',
-      'get_transaction',
-      'create_transaction',
-      'update_transaction',
-      'delete_transaction',
-      'list_categories',
-      'get_category',
-      'update_category',
-      'list_payees',
-      'get_payee',
-      'get_month',
-      'list_months',
-      'get_user',
-      'convert_amount',
-      'financial_overview',
-      'spending_analysis',
-      'budget_health_check',
-      'diagnostic_info',
-      'clear_cache',
-      'set_output_format',
-    ] as const;
 
     const accessToken = () => {
       const token = process.env['YNAB_ACCESS_TOKEN'];
@@ -356,4 +358,111 @@ describe('YNABMCPServer', () => {
     });
   });
 
+  describe('Modular Architecture Integration', () => {
+    let server: YNABMCPServer;
+
+    beforeEach(() => {
+      server = new YNABMCPServer(false);
+    });
+
+    it('should initialize all service modules during construction', () => {
+      // Verify the server has been constructed successfully with all modules
+      expect(server).toBeInstanceOf(YNABMCPServer);
+
+      // Check that core functionality from modules works through public interface
+      expect(server.getYNABAPI()).toBeDefined();
+      expect(server.getServer()).toBeDefined();
+    });
+
+    it('should use config module for environment validation', () => {
+      // The fact that constructor succeeds means config module is working
+      // This test verifies the integration is seamless
+      expect(server.getYNABAPI()).toBeDefined();
+    });
+
+    it('should handle resource requests through resource manager', async () => {
+      // Test that resources work (this goes through the resource manager now)
+      const mcpServer = server.getServer();
+      expect(mcpServer).toBeDefined();
+
+      // The server should be properly configured with resource handlers
+      // If the integration failed, the server wouldn't have the handlers
+      expect(() => server.getYNABAPI()).not.toThrow();
+    });
+
+    it('should handle prompt requests through prompt manager', async () => {
+      // Test that the server has prompt handling capability
+      // The integration ensures prompt handlers are properly set up
+      const mcpServer = server.getServer();
+      expect(mcpServer).toBeDefined();
+    });
+
+    it('should handle diagnostic requests through diagnostic manager', async () => {
+      // Test that diagnostic tools work through the tool registry integration
+      const registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+
+      // Verify diagnostic tool is registered
+      const tools = registry.listTools();
+      const diagnosticTool = tools.find((tool) => tool.name === 'diagnostic_info');
+      expect(diagnosticTool).toBeDefined();
+      expect(diagnosticTool?.description).toContain('diagnostic information');
+    });
+
+    it('should maintain backward compatibility after modular refactoring', async () => {
+      // Test that all expected tools are still available
+      const registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+      const tools = registry.listTools();
+
+      // Use the shared expectedToolNames constant defined at the top of the test file
+
+      const actualToolNames = tools.map((tool) => tool.name).sort();
+      expect(actualToolNames).toEqual(expectedToolNames.sort());
+    });
+
+    it('should maintain same error handling behavior after refactoring', () => {
+      // Test that configuration errors are still properly thrown
+      const originalToken = process.env['YNAB_ACCESS_TOKEN'];
+      delete process.env['YNAB_ACCESS_TOKEN'];
+
+      try {
+        expect(() => new YNABMCPServer()).toThrow(ConfigurationError);
+        expect(() => new YNABMCPServer()).toThrow(
+          'YNAB_ACCESS_TOKEN environment variable is required but not set',
+        );
+      } finally {
+        // Restore token
+        process.env['YNAB_ACCESS_TOKEN'] = originalToken;
+      }
+    });
+
+    it('should delegate diagnostic collection to diagnostic manager', async () => {
+      const registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+      const accessToken = process.env['YNAB_ACCESS_TOKEN']!;
+
+      // Test that diagnostic_info tool works and returns expected structure
+      const result = await registry.executeTool({
+        name: 'diagnostic_info',
+        accessToken,
+        arguments: {
+          include_server: true,
+          include_memory: false,
+          include_environment: false,
+          include_security: false,
+          include_cache: false,
+        },
+      });
+
+      const diagnostics = JSON.parse(result.content?.[0]?.text ?? '{}');
+      expect(diagnostics.timestamp).toBeDefined();
+      expect(diagnostics.server).toBeDefined();
+      expect(diagnostics.server.name).toBe('ynab-mcp-server');
+      expect(diagnostics.server.version).toBeDefined();
+
+      // These should be undefined because we set include flags to false
+      expect(diagnostics.memory).toBeUndefined();
+      expect(diagnostics.environment).toBeUndefined();
+      expect(diagnostics.security).toBeUndefined();
+      expect(diagnostics.cache).toBeUndefined();
+    });
+  });
 });

@@ -14,23 +14,56 @@ function formatCurrency(milliunits: number): string {
   return ynab.utils.convertMilliUnitsToCurrencyAmount(milliunits).toFixed(2);
 }
 
-export const FinancialOverviewSchema = z.object({
-  budget_id: z.string().optional(),
-  months: z.number().min(1).max(12).default(3),
-  include_trends: z.boolean().default(true),
-  include_insights: z.boolean().default(true),
-}).strict();
+/**
+ * Validates and normalizes budget_id parameter
+ */
+function validateBudgetId(budgetId: string | undefined): string {
+  if (!budgetId) {
+    throw new Error("Invalid budget_id: must be a UUID or 'default'/'last-used'");
+  }
 
-export const SpendingAnalysisSchema = z.object({
-  budget_id: z.string().optional(),
-  period_months: z.number().min(1).max(12).default(6),
-  category_id: z.string().optional(),
-}).strict();
+  const trimmed = budgetId.trim();
+  if (!trimmed) {
+    throw new Error("Invalid budget_id: must be a UUID or 'default'/'last-used'");
+  }
 
-export const BudgetHealthSchema = z.object({
-  budget_id: z.string().optional(),
-  include_recommendations: z.boolean().default(true),
-}).strict();
+  // Allow special literal values
+  if (trimmed === 'default' || trimmed === 'last-used') {
+    return trimmed;
+  }
+
+  // Validate UUID v4 format
+  const uuidV4Regex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if (!uuidV4Regex.test(trimmed)) {
+    throw new Error("Invalid budget_id: must be a UUID or 'default'/'last-used'");
+  }
+
+  return trimmed;
+}
+
+export const FinancialOverviewSchema = z
+  .object({
+    budget_id: z.string().optional(),
+    months: z.number().min(1).max(12).default(3),
+    include_trends: z.boolean().default(true),
+    include_insights: z.boolean().default(true),
+  })
+  .strict();
+
+export const SpendingAnalysisSchema = z
+  .object({
+    budget_id: z.string().optional(),
+    period_months: z.number().min(1).max(12).default(6),
+    category_id: z.string().optional(),
+  })
+  .strict();
+
+export const BudgetHealthSchema = z
+  .object({
+    budget_id: z.string().optional(),
+    include_recommendations: z.boolean().default(true),
+  })
+  .strict();
 
 export type FinancialOverviewParams = z.infer<typeof FinancialOverviewSchema>;
 export type SpendingAnalysisParams = z.infer<typeof SpendingAnalysisSchema>;
@@ -114,7 +147,7 @@ export async function handleFinancialOverview(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const budgetId = params.budget_id!; // Will always be provided by the server
+      const budgetId = validateBudgetId(params.budget_id);
       const cacheKey = `financial-overview:${budgetId}:${params.months}:${params.include_trends}:${params.include_insights}`;
 
       const cached = cacheManager.get<CallToolResult>(cacheKey);
@@ -259,7 +292,7 @@ export async function handleSpendingAnalysis(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const budgetId = params.budget_id!; // Will always be provided by the server
+      const budgetId = validateBudgetId(params.budget_id);
 
       const monthsToAnalyze = getHistoricalMonths(params.period_months);
 
@@ -299,7 +332,7 @@ export async function handleBudgetHealthCheck(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const budgetId = params.budget_id!; // Will always be provided by the server
+      const budgetId = validateBudgetId(params.budget_id);
 
       const currentMonth = ynab.utils.getCurrentMonthInISOFormat();
       const [budget, currentMonthData, recentTransactions] = await Promise.all([
@@ -494,16 +527,30 @@ function analyzeCategoryPerformance(months: MonthData[], categories: ynab.Catego
 }
 
 function calculateNetWorthTrend(months: MonthData[], currentBalances: AccountBalance) {
+  // Sort months chronologically (oldest to newest)
+  const sortedMonths = [...months].sort((a, b) => {
+    const dateA = new Date(a?.data.month.month + '-01');
+    const dateB = new Date(b?.data.month.month + '-01');
+    return dateA.getTime() - dateB.getTime();
+  });
+
+  // Note: YNAB API doesn't provide historical account balances, only current balances
+  // So we can only show current net worth for all historical entries
+  // In a real implementation, you'd need to track account balance changes over time
+  const historical = sortedMonths.map((monthData) => ({
+    month: monthData?.data.month.month,
+    liquid_net_worth: currentBalances.liquidNetWorth, // Current balance (historical data not available)
+    total_net_worth: currentBalances.totalNetWorth, // Current balance (historical data not available)
+    change_from_previous: null, // Cannot calculate without historical account balance data
+  }));
+
+  // Since we don't have historical account data, we cannot determine actual trends
+  // This would need to be calculated from stored historical snapshots
   return {
     liquid_net_worth: currentBalances.liquidNetWorth,
     total_net_worth: currentBalances.totalNetWorth,
-    historical: months.map((monthData, index) => ({
-      month: monthData?.data.month.month,
-      liquid_net_worth: currentBalances.liquidNetWorth,
-      total_net_worth: currentBalances.totalNetWorth,
-      change_from_previous: index < months.length - 1 ? 0 : 0,
-    })),
-    trend: 'stable',
+    historical,
+    trend: 'unknown', // Cannot determine trend without historical account balance data
   };
 }
 

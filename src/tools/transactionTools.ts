@@ -19,81 +19,91 @@ function ensureTransaction<T>(transaction: T | undefined, errorMessage: string):
 /**
  * Schema for ynab:list_transactions tool parameters
  */
-export const ListTransactionsSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  account_id: z.string().optional(),
-  category_id: z.string().optional(),
-  since_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
-    .optional(),
-  type: z.enum(['uncategorized', 'unapproved']).optional(),
-}).strict();
+export const ListTransactionsSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    account_id: z.string().optional(),
+    category_id: z.string().optional(),
+    since_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
+      .optional(),
+    type: z.enum(['uncategorized', 'unapproved']).optional(),
+  })
+  .strict();
 
 export type ListTransactionsParams = z.infer<typeof ListTransactionsSchema>;
 
 /**
  * Schema for ynab:get_transaction tool parameters
  */
-export const GetTransactionSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  transaction_id: z.string().min(1, 'Transaction ID is required'),
-}).strict();
+export const GetTransactionSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    transaction_id: z.string().min(1, 'Transaction ID is required'),
+  })
+  .strict();
 
 export type GetTransactionParams = z.infer<typeof GetTransactionSchema>;
 
 /**
  * Schema for ynab:create_transaction tool parameters
  */
-export const CreateTransactionSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  account_id: z.string().min(1, 'Account ID is required'),
-  amount: z.number().int('Amount must be an integer in milliunits'),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)'),
-  payee_name: z.string().optional(),
-  payee_id: z.string().optional(),
-  category_id: z.string().optional(),
-  memo: z.string().optional(),
-  cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional(),
-  approved: z.boolean().optional(),
-  flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
-  dry_run: z.boolean().optional(),
-}).strict();
+export const CreateTransactionSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    account_id: z.string().min(1, 'Account ID is required'),
+    amount: z.number().int('Amount must be an integer in milliunits'),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)'),
+    payee_name: z.string().optional(),
+    payee_id: z.string().optional(),
+    category_id: z.string().optional(),
+    memo: z.string().optional(),
+    cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional(),
+    approved: z.boolean().optional(),
+    flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
+    dry_run: z.boolean().optional(),
+  })
+  .strict();
 
 export type CreateTransactionParams = z.infer<typeof CreateTransactionSchema>;
 
 /**
  * Schema for ynab:update_transaction tool parameters
  */
-export const UpdateTransactionSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  transaction_id: z.string().min(1, 'Transaction ID is required'),
-  account_id: z.string().optional(),
-  amount: z.number().int('Amount must be an integer in milliunits').optional(),
-  date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
-    .optional(),
-  payee_name: z.string().optional(),
-  payee_id: z.string().optional(),
-  category_id: z.string().optional(),
-  memo: z.string().optional(),
-  cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional(),
-  approved: z.boolean().optional(),
-  flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
-  dry_run: z.boolean().optional(),
-}).strict();
+export const UpdateTransactionSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    transaction_id: z.string().min(1, 'Transaction ID is required'),
+    account_id: z.string().optional(),
+    amount: z.number().int('Amount must be an integer in milliunits').optional(),
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
+      .optional(),
+    payee_name: z.string().optional(),
+    payee_id: z.string().optional(),
+    category_id: z.string().optional(),
+    memo: z.string().optional(),
+    cleared: z.enum(['cleared', 'uncleared', 'reconciled']).optional(),
+    approved: z.boolean().optional(),
+    flag_color: z.enum(['red', 'orange', 'yellow', 'green', 'blue', 'purple']).optional(),
+    dry_run: z.boolean().optional(),
+  })
+  .strict();
 
 export type UpdateTransactionParams = z.infer<typeof UpdateTransactionSchema>;
 
 /**
  * Schema for ynab:delete_transaction tool parameters
  */
-export const DeleteTransactionSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  transaction_id: z.string().min(1, 'Transaction ID is required'),
-  dry_run: z.boolean().optional(),
-}).strict();
+export const DeleteTransactionSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    transaction_id: z.string().min(1, 'Transaction ID is required'),
+    dry_run: z.boolean().optional(),
+  })
+  .strict();
 
 export type DeleteTransactionParams = z.infer<typeof DeleteTransactionSchema>;
 

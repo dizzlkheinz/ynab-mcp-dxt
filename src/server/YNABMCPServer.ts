@@ -84,6 +84,10 @@ import {
   type DefaultArgumentResolver,
   type ToolExecutionPayload,
 } from './toolRegistry.js';
+import { validateEnvironment } from './config.js';
+import { ResourceManager } from './resources.js';
+import { PromptManager } from './prompts.js';
+import { DiagnosticManager } from './diagnostics.js';
 
 /**
  * YNAB MCP Server class that provides integration with You Need A Budget API
@@ -96,11 +100,14 @@ export class YNABMCPServer {
   private defaultBudgetId?: string;
   private serverVersion: string;
   private toolRegistry: ToolRegistry;
+  private resourceManager: ResourceManager;
+  private promptManager: PromptManager;
+  private diagnosticManager: DiagnosticManager;
 
   constructor(exitOnError: boolean = true) {
     this.exitOnError = exitOnError;
     // Validate environment variables
-    this.config = this.validateEnvironment();
+    this.config = validateEnvironment();
 
     // Initialize YNAB API
     this.ynabAPI = new ynab.API(this.config.accessToken);
@@ -139,7 +146,7 @@ export class YNABMCPServer {
               return segment;
             }
             return JSON.stringify(segment);
-          }) as Array<string | number | boolean | undefined>;
+          }) as (string | number | boolean | undefined)[];
           return CacheManager.generateKey('tool', ...normalized);
         },
         invalidate: (key: string) => {
@@ -151,29 +158,23 @@ export class YNABMCPServer {
       },
     });
 
+    // Initialize service modules
+    this.resourceManager = new ResourceManager({
+      ynabAPI: this.ynabAPI,
+      responseFormatter,
+    });
+
+    this.promptManager = new PromptManager();
+
+    this.diagnosticManager = new DiagnosticManager({
+      securityMiddleware: SecurityMiddleware,
+      cacheManager,
+      responseFormatter,
+      serverVersion: this.serverVersion,
+    });
+
     this.setupToolRegistry();
     this.setupHandlers();
-  }
-
-  /**
-   * Validates environment variables and returns server configuration
-   */
-  private validateEnvironment(): ServerConfig {
-    const accessToken = process.env['YNAB_ACCESS_TOKEN'];
-
-    if (accessToken === undefined) {
-      throw new ConfigurationError(
-        'YNAB_ACCESS_TOKEN environment variable is required but not set',
-      );
-    }
-
-    if (typeof accessToken !== 'string' || accessToken.trim().length === 0) {
-      throw new ConfigurationError('YNAB_ACCESS_TOKEN must be a non-empty string');
-    }
-
-    return {
-      accessToken: accessToken.trim(),
-    };
   }
 
   /**
@@ -203,294 +204,31 @@ export class YNABMCPServer {
   private setupHandlers(): void {
     // Handle list resources requests
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
-      return {
-        resources: [
-          {
-            uri: 'ynab://budgets',
-            name: 'YNAB Budgets',
-            description: 'List of all available budgets',
-            mimeType: 'application/json',
-          },
-          {
-            name: 'set_output_format',
-            description: 'Configure default JSON output formatting (minify or pretty spaces)',
-            inputSchema: {
-              type: 'object',
-              additionalProperties: false,
-              properties: {
-                default_minify: { type: 'boolean', description: 'Default: true' },
-                pretty_spaces: {
-                  type: 'number',
-                  minimum: 0,
-                  maximum: 10,
-                  description: 'Spaces for pretty printing when not minified',
-                },
-              },
-              required: [],
-            },
-          },
-          {
-            uri: 'ynab://user',
-            name: 'YNAB User Info',
-            description: 'Current user information and subscription details',
-            mimeType: 'application/json',
-          },
-        ],
-      };
+      return this.resourceManager.listResources();
     });
 
     // Handle read resource requests
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const { uri } = request.params;
-
-      switch (uri) {
-        case 'ynab://budgets':
-          try {
-            const response = await this.ynabAPI.budgets.getBudgets();
-            const budgets = response.data.budgets.map((budget) => ({
-              id: budget.id,
-              name: budget.name,
-              last_modified_on: budget.last_modified_on,
-              first_month: budget.first_month,
-              last_month: budget.last_month,
-              currency_format: budget.currency_format,
-            }));
-
-            return {
-              contents: [
-                {
-                  uri: uri,
-                  mimeType: 'application/json',
-                  text: responseFormatter.format({ budgets }),
-                },
-              ],
-            };
-          } catch (error) {
-            throw new Error(`Failed to fetch budgets: ${error}`);
-          }
-
-        case 'ynab://user':
-          try {
-            const response = await this.ynabAPI.user.getUser();
-            const user = {
-              id: response.data.user.id,
-            };
-
-            return {
-              contents: [
-                {
-                  uri: uri,
-                  mimeType: 'application/json',
-                  text: responseFormatter.format({ user }),
-                },
-              ],
-            };
-          } catch (error) {
-            throw new Error(`Failed to fetch user info: ${error}`);
-          }
-
-        default:
-          throw new Error(`Unknown resource: ${uri}`);
+      try {
+        return await this.resourceManager.readResource(uri);
+      } catch (error) {
+        return ErrorHandler.handleError(error, `reading resource: ${uri}`);
       }
     });
 
     // Handle list prompts requests
     this.server.setRequestHandler(ListPromptsRequestSchema, async () => {
-      return {
-        prompts: [
-          {
-            name: 'create-transaction',
-            description: 'Create a new transaction in YNAB',
-            arguments: [
-              {
-                name: 'budget_name',
-                description: 'Name of the budget (optional, uses first budget if not specified)',
-                required: false,
-              },
-              {
-                name: 'account_name',
-                description: 'Name of the account',
-                required: true,
-              },
-              {
-                name: 'amount',
-                description: 'Transaction amount (negative for expenses, positive for income)',
-                required: true,
-              },
-              {
-                name: 'payee',
-                description: 'Who you paid or received money from',
-                required: true,
-              },
-              {
-                name: 'category',
-                description: 'Budget category (optional)',
-                required: false,
-              },
-              {
-                name: 'memo',
-                description: 'Additional notes (optional)',
-                required: false,
-              },
-            ],
-          },
-          {
-            name: 'budget-summary',
-            description: 'Get a summary of your budget status',
-            arguments: [
-              {
-                name: 'budget_name',
-                description: 'Name of the budget (optional, uses first budget if not specified)',
-                required: false,
-              },
-              {
-                name: 'month',
-                description:
-                  'Month to analyze (YYYY-MM format, optional, uses current month if not specified)',
-                required: false,
-              },
-            ],
-          },
-          {
-            name: 'account-balances',
-            description: 'Check balances across all accounts',
-            arguments: [
-              {
-                name: 'budget_name',
-                description: 'Name of the budget (optional, uses first budget if not specified)',
-                required: false,
-              },
-              {
-                name: 'account_type',
-                description: 'Filter by account type (checking, savings, creditCard, etc.)',
-                required: false,
-              },
-            ],
-          },
-        ],
-      };
+      return this.promptManager.listPrompts();
     });
 
     // Handle get prompt requests
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-
-      switch (name) {
-        case 'create-transaction': {
-          const budgetName = args?.['budget_name'] || 'first available budget';
-          const accountName = args?.['account_name'] || '[ACCOUNT_NAME]';
-          const amount = args?.['amount'] || '[AMOUNT]';
-          const payee = args?.['payee'] || '[PAYEE]';
-          const category = args?.['category'] || '[CATEGORY]';
-          const memo = args?.['memo'] || '';
-
-          return {
-            description: `Create a transaction for ${payee} in ${accountName}`,
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: `Please create a transaction with the following details:
-- Budget: ${budgetName}
-- Account: ${accountName}
-- Amount: $${amount}
-- Payee: ${payee}
-- Category: ${category}
-- Memo: ${memo}
-
-Use the appropriate YNAB MCP tools to:
-1. First, list budgets to find the budget ID
-2. List accounts for that budget to find the account ID
-3. If a category is specified, list categories to find the category ID
-4. Create the transaction with the correct amount in milliunits (multiply by 1000)
-5. Confirm the transaction was created successfully`,
-                },
-              },
-            ],
-          };
-        }
-
-        case 'budget-summary': {
-          const summaryBudget = args?.['budget_name'] || 'first available budget';
-          const month = args?.['month'] || 'current month';
-
-          return {
-            description: `Get budget summary for ${summaryBudget}`,
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: `Please provide a comprehensive budget summary for ${summaryBudget} (${month}):
-
-IMPORTANT: In YNAB, understand these key fields:
-- budgeted: Amount assigned to the category this month
-- activity: Spending/income in the category this month (negative = spending)  
-- balance: Available amount in the category = previous balance + budgeted + activity
-- OVERSPENDING occurs when balance < 0 (Available goes negative), NOT when spending > budgeted for the month
-
-SPENDING TRENDS: The analysis uses linear regression over multiple months to detect real spending patterns. Each trend includes:
-- explanation: User-friendly description of what the trend means
-- reliability_score: Confidence level (0-100%) indicating how reliable the trend is
-- data_points: Number of months used in the analysis
-Focus on trends with high reliability scores for actionable insights.
-
-BUDGET OPTIMIZATION: The system provides three types of optimization insights:
-1. "Consistently Under-Spent Categories" - Based on multi-month historical trends (reliable patterns)
-2. "Categories Over Monthly Assignment" - Current month only (spending > budgeted but Available still positive)  
-3. "Large Unused Category Balances" - Categories with substantial unused funds
-Distinguish between current-month patterns vs historical trends when presenting insights.
-
-1. List all budgets and select the appropriate one
-2. Get monthly data for ${month}
-3. List categories to show budget vs actual spending
-4. Provide insights on:
-   - Total budgeted vs actual spending
-   - Categories where Available balance is negative (true overspending - when the category's balance field is < 0)
-   - Categories where spending exceeded this month's assignment (but still have positive Available balance)
-   - Available money to budget
-   - Any true overspending where categories went into the red (negative Available balance)
-
-Format the response in a clear, easy-to-read summary.`,
-                },
-              },
-            ],
-          };
-        }
-
-        case 'account-balances': {
-          const balanceBudget = args?.['budget_name'] || 'first available budget';
-          const accountType = args?.['account_type'] || 'all accounts';
-
-          return {
-            description: `Check account balances for ${accountType}`,
-            messages: [
-              {
-                role: 'user',
-                content: {
-                  type: 'text',
-                  text: `Please show account balances for ${balanceBudget}:
-
-1. List all budgets and select the appropriate one
-2. List accounts for that budget
-3. Filter by account type: ${accountType}
-4. Show balances in a clear format with:
-   - Account name and type
-   - Current balance
-   - Cleared vs uncleared amounts
-   - Total by account type
-   - Net worth summary (assets - liabilities)
-
-Convert milliunits to dollars for easy reading.`,
-                },
-              },
-            ],
-          };
-        }
-
-        default:
-          throw new Error(`Unknown prompt: ${name}`);
+      try {
+        return await this.promptManager.getPrompt(name, args);
+      } catch (error) {
+        return ErrorHandler.handleError(error, `getting prompt: ${name}`);
       }
     });
 
@@ -503,7 +241,9 @@ Convert milliunits to dollars for easy reading.`,
 
     // Handle tool call requests
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
-      const rawArgs = (request.params.arguments ?? undefined) as Record<string, unknown> | undefined;
+      const rawArgs = (request.params.arguments ?? undefined) as
+        | Record<string, unknown>
+        | undefined;
       const minifyOverride = this.extractMinifyOverride(rawArgs);
 
       const sanitizedArgs = rawArgs
@@ -519,19 +259,19 @@ Convert milliunits to dollars for easy reading.`,
       return await this.toolRegistry.executeTool({
         name: request.params.name,
         accessToken: this.config.accessToken,
-        arguments: sanitizedArgs,
-        minifyOverride,
+        arguments: sanitizedArgs ?? {},
+        minifyOverride: minifyOverride ?? false,
       });
     });
   }
-
-
 
   /**
    * Registers all tools with the registry to centralize handler execution
    */
   private setupToolRegistry(): void {
-    const register = <TInput extends Record<string, unknown>>(definition: ToolDefinition<TInput>): void => {
+    const register = <TInput extends Record<string, unknown>>(
+      definition: ToolDefinition<TInput>,
+    ): void => {
       this.toolRegistry.register(definition);
     };
 
@@ -542,13 +282,14 @@ Convert milliunits to dollars for easy reading.`,
       async ({ input }: ToolExecutionPayload<TInput>): Promise<CallToolResult> =>
         handler(this.ynabAPI, input);
 
-    const adaptNoInput = (
-      handler: (ynabAPI: ynab.API) => Promise<CallToolResult>,
-    ) =>
+    const adaptNoInput =
+      (handler: (ynabAPI: ynab.API) => Promise<CallToolResult>) =>
       async (_payload: ToolExecutionPayload<Record<string, unknown>>): Promise<CallToolResult> =>
         handler(this.ynabAPI);
 
-    const resolveBudgetId = <TInput extends { budget_id?: string }>(): DefaultArgumentResolver<TInput> => {
+    const resolveBudgetId = <
+      TInput extends { budget_id?: string },
+    >(): DefaultArgumentResolver<TInput> => {
       return ({ rawArguments }) => {
         const provided =
           typeof rawArguments['budget_id'] === 'string' && rawArguments['budget_id'].length > 0
@@ -685,7 +426,8 @@ Convert milliunits to dollars for easy reading.`,
 
     register({
       name: 'compare_transactions',
-      description: 'Compare bank transactions from CSV with YNAB transactions to find missing entries',
+      description:
+        'Compare bank transactions from CSV with YNAB transactions to find missing entries',
       inputSchema: CompareTransactionsSchema,
       handler: adapt(handleCompareTransactions),
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof CompareTransactionsSchema>>(),
@@ -840,91 +582,7 @@ Convert milliunits to dollars for easy reading.`,
       description: 'Get comprehensive diagnostic information about the MCP server',
       inputSchema: diagnosticInfoSchema,
       handler: async ({ input }) => {
-        const diagnostics: Record<string, unknown> = {
-          timestamp: new Date().toISOString(),
-        };
-
-        if (input.include_server) {
-          const uptimeMs = Math.round(process.uptime() * 1000);
-          diagnostics['server'] = {
-            name: 'ynab-mcp-server',
-            version: this.serverVersion,
-            node_version: process.version,
-            platform: process.platform,
-            arch: process.arch,
-            pid: process.pid,
-            uptime_ms: uptimeMs,
-            uptime_readable: this.formatUptime(uptimeMs),
-            env: {
-              node_env: process.env['NODE_ENV'] || 'development',
-              minify_output: process.env['YNAB_MCP_MINIFY_OUTPUT'] ?? 'true',
-            },
-          };
-        }
-
-        if (input.include_memory) {
-          const memUsage = process.memoryUsage();
-          const formatBytes = (bytes: number) => Math.round((bytes / 1024 / 1024) * 100) / 100;
-          diagnostics['memory'] = {
-            rss_mb: formatBytes(memUsage.rss),
-            heap_used_mb: formatBytes(memUsage.heapUsed),
-            heap_total_mb: formatBytes(memUsage.heapTotal),
-            external_mb: formatBytes(memUsage.external),
-            array_buffers_mb: formatBytes(memUsage.arrayBuffers ?? 0),
-            description: {
-              rss: 'Resident Set Size - total memory allocated for the process',
-              heap_used: 'Used heap memory (objects, closures, etc.)',
-              heap_total: 'Total heap memory allocated',
-              external: 'Memory used by C++ objects bound to JavaScript objects',
-              array_buffers: 'Memory allocated for ArrayBuffer and SharedArrayBuffer',
-            },
-          };
-        }
-
-        if (input.include_environment) {
-          const token = process.env['YNAB_ACCESS_TOKEN'];
-          const masked =
-            token && token.length >= 8
-              ? `${token.slice(0, 4)}...${token.slice(-4)}`
-              : token
-                ? `${token.slice(0, 1)}***`
-                : null;
-          const envKeys = Object.keys(process.env ?? {});
-          const ynabEnvKeys = envKeys.filter((key) => key.toUpperCase().includes('YNAB'));
-          diagnostics['environment'] = {
-            token_present: !!token,
-            token_length: token ? token.length : 0,
-            token_preview: masked,
-            ynab_env_keys_present: ynabEnvKeys,
-            working_directory: process.cwd(),
-          };
-        }
-
-        if (input.include_security) {
-          diagnostics['security'] = SecurityMiddleware.getSecurityStats();
-        }
-
-        if (input.include_cache) {
-          const cacheStats = cacheManager.getStats();
-          const estimateCacheSize = () => {
-            try {
-              const serialized = JSON.stringify(cacheManager.getEntriesForSizeEstimation());
-              return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
-            } catch {
-              return 0;
-            }
-          };
-
-          diagnostics['cache'] = {
-            entries: cacheStats.size,
-            estimated_size_kb: estimateCacheSize(),
-            keys: cacheStats.keys,
-          };
-        }
-
-        return {
-          content: [{ type: 'text', text: responseFormatter.format(diagnostics) }],
-        };
+        return this.diagnosticManager.collectDiagnostics(input);
       },
     });
 
@@ -1046,26 +704,6 @@ Convert milliunits to dollars for easy reading.`,
     throw new Error(
       'No budget ID provided and no default budget set. Use set_default_budget first.',
     );
-  }
-
-  /**
-   * Formats uptime from milliseconds to readable format
-   */
-  private formatUptime(ms: number): string {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) {
-      return `${days}d ${hours % 24}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
   }
 
   /**

@@ -8,9 +8,11 @@ import { responseFormatter } from '../server/responseFormatter.js';
 /**
  * Schema for ynab:get_budget tool parameters
  */
-export const GetBudgetSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-}).strict();
+export const GetBudgetSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+  })
+  .strict();
 
 export type GetBudgetParams = z.infer<typeof GetBudgetSchema>;
 
@@ -39,6 +41,7 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
                     last_modified_on: budget.last_modified_on,
                     first_month: budget.first_month,
                     last_month: budget.last_month,
+                    date_format: budget.date_format,
                     currency_format: budget.currency_format,
                   })),
                   cached: true,

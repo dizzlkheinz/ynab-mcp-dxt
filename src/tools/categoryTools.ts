@@ -8,31 +8,37 @@ import { milliunitsToAmount } from '../utils/amountUtils.js';
 /**
  * Schema for ynab:list_categories tool parameters
  */
-export const ListCategoriesSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-}).strict();
+export const ListCategoriesSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+  })
+  .strict();
 
 export type ListCategoriesParams = z.infer<typeof ListCategoriesSchema>;
 
 /**
  * Schema for ynab:get_category tool parameters
  */
-export const GetCategorySchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  category_id: z.string().min(1, 'Category ID is required'),
-}).strict();
+export const GetCategorySchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    category_id: z.string().min(1, 'Category ID is required'),
+  })
+  .strict();
 
 export type GetCategoryParams = z.infer<typeof GetCategorySchema>;
 
 /**
  * Schema for ynab:update_category tool parameters
  */
-export const UpdateCategorySchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  category_id: z.string().min(1, 'Category ID is required'),
-  budgeted: z.number().int('Budgeted amount must be an integer in milliunits'),
-  dry_run: z.boolean().optional(),
-}).strict();
+export const UpdateCategorySchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    category_id: z.string().min(1, 'Category ID is required'),
+    budgeted: z.number().int('Budgeted amount must be an integer in milliunits'),
+    dry_run: z.boolean().optional(),
+  })
+  .strict();
 
 export type UpdateCategoryParams = z.infer<typeof UpdateCategorySchema>;
 

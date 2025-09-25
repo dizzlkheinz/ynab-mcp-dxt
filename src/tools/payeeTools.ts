@@ -7,19 +7,23 @@ import { responseFormatter } from '../server/responseFormatter.js';
 /**
  * Schema for ynab:list_payees tool parameters
  */
-export const ListPayeesSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-}).strict();
+export const ListPayeesSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+  })
+  .strict();
 
 export type ListPayeesParams = z.infer<typeof ListPayeesSchema>;
 
 /**
  * Schema for ynab:get_payee tool parameters
  */
-export const GetPayeeSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  payee_id: z.string().min(1, 'Payee ID is required'),
-}).strict();
+export const GetPayeeSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    payee_id: z.string().min(1, 'Payee ID is required'),
+  })
+  .strict();
 
 export type GetPayeeParams = z.infer<typeof GetPayeeSchema>;
 

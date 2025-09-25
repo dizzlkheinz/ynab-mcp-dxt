@@ -8,19 +8,23 @@ import { milliunitsToAmount } from '../utils/amountUtils.js';
 /**
  * Schema for ynab:get_month tool parameters
  */
-export const GetMonthSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  month: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Month must be in YYYY-MM-DD format'),
-}).strict();
+export const GetMonthSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    month: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Month must be in YYYY-MM-DD format'),
+  })
+  .strict();
 
 export type GetMonthParams = z.infer<typeof GetMonthSchema>;
 
 /**
  * Schema for ynab:list_months tool parameters
  */
-export const ListMonthsSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-}).strict();
+export const ListMonthsSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+  })
+  .strict();
 
 export type ListMonthsParams = z.infer<typeof ListMonthsSchema>;
 

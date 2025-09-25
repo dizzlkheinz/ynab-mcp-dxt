@@ -11,18 +11,20 @@ import { homedir } from 'os';
 /**
  * Schema for ynab:export_transactions tool parameters
  */
-export const ExportTransactionsSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  account_id: z.string().optional(),
-  category_id: z.string().optional(),
-  since_date: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
-    .optional(),
-  type: z.enum(['uncategorized', 'unapproved']).optional(),
-  filename: z.string().optional(),
-  minimal: z.boolean().optional().default(true),
-}).strict();
+export const ExportTransactionsSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    account_id: z.string().optional(),
+    category_id: z.string().optional(),
+    since_date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in ISO format (YYYY-MM-DD)')
+      .optional(),
+    type: z.enum(['uncategorized', 'unapproved']).optional(),
+    filename: z.string().optional(),
+    minimal: z.boolean().optional().default(true),
+  })
+  .strict();
 
 export type ExportTransactionsParams = z.infer<typeof ExportTransactionsSchema>;
 

@@ -72,9 +72,11 @@ export class CacheManager {
   /**
    * Provide a filtered snapshot for cache size estimation without exposing expired entries.
    */
-  getEntriesForSizeEstimation(): Array<[string, CacheEntry<unknown>]> {
+  getEntriesForSizeEstimation(): [string, CacheEntry<unknown>][] {
     const now = Date.now();
-    return Array.from(this.cache.entries()).filter(([, entry]) => now - entry.timestamp <= entry.ttl);
+    return Array.from(this.cache.entries()).filter(
+      ([, entry]) => now - entry.timestamp <= entry.ttl,
+    );
   }
 
   /**

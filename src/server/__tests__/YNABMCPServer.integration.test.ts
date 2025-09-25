@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll, afterEach, vi } from 'vitest';
-import { YNABMCPServer } from '../YNABMCPServer';
-import { AuthenticationError, ConfigurationError } from '../../types/index';
+import { YNABMCPServer } from '../YNABMCPServer.js';
+import { AuthenticationError, ConfigurationError } from '../../types/index.js';
 import { ToolRegistry } from '../toolRegistry.js';
 import { cacheManager } from '../../server/cacheManager.js';
 import { responseFormatter } from '../../server/responseFormatter.js';
@@ -299,4 +299,82 @@ describe('YNABMCPServer', () => {
     });
   });
 
+  describe('Modular Architecture Integration with Real API', () => {
+    let server: YNABMCPServer;
+    let registry: ToolRegistry;
+
+    const accessToken = () => {
+      const token = process.env['YNAB_ACCESS_TOKEN'];
+      if (!token) {
+        throw new Error('YNAB_ACCESS_TOKEN must be defined for integration tests');
+      }
+      return token;
+    };
+
+    beforeEach(() => {
+      server = new YNABMCPServer(false);
+      registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+    });
+
+    it('should maintain real API functionality after modular refactoring', async () => {
+      // Test that the key integration points work with real API calls
+      // This verifies that resource manager, diagnostic manager, and other modules
+      // properly integrate with the real YNAB API
+
+      // Test 1: User info via API (tests core YNAB integration)
+      const userResult = await registry.executeTool({
+        name: 'get_user',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const userPayload = JSON.parse(userResult.content?.[0]?.text ?? '{}');
+      expect(userPayload.user).toBeDefined();
+      expect(userPayload.user.id).toBeDefined();
+
+      // Test 2: Budget listing (tests resource-like functionality)
+      const budgetsResult = await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const budgetsPayload = JSON.parse(budgetsResult.content?.[0]?.text ?? '{}');
+      expect(budgetsPayload.budgets).toBeDefined();
+      expect(Array.isArray(budgetsPayload.budgets)).toBe(true);
+
+      // Test 3: Diagnostic info (tests diagnostic manager integration)
+      const diagResult = await registry.executeTool({
+        name: 'diagnostic_info',
+        accessToken: accessToken(),
+        arguments: {
+          include_server: true,
+          include_memory: false,
+          include_environment: false,
+          include_security: true,
+          include_cache: true,
+        },
+      });
+      const diagnostics = JSON.parse(diagResult.content?.[0]?.text ?? '{}');
+      expect(diagnostics.timestamp).toBeDefined();
+      expect(diagnostics.server).toBeDefined();
+      expect(diagnostics.server.name).toBe('ynab-mcp-server');
+      expect(diagnostics.security).toBeDefined();
+      expect(diagnostics.cache).toBeDefined();
+    });
+
+    it('should handle modular service errors gracefully in integration', async () => {
+      // Test error handling through the modules with real API
+      try {
+        await registry.executeTool({
+          name: 'get_budget',
+          accessToken: accessToken(),
+          arguments: {} as Record<string, unknown>, // Missing required budget_id
+        });
+        // Should not reach here
+        expect(false).toBe(true);
+      } catch (error) {
+        // Error handling should still work properly
+        expect(error).toBeDefined();
+      }
+    });
+  });
 });

@@ -8,40 +8,46 @@ import { milliunitsToAmount } from '../utils/amountUtils.js';
 /**
  * Schema for ynab:list_accounts tool parameters
  */
-export const ListAccountsSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-}).strict();
+export const ListAccountsSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+  })
+  .strict();
 
 export type ListAccountsParams = z.infer<typeof ListAccountsSchema>;
 
 /**
  * Schema for ynab:get_account tool parameters
  */
-export const GetAccountSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  account_id: z.string().min(1, 'Account ID is required'),
-}).strict();
+export const GetAccountSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    account_id: z.string().min(1, 'Account ID is required'),
+  })
+  .strict();
 
 export type GetAccountParams = z.infer<typeof GetAccountSchema>;
 
 /**
  * Schema for ynab:create_account tool parameters
  */
-export const CreateAccountSchema = z.object({
-  budget_id: z.string().min(1, 'Budget ID is required'),
-  name: z.string().min(1, 'Account name is required'),
-  type: z.enum([
-    'checking',
-    'savings',
-    'creditCard',
-    'cash',
-    'lineOfCredit',
-    'otherAsset',
-    'otherLiability',
-  ]),
-  balance: z.number().optional(),
-  dry_run: z.boolean().optional(),
-}).strict();
+export const CreateAccountSchema = z
+  .object({
+    budget_id: z.string().min(1, 'Budget ID is required'),
+    name: z.string().min(1, 'Account name is required'),
+    type: z.enum([
+      'checking',
+      'savings',
+      'creditCard',
+      'cash',
+      'lineOfCredit',
+      'otherAsset',
+      'otherLiability',
+    ]),
+    balance: z.number().optional(),
+    dry_run: z.boolean().optional(),
+  })
+  .strict();
 
 export type CreateAccountParams = z.infer<typeof CreateAccountSchema>;
 

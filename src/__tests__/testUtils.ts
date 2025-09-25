@@ -57,7 +57,9 @@ export async function executeToolCall(
   }
 
   const registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
-  const normalizedName = toolName.startsWith('ynab:') ? toolName.slice(toolName.indexOf(':') + 1) : toolName;
+  const normalizedName = toolName.startsWith('ynab:')
+    ? toolName.slice(toolName.indexOf(':') + 1)
+    : toolName;
 
   return await registry.executeTool({
     name: normalizedName,
@@ -277,7 +279,3 @@ export const YNABAssertions = {
     expect(typeof payee.name).toBe('string');
   },
 };
-
-
-
-
