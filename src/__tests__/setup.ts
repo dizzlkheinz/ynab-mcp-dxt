@@ -75,6 +75,7 @@ afterEach(async () => {
  */
 export class TestEnvironment {
   private originalEnv: Record<string, string | undefined> = {};
+  private originalNodeEnv: string | undefined = undefined;
 
   /**
    * Set environment variables for a test
@@ -98,6 +99,12 @@ export class TestEnvironment {
       }
     }
     this.originalEnv = {};
+
+    // Restore original NODE_ENV if it was modified by cache methods
+    if (this.originalNodeEnv !== undefined) {
+      process.env['NODE_ENV'] = this.originalNodeEnv;
+      this.originalNodeEnv = undefined;
+    }
   }
 
   /**
@@ -130,6 +137,10 @@ export class TestEnvironment {
    * Disable cache for testing by setting maxEntries to 0
    */
   disableCache(): void {
+    // Store original NODE_ENV value if not already stored
+    if (this.originalNodeEnv === undefined) {
+      this.originalNodeEnv = process.env['NODE_ENV'];
+    }
     // This would require access to CacheManager internals
     // For now, we rely on NODE_ENV=test to disable caching
     process.env['NODE_ENV'] = 'test';
@@ -139,6 +150,10 @@ export class TestEnvironment {
    * Enable cache for testing specific cache behavior
    */
   enableCache(): void {
+    // Store original NODE_ENV value if not already stored
+    if (this.originalNodeEnv === undefined) {
+      this.originalNodeEnv = process.env['NODE_ENV'];
+    }
     // Temporarily enable cache for specific tests
     process.env['NODE_ENV'] = 'development';
   }

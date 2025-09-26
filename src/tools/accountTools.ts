@@ -98,6 +98,7 @@ export async function handleListAccounts(
 
       // Use enhanced CacheManager wrap method
       const cacheKey = CacheManager.generateKey('accounts', 'list', params.budget_id);
+      const wasCached = cacheManager.has(cacheKey);
       const accounts = await cacheManager.wrap<ynab.Account[]>(cacheKey, {
         ttl: CACHE_TTLS.ACCOUNTS,
         loader: async () => {
@@ -125,8 +126,8 @@ export async function handleListAccounts(
                 direct_import_linked: account.direct_import_linked,
                 direct_import_in_error: account.direct_import_in_error,
               })),
-              cached: cacheManager.has(cacheKey),
-              cache_info: cacheManager.has(cacheKey)
+              cached: wasCached,
+              cache_info: wasCached
                 ? 'Data retrieved from cache for improved performance'
                 : 'Fresh data retrieved from YNAB API',
             }),
@@ -190,6 +191,7 @@ export async function handleGetAccount(
         params.budget_id,
         params.account_id,
       );
+      const wasCached = cacheManager.has(cacheKey);
       const account = await cacheManager.wrap<ynab.Account>(cacheKey, {
         ttl: CACHE_TTLS.ACCOUNTS,
         loader: async () => {
@@ -220,8 +222,8 @@ export async function handleGetAccount(
                 direct_import_linked: account.direct_import_linked,
                 direct_import_in_error: account.direct_import_in_error,
               },
-              cached: cacheManager.has(cacheKey),
-              cache_info: cacheManager.has(cacheKey)
+              cached: wasCached,
+              cache_info: wasCached
                 ? 'Data retrieved from cache for improved performance'
                 : 'Fresh data retrieved from YNAB API',
             }),

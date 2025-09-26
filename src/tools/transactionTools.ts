@@ -125,10 +125,12 @@ export async function handleListTransactions(
         useCache && !params.account_id && !params.category_id && !params.since_date && !params.type;
 
       let transactions: ynab.TransactionDetail[];
+      let cacheHit = false;
 
       if (shouldCache) {
         // Use enhanced CacheManager wrap method
         const cacheKey = CacheManager.generateKey('transactions', 'list', params.budget_id);
+        cacheHit = cacheManager.has(cacheKey);
         transactions = await cacheManager.wrap<ynab.TransactionDetail[]>(cacheKey, {
           ttl: CACHE_TTLS.TRANSACTIONS,
           loader: async () => {
@@ -197,21 +199,16 @@ export async function handleListTransactions(
         };
       }
 
-      const cacheKey = shouldCache
-        ? CacheManager.generateKey('transactions', 'list', params.budget_id)
-        : null;
-
       return {
         content: [
           {
             type: 'text',
             text: responseFormatter.format({
               total_count: transactions.length,
-              cached: shouldCache && cacheKey ? cacheManager.has(cacheKey) : false,
-              cache_info:
-                shouldCache && cacheKey && cacheManager.has(cacheKey)
-                  ? 'Data retrieved from cache for improved performance'
-                  : 'Fresh data retrieved from YNAB API',
+              cached: cacheHit,
+              cache_info: cacheHit
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
               transactions: transactions.map((transaction) => ({
                 id: transaction.id,
                 date: transaction.date,
@@ -279,10 +276,6 @@ export async function handleGetTransaction(
       transaction = ensureTransaction(response.data.transaction, 'Transaction not found');
     }
 
-    const cacheKey = useCache
-      ? CacheManager.generateKey('transaction', 'get', params.budget_id, params.transaction_id)
-      : null;
-
     return {
       content: [
         {
@@ -308,11 +301,10 @@ export async function handleGetTransaction(
               payee_name: transaction.payee_name,
               category_name: transaction.category_name,
             },
-            cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-            cache_info:
-              useCache && cacheKey && cacheManager.has(cacheKey)
-                ? 'Data retrieved from cache for improved performance'
-                : 'Fresh data retrieved from YNAB API',
+            cached: cacheHit,
+            cache_info: cacheHit
+              ? 'Data retrieved from cache for improved performance'
+              : 'Fresh data retrieved from YNAB API',
           }),
         },
       ],

@@ -39,7 +39,7 @@ const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cache
 
 describe('Account Tools', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     // Reset NODE_ENV to test to ensure cache bypassing in tests
     process.env['NODE_ENV'] = 'test';
   });

@@ -306,10 +306,24 @@ describe('YNABMCPServer', () => {
         arguments: { budget_id: firstBudget.id },
       });
 
-      // Wait a short moment for cache warming to complete (it's fire-and-forget)
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Wait for cache warming to complete with polling (it's fire-and-forget)
+      const timeoutMs = 5000; // 5 second timeout
+      const pollIntervalMs = 50; // Check every 50ms
+      const startTime = Date.now();
+      let statsAfterSet = cacheManager.getStats();
 
-      const statsAfterSet = cacheManager.getStats();
+      while (statsAfterSet.size <= initialSize && Date.now() - startTime < timeoutMs) {
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+        statsAfterSet = cacheManager.getStats();
+      }
+
+      // Fail test if timeout was reached without cache growth
+      if (statsAfterSet.size <= initialSize) {
+        throw new Error(
+          `Cache warming failed to complete within ${timeoutMs}ms. ` +
+            `Initial size: ${initialSize}, Final size: ${statsAfterSet.size}`,
+        );
+      }
 
       // Cache should have more entries due to warming
       expect(statsAfterSet.size).toBeGreaterThan(initialSize);

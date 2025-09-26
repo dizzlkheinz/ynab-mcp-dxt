@@ -30,7 +30,6 @@ export async function handleGetUser(ynabAPI: ynab.API): Promise<CallToolResult> 
         id: userInfo.id,
         ...(userInfo.email && { email: userInfo.email }),
         ...(userInfo.name && { name: userInfo.name }),
-        ...(userInfo.date_created && { date_created: userInfo.date_created }),
       };
 
       return {

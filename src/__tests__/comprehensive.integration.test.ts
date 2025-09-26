@@ -761,11 +761,26 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
   });
 
   describe('Caching Integration Tests', () => {
+    let previousNodeEnv: string | undefined;
+
+    beforeAll(() => {
+      previousNodeEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'development';
+    });
+
     beforeEach(() => {
       // Clear cache before each test to ensure clean state
       cacheManager.clear();
-      // Set NODE_ENV to enable caching for these tests
+      // Double-check NODE_ENV stays on for caching assertions
       process.env['NODE_ENV'] = 'development';
+    });
+
+    afterAll(() => {
+      if (previousNodeEnv === undefined) {
+        delete process.env['NODE_ENV'];
+      } else {
+        process.env['NODE_ENV'] = previousNodeEnv;
+      }
     });
 
     it('should cache budget list requests and improve performance on subsequent calls', async () => {
