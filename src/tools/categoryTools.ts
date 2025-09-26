@@ -57,9 +57,12 @@ export async function handleListCategories(
 
       let categoryGroups: ynab.CategoryGroupWithCategories[];
 
+      let wasCached = false;
+
       if (useCache) {
         // Use enhanced CacheManager wrap method
         const cacheKey = CacheManager.generateKey('categories', 'list', params.budget_id);
+        wasCached = cacheManager.has(cacheKey);
         categoryGroups = await cacheManager.wrap<ynab.CategoryGroupWithCategories[]>(cacheKey, {
           ttl: CACHE_TTLS.CATEGORIES,
           loader: async () => {
@@ -94,10 +97,6 @@ export async function handleListCategories(
         })),
       );
 
-      const cacheKey = useCache
-        ? CacheManager.generateKey('categories', 'list', params.budget_id)
-        : null;
-
       return {
         content: [
           {
@@ -110,11 +109,10 @@ export async function handleListCategories(
                 hidden: group.hidden,
                 deleted: group.deleted,
               })),
-              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-              cache_info:
-                useCache && cacheKey && cacheManager.has(cacheKey)
-                  ? 'Data retrieved from cache for improved performance'
-                  : 'Fresh data retrieved from YNAB API',
+              cached: wasCached,
+              cache_info: wasCached
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],
@@ -137,6 +135,7 @@ export async function handleGetCategory(
     const useCache = process.env['NODE_ENV'] !== 'test';
 
     let category: ynab.Category;
+    let wasCached = false;
 
     if (useCache) {
       // Use enhanced CacheManager wrap method
@@ -146,6 +145,7 @@ export async function handleGetCategory(
         params.budget_id,
         params.category_id,
       );
+      wasCached = cacheManager.has(cacheKey);
       category = await cacheManager.wrap<ynab.Category>(cacheKey, {
         ttl: CACHE_TTLS.CATEGORIES,
         loader: async () => {
@@ -164,10 +164,6 @@ export async function handleGetCategory(
       );
       category = response.data.category;
     }
-
-    const cacheKey = useCache
-      ? CacheManager.generateKey('category', 'get', params.budget_id, params.category_id)
-      : null;
 
     return {
       content: [
@@ -190,11 +186,10 @@ export async function handleGetCategory(
               goal_target_month: category.goal_target_month,
               goal_percentage_complete: category.goal_percentage_complete,
             },
-            cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-            cache_info:
-              useCache && cacheKey && cacheManager.has(cacheKey)
-                ? 'Data retrieved from cache for improved performance'
-                : 'Fresh data retrieved from YNAB API',
+            cached: wasCached,
+            cache_info: wasCached
+              ? 'Data retrieved from cache for improved performance'
+              : 'Fresh data retrieved from YNAB API',
           }),
         },
       ],
@@ -257,6 +252,17 @@ export async function handleUpdateCategory(
     );
     cacheManager.delete(categoriesListCacheKey);
     cacheManager.delete(specificCategoryCacheKey);
+
+    // Invalidate month-related caches as category budget changes affect month data
+    const monthsListCacheKey = CacheManager.generateKey('months', 'list', params.budget_id);
+    const currentMonthCacheKey = CacheManager.generateKey(
+      'month',
+      'get',
+      params.budget_id,
+      currentMonth,
+    );
+    cacheManager.delete(monthsListCacheKey);
+    cacheManager.delete(currentMonthCacheKey);
 
     return {
       content: [

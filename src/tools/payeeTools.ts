@@ -41,10 +41,12 @@ export async function handleListPayees(
       const useCache = process.env['NODE_ENV'] !== 'test';
 
       let payees: ynab.Payee[];
+      let wasCached = false;
 
       if (useCache) {
         // Use enhanced CacheManager wrap method
         const cacheKey = CacheManager.generateKey('payees', 'list', params.budget_id);
+        wasCached = cacheManager.has(cacheKey);
         payees = await cacheManager.wrap<ynab.Payee[]>(cacheKey, {
           ttl: CACHE_TTLS.PAYEES,
           loader: async () => {
@@ -58,10 +60,6 @@ export async function handleListPayees(
         payees = response.data.payees;
       }
 
-      const cacheKey = useCache
-        ? CacheManager.generateKey('payees', 'list', params.budget_id)
-        : null;
-
       return {
         content: [
           {
@@ -73,11 +71,10 @@ export async function handleListPayees(
                 transfer_account_id: payee.transfer_account_id,
                 deleted: payee.deleted,
               })),
-              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-              cache_info:
-                useCache && cacheKey && cacheManager.has(cacheKey)
-                  ? 'Data retrieved from cache for improved performance'
-                  : 'Fresh data retrieved from YNAB API',
+              cached: wasCached,
+              cache_info: wasCached
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],
@@ -101,6 +98,7 @@ export async function handleGetPayee(
       const useCache = process.env['NODE_ENV'] !== 'test';
 
       let payee: ynab.Payee;
+      let wasCached = false;
 
       if (useCache) {
         // Use enhanced CacheManager wrap method
@@ -110,6 +108,7 @@ export async function handleGetPayee(
           params.budget_id,
           params.payee_id,
         );
+        wasCached = cacheManager.has(cacheKey);
         payee = await cacheManager.wrap<ynab.Payee>(cacheKey, {
           ttl: CACHE_TTLS.PAYEES,
           loader: async () => {
@@ -123,10 +122,6 @@ export async function handleGetPayee(
         payee = response.data.payee;
       }
 
-      const cacheKey = useCache
-        ? CacheManager.generateKey('payee', 'get', params.budget_id, params.payee_id)
-        : null;
-
       return {
         content: [
           {
@@ -138,11 +133,10 @@ export async function handleGetPayee(
                 transfer_account_id: payee.transfer_account_id,
                 deleted: payee.deleted,
               },
-              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-              cache_info:
-                useCache && cacheKey && cacheManager.has(cacheKey)
-                  ? 'Data retrieved from cache for improved performance'
-                  : 'Fresh data retrieved from YNAB API',
+              cached: wasCached,
+              cache_info: wasCached
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],

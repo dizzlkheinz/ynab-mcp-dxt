@@ -54,6 +54,7 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
 
       // Use enhanced CacheManager wrap method
       const cacheKey = CacheManager.generateKey('budgets', 'list');
+      const wasCached = cacheManager.has(cacheKey);
       const budgets = await cacheManager.wrap<ynab.BudgetSummary[]>(cacheKey, {
         ttl: CACHE_TTLS.BUDGETS,
         loader: async () => {
@@ -76,8 +77,8 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
                 date_format: budget.date_format,
                 currency_format: budget.currency_format,
               })),
-              cached: cacheManager.has(cacheKey),
-              cache_info: cacheManager.has(cacheKey)
+              cached: wasCached,
+              cache_info: wasCached
                 ? 'Data retrieved from cache for improved performance'
                 : 'Fresh data retrieved from YNAB API',
             }),

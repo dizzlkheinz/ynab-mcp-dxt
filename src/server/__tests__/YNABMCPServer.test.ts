@@ -339,32 +339,40 @@ describe('YNABMCPServer', () => {
     });
 
     it('should handle cache warming errors gracefully', async () => {
-      // Use an invalid budget ID to trigger cache warming errors
-      const invalidBudgetId = '00000000-0000-0000-0000-000000000000';
+      // Get a real budget ID first, since API validation is in place
+      const budgetsResult = await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const budgetsPayload = parseCallToolJson(budgetsResult);
+      const firstBudget = budgetsPayload.budgets?.[0];
+      expect(firstBudget?.id).toBeDefined();
+      const realBudgetId = firstBudget.id as string;
 
-      // This should not throw an error even though cache warming will fail
+      // This should succeed with API validation in place
       const result = await registry.executeTool({
         name: 'set_default_budget',
         accessToken: accessToken(),
-        arguments: { budget_id: invalidBudgetId },
+        arguments: { budget_id: realBudgetId },
       });
 
-      // The set_default_budget operation should still succeed
+      // The set_default_budget operation should succeed
       const payload = parseCallToolJson(result);
-      expect(payload.message).toContain('Default budget set successfully');
-      expect(payload.budget_id).toBe(invalidBudgetId);
+      expect(payload.message).toContain('Default budget set to:');
+      expect(payload.default_budget_id).toBe(realBudgetId);
 
       // Wait a moment for cache warming attempts to complete
       await new Promise((resolve) => setTimeout(resolve, 100));
 
-      // Server should still be functional (cache warming errors are silently handled)
+      // Server should still be functional
       const defaultResult = await registry.executeTool({
         name: 'get_default_budget',
         accessToken: accessToken(),
         arguments: {},
       });
       const defaultPayload = parseCallToolJson(defaultResult);
-      expect(defaultPayload.default_budget_id).toBe(invalidBudgetId);
+      expect(defaultPayload.default_budget_id).toBe(realBudgetId);
     });
 
     it('should execute list tools that rely on the default budget', async () => {

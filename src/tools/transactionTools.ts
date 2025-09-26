@@ -248,6 +248,7 @@ export async function handleGetTransaction(
     const useCache = process.env['NODE_ENV'] !== 'test';
 
     let transaction: ynab.TransactionDetail;
+    let cacheHit = false;
 
     if (useCache) {
       // Use enhanced CacheManager wrap method
@@ -257,6 +258,7 @@ export async function handleGetTransaction(
         params.budget_id,
         params.transaction_id,
       );
+      cacheHit = cacheManager.has(cacheKey);
       transaction = await cacheManager.wrap<ynab.TransactionDetail>(cacheKey, {
         ttl: CACHE_TTLS.TRANSACTIONS,
         loader: async () => {
@@ -364,6 +366,17 @@ export async function handleCreateTransaction(
       params.budget_id,
     );
     cacheManager.delete(transactionsListCacheKey);
+
+    // Invalidate account-related caches as the account balance has changed
+    const accountsListCacheKey = CacheManager.generateKey('accounts', 'list', params.budget_id);
+    const specificAccountCacheKey = CacheManager.generateKey(
+      'account',
+      'get',
+      params.budget_id,
+      transaction.account_id,
+    );
+    cacheManager.delete(accountsListCacheKey);
+    cacheManager.delete(specificAccountCacheKey);
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(
@@ -489,6 +502,17 @@ export async function handleUpdateTransaction(
     cacheManager.delete(transactionsListCacheKey);
     cacheManager.delete(specificTransactionCacheKey);
 
+    // Invalidate account-related caches as the account balance has changed
+    const accountsListCacheKey = CacheManager.generateKey('accounts', 'list', params.budget_id);
+    const specificAccountCacheKey = CacheManager.generateKey(
+      'account',
+      'get',
+      params.budget_id,
+      transaction.account_id,
+    );
+    cacheManager.delete(accountsListCacheKey);
+    cacheManager.delete(specificAccountCacheKey);
+
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(
       params.budget_id,
@@ -573,6 +597,17 @@ export async function handleDeleteTransaction(
     );
     cacheManager.delete(transactionsListCacheKey);
     cacheManager.delete(specificTransactionCacheKey);
+
+    // Invalidate account-related caches as the account balance has changed
+    const accountsListCacheKey = CacheManager.generateKey('accounts', 'list', params.budget_id);
+    const specificAccountCacheKey = CacheManager.generateKey(
+      'account',
+      'get',
+      params.budget_id,
+      transaction.account_id,
+    );
+    cacheManager.delete(accountsListCacheKey);
+    cacheManager.delete(specificAccountCacheKey);
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(

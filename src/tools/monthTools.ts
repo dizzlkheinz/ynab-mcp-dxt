@@ -42,10 +42,12 @@ export async function handleGetMonth(
       const useCache = process.env['NODE_ENV'] !== 'test';
 
       let month: ynab.MonthDetail;
+      let wasCached = false;
 
       if (useCache) {
         // Use enhanced CacheManager wrap method
         const cacheKey = CacheManager.generateKey('month', 'get', params.budget_id, params.month);
+        wasCached = cacheManager.has(cacheKey);
         month = await cacheManager.wrap<ynab.MonthDetail>(cacheKey, {
           ttl: CACHE_TTLS.MONTHS,
           loader: async () => {
@@ -58,10 +60,6 @@ export async function handleGetMonth(
         const response = await ynabAPI.months.getBudgetMonth(params.budget_id, params.month);
         month = response.data.month;
       }
-
-      const cacheKey = useCache
-        ? CacheManager.generateKey('month', 'get', params.budget_id, params.month)
-        : null;
 
       return {
         content: [
@@ -100,11 +98,10 @@ export async function handleGetMonth(
                   deleted: category.deleted,
                 })),
               },
-              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-              cache_info:
-                useCache && cacheKey && cacheManager.has(cacheKey)
-                  ? 'Data retrieved from cache for improved performance'
-                  : 'Fresh data retrieved from YNAB API',
+              cached: wasCached,
+              cache_info: wasCached
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],
@@ -128,10 +125,12 @@ export async function handleListMonths(
       const useCache = process.env['NODE_ENV'] !== 'test';
 
       let months: ynab.MonthSummary[];
+      let wasCached = false;
 
       if (useCache) {
         // Use enhanced CacheManager wrap method
         const cacheKey = CacheManager.generateKey('months', 'list', params.budget_id);
+        wasCached = cacheManager.has(cacheKey);
         months = await cacheManager.wrap<ynab.MonthSummary[]>(cacheKey, {
           ttl: CACHE_TTLS.MONTHS,
           loader: async () => {
@@ -144,10 +143,6 @@ export async function handleListMonths(
         const response = await ynabAPI.months.getBudgetMonths(params.budget_id);
         months = response.data.months;
       }
-
-      const cacheKey = useCache
-        ? CacheManager.generateKey('months', 'list', params.budget_id)
-        : null;
 
       return {
         content: [
@@ -164,11 +159,10 @@ export async function handleListMonths(
                 age_of_money: month.age_of_money,
                 deleted: month.deleted,
               })),
-              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
-              cache_info:
-                useCache && cacheKey && cacheManager.has(cacheKey)
-                  ? 'Data retrieved from cache for improved performance'
-                  : 'Fresh data retrieved from YNAB API',
+              cached: wasCached,
+              cache_info: wasCached
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],

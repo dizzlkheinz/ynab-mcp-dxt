@@ -766,35 +766,39 @@ export class YNABMCPServer {
   /**
    * Warm cache for frequently accessed data after setting default budget
    * Uses fire-and-forget pattern to avoid blocking the main operation
+   * Runs cache warming operations in parallel for faster completion
    */
   private async warmCacheForBudget(budgetId: string): Promise<void> {
     try {
-      // Warm accounts cache
-      await cacheManager.wrap(CacheManager.generateKey('accounts', 'list', budgetId), {
-        ttl: CACHE_TTLS.ACCOUNTS,
-        loader: async () => {
-          const response = await this.ynabAPI.accounts.getAccounts(budgetId);
-          return response.data.accounts;
-        },
-      });
+      // Run all cache warming operations in parallel
+      await Promise.all([
+        // Warm accounts cache
+        cacheManager.wrap(CacheManager.generateKey('accounts', 'list', budgetId), {
+          ttl: CACHE_TTLS.ACCOUNTS,
+          loader: async () => {
+            const response = await this.ynabAPI.accounts.getAccounts(budgetId);
+            return response.data.accounts;
+          },
+        }),
 
-      // Warm categories cache
-      await cacheManager.wrap(CacheManager.generateKey('categories', 'list', budgetId), {
-        ttl: CACHE_TTLS.CATEGORIES,
-        loader: async () => {
-          const response = await this.ynabAPI.categories.getCategories(budgetId);
-          return response.data.category_groups;
-        },
-      });
+        // Warm categories cache
+        cacheManager.wrap(CacheManager.generateKey('categories', 'list', budgetId), {
+          ttl: CACHE_TTLS.CATEGORIES,
+          loader: async () => {
+            const response = await this.ynabAPI.categories.getCategories(budgetId);
+            return response.data.category_groups;
+          },
+        }),
 
-      // Warm payees cache
-      await cacheManager.wrap(CacheManager.generateKey('payees', 'list', budgetId), {
-        ttl: CACHE_TTLS.PAYEES,
-        loader: async () => {
-          const response = await this.ynabAPI.payees.getPayees(budgetId);
-          return response.data.payees;
-        },
-      });
+        // Warm payees cache
+        cacheManager.wrap(CacheManager.generateKey('payees', 'list', budgetId), {
+          ttl: CACHE_TTLS.PAYEES,
+          loader: async () => {
+            const response = await this.ynabAPI.payees.getPayees(budgetId);
+            return response.data.payees;
+          },
+        }),
+      ]);
     } catch {
       // Cache warming failures should not affect the main operation
       // Errors are handled by the caller with a catch block
