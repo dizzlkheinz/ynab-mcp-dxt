@@ -107,7 +107,7 @@ export function parseToolResult<T = any>(result: CallToolResult): T {
       if ('data' in record) {
         return parsed as T;
       }
-      return { data: parsed, ...record } as T;
+      return { ...record, data: parsed } as T;
     }
     return parsed as T;
   } catch (error) {

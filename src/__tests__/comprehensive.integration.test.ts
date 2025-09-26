@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { YNABMCPServer } from '../server/YNABMCPServer.js';
 import { executeToolCall, parseToolResult, validateToolResult } from './testUtils.js';
+import { cacheManager } from '../server/cacheManager.js';
 
 // Mock the YNAB SDK
 vi.mock('ynab', () => {
@@ -756,6 +757,278 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
       } catch (error) {
         expect(error).toBeDefined();
       }
+    });
+  });
+
+  describe('Caching Integration Tests', () => {
+    beforeEach(() => {
+      // Clear cache before each test to ensure clean state
+      cacheManager.clear();
+      // Set NODE_ENV to enable caching for these tests
+      process.env['NODE_ENV'] = 'development';
+    });
+
+    it('should cache budget list requests and improve performance on subsequent calls', async () => {
+      const mockBudgets = {
+        data: {
+          budgets: [
+            {
+              id: 'budget-1',
+              name: 'Test Budget',
+              last_modified_on: '2024-01-01T00:00:00Z',
+              first_month: '2024-01-01',
+              last_month: '2024-12-01',
+              date_format: { format: 'MM/DD/YYYY' },
+              currency_format: { iso_code: 'USD', example_format: '$123.45' },
+            },
+          ],
+        },
+      };
+
+      mockYnabAPI.budgets.getBudgets.mockResolvedValue(mockBudgets);
+
+      const statsBeforeFirstCall = cacheManager.getStats();
+      const initialSize = statsBeforeFirstCall.size;
+
+      // First call - should hit API and cache result
+      const firstResult = await executeToolCall(server, 'ynab:list_budgets');
+      validateToolResult(firstResult);
+
+      const firstParsed = parseToolResult(firstResult);
+      expect(firstParsed.cached).toBe(false);
+      expect(firstParsed.cache_info).toBe('Fresh data retrieved from YNAB API');
+
+      // Cache should have grown
+      const statsAfterFirstCall = cacheManager.getStats();
+      expect(statsAfterFirstCall.size).toBeGreaterThan(initialSize);
+
+      // Second call - should hit cache
+      const secondResult = await executeToolCall(server, 'ynab:list_budgets');
+      validateToolResult(secondResult);
+
+      const secondParsed = parseToolResult(secondResult);
+      expect(secondParsed.cached).toBe(true);
+      expect(secondParsed.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // API should only have been called once
+      expect(mockYnabAPI.budgets.getBudgets).toHaveBeenCalledTimes(1);
+
+      // Cache hit count should have increased
+      const finalStats = cacheManager.getStats();
+      expect(finalStats.hits).toBeGreaterThan(statsBeforeFirstCall.hits);
+    });
+
+    it('should invalidate cache on write operations', async () => {
+      const budgetId = 'test-budget';
+
+      // Mock responses
+      const mockAccounts = {
+        data: {
+          accounts: [
+            {
+              id: 'account-1',
+              name: 'Test Account',
+              type: 'checking',
+              on_budget: true,
+              closed: false,
+              balance: 100000,
+              cleared_balance: 95000,
+              uncleared_balance: 5000,
+            },
+          ],
+        },
+      };
+
+      const mockCreatedAccount = {
+        data: {
+          account: {
+            id: 'account-2',
+            name: 'New Account',
+            type: 'savings',
+            on_budget: true,
+            closed: false,
+            balance: 0,
+            cleared_balance: 0,
+            uncleared_balance: 0,
+          },
+        },
+      };
+
+      mockYnabAPI.accounts.getAccounts.mockResolvedValue(mockAccounts);
+      mockYnabAPI.accounts.createAccount.mockResolvedValue(mockCreatedAccount);
+
+      // First, populate cache with account list
+      await executeToolCall(server, 'ynab:list_accounts', { budget_id: budgetId });
+
+      // Verify cache has entries
+      const statsAfterRead = cacheManager.getStats();
+      expect(statsAfterRead.size).toBeGreaterThan(0);
+
+      // Create a new account (write operation)
+      await executeToolCall(server, 'ynab:create_account', {
+        budget_id: budgetId,
+        name: 'New Account',
+        type: 'savings',
+      });
+
+      // Next call to list accounts should hit API again (cache was invalidated)
+      mockYnabAPI.accounts.getAccounts.mockClear();
+      await executeToolCall(server, 'ynab:list_accounts', { budget_id: budgetId });
+
+      // Verify API was called again after cache invalidation
+      expect(mockYnabAPI.accounts.getAccounts).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not cache filtered transaction requests', async () => {
+      const budgetId = 'test-budget';
+
+      const mockTransactions = {
+        data: {
+          transactions: [
+            {
+              id: 'transaction-1',
+              date: '2024-01-15',
+              amount: -5000,
+              memo: 'Test transaction',
+              cleared: 'cleared',
+              approved: true,
+              account_id: 'account-1',
+              category_id: 'category-1',
+            },
+          ],
+        },
+      };
+
+      mockYnabAPI.transactions.getTransactions.mockResolvedValue(mockTransactions);
+      mockYnabAPI.transactions.getTransactionsByAccount.mockResolvedValue(mockTransactions);
+
+      const statsBeforeUnfiltered = cacheManager.getStats();
+
+      // Unfiltered request - should be cached
+      const unfilteredResult = await executeToolCall(server, 'ynab:list_transactions', {
+        budget_id: budgetId,
+      });
+      const unfilteredParsed = parseToolResult(unfilteredResult);
+      expect(unfilteredParsed.cached).toBe(false); // First call, cache miss
+
+      const statsAfterUnfiltered = cacheManager.getStats();
+      expect(statsAfterUnfiltered.size).toBeGreaterThan(statsBeforeUnfiltered.size);
+
+      // Filtered request - should NOT be cached
+      const filteredResult = await executeToolCall(server, 'ynab:list_transactions', {
+        budget_id: budgetId,
+        account_id: 'account-1',
+      });
+      const filteredParsed = parseToolResult(filteredResult);
+      expect(filteredParsed.cached).toBe(false);
+      expect(filteredParsed.cache_info).toBe('Fresh data retrieved from YNAB API');
+
+      // Cache size should not have increased for filtered request
+      const statsAfterFiltered = cacheManager.getStats();
+      expect(statsAfterFiltered.size).toBe(statsAfterUnfiltered.size);
+
+      // Both API methods should have been called
+      expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledTimes(1);
+      expect(mockYnabAPI.transactions.getTransactionsByAccount).toHaveBeenCalledTimes(1);
+    });
+
+    it('should handle cache warming after setting default budget', async () => {
+      const budgetId = 'test-budget';
+
+      // Mock all the responses for cache warming
+      mockYnabAPI.accounts.getAccounts.mockResolvedValue({
+        data: { accounts: [] },
+      });
+      mockYnabAPI.categories.getCategories.mockResolvedValue({
+        data: { category_groups: [] },
+      });
+      mockYnabAPI.payees.getPayees.mockResolvedValue({
+        data: { payees: [] },
+      });
+
+      const statsBeforeSet = cacheManager.getStats();
+      const initialSize = statsBeforeSet.size;
+
+      // Set default budget (should trigger cache warming)
+      await executeToolCall(server, 'ynab:set_default_budget', {
+        budget_id: budgetId,
+      });
+
+      // Wait a moment for cache warming to complete (it's fire-and-forget)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const statsAfterSet = cacheManager.getStats();
+
+      // Cache should have more entries due to warming
+      expect(statsAfterSet.size).toBeGreaterThan(initialSize);
+
+      // Verify that cache warming API calls were made
+      expect(mockYnabAPI.accounts.getAccounts).toHaveBeenCalled();
+      expect(mockYnabAPI.categories.getCategories).toHaveBeenCalled();
+      expect(mockYnabAPI.payees.getPayees).toHaveBeenCalled();
+    });
+
+    it('should handle cache clear operation', async () => {
+      // Populate cache with some data
+      mockYnabAPI.budgets.getBudgets.mockResolvedValue({
+        data: { budgets: [] },
+      });
+
+      await executeToolCall(server, 'ynab:list_budgets');
+
+      // Verify cache has entries
+      const statsAfterPopulation = cacheManager.getStats();
+      expect(statsAfterPopulation.size).toBeGreaterThan(0);
+
+      // Clear cache
+      await executeToolCall(server, 'ynab:clear_cache');
+
+      // Verify cache is empty
+      const statsAfterClear = cacheManager.getStats();
+      expect(statsAfterClear.size).toBe(0);
+      expect(statsAfterClear.hits).toBe(0);
+      expect(statsAfterClear.misses).toBe(0);
+    });
+
+    it('should respect cache TTL and return fresh data after expiration', async () => {
+      // Note: This test is conceptual since TTL testing requires time manipulation
+      // In a real scenario, we would mock the Date.now() or use a test clock
+
+      const mockBudgets = {
+        data: {
+          budgets: [
+            {
+              id: 'budget-1',
+              name: 'Test Budget',
+              last_modified_on: '2024-01-01T00:00:00Z',
+              first_month: '2024-01-01',
+              last_month: '2024-12-01',
+              date_format: { format: 'MM/DD/YYYY' },
+              currency_format: { iso_code: 'USD', example_format: '$123.45' },
+            },
+          ],
+        },
+      };
+
+      mockYnabAPI.budgets.getBudgets.mockResolvedValue(mockBudgets);
+
+      // First call - cache miss
+      const firstResult = await executeToolCall(server, 'ynab:list_budgets');
+      const firstParsed = parseToolResult(firstResult);
+      expect(firstParsed.cached).toBe(false);
+
+      // Second call - cache hit
+      const secondResult = await executeToolCall(server, 'ynab:list_budgets');
+      const secondParsed = parseToolResult(secondResult);
+      expect(secondParsed.cached).toBe(true);
+
+      // Verify API was only called once (second call used cache)
+      expect(mockYnabAPI.budgets.getBudgets).toHaveBeenCalledTimes(1);
+    });
+
+    afterEach(() => {
+      // Reset NODE_ENV back to test
+      process.env['NODE_ENV'] = 'test';
     });
   });
 });

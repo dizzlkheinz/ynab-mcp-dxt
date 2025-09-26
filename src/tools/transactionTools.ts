@@ -5,6 +5,7 @@ import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
 import { milliunitsToAmount } from '../utils/amountUtils.js';
+import { cacheManager, CACHE_TTLS, CacheManager } from '../server/cacheManager.js';
 
 /**
  * Utility function to ensure transaction is not null/undefined
@@ -117,33 +118,53 @@ export async function handleListTransactions(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      let response;
+      const useCache = process.env['NODE_ENV'] !== 'test';
 
-      // Use conditional API calls based on filter parameters
-      if (params.account_id) {
-        // Get transactions for specific account
-        response = await ynabAPI.transactions.getTransactionsByAccount(
-          params.budget_id,
-          params.account_id,
-          params.since_date,
-        );
-      } else if (params.category_id) {
-        // Get transactions for specific category
-        response = await ynabAPI.transactions.getTransactionsByCategory(
-          params.budget_id,
-          params.category_id,
-          params.since_date,
-        );
+      // Only cache when no filters are used (only budget_id is provided)
+      const shouldCache =
+        useCache && !params.account_id && !params.category_id && !params.since_date && !params.type;
+
+      let transactions: ynab.TransactionDetail[];
+
+      if (shouldCache) {
+        // Use enhanced CacheManager wrap method
+        const cacheKey = CacheManager.generateKey('transactions', 'list', params.budget_id);
+        transactions = await cacheManager.wrap<ynab.TransactionDetail[]>(cacheKey, {
+          ttl: CACHE_TTLS.TRANSACTIONS,
+          loader: async () => {
+            const response = await ynabAPI.transactions.getTransactions(params.budget_id);
+            return response.data.transactions;
+          },
+        });
       } else {
-        // Get all transactions for budget
-        response = await ynabAPI.transactions.getTransactions(
-          params.budget_id,
-          params.since_date,
-          params.type,
-        );
-      }
+        // Use conditional API calls based on filter parameters (no caching for filtered requests)
+        let response;
 
-      const transactions = response.data.transactions;
+        if (params.account_id) {
+          // Get transactions for specific account
+          response = await ynabAPI.transactions.getTransactionsByAccount(
+            params.budget_id,
+            params.account_id,
+            params.since_date,
+          );
+        } else if (params.category_id) {
+          // Get transactions for specific category
+          response = await ynabAPI.transactions.getTransactionsByCategory(
+            params.budget_id,
+            params.category_id,
+            params.since_date,
+          );
+        } else {
+          // Get all transactions for budget
+          response = await ynabAPI.transactions.getTransactions(
+            params.budget_id,
+            params.since_date,
+            params.type,
+          );
+        }
+
+        transactions = response.data.transactions;
+      }
 
       // Check if response might be too large for MCP
       const estimatedSize = JSON.stringify(transactions).length;
@@ -176,12 +197,21 @@ export async function handleListTransactions(
         };
       }
 
+      const cacheKey = shouldCache
+        ? CacheManager.generateKey('transactions', 'list', params.budget_id)
+        : null;
+
       return {
         content: [
           {
             type: 'text',
             text: responseFormatter.format({
               total_count: transactions.length,
+              cached: shouldCache && cacheKey ? cacheManager.has(cacheKey) : false,
+              cache_info:
+                shouldCache && cacheKey && cacheManager.has(cacheKey)
+                  ? 'Data retrieved from cache for improved performance'
+                  : 'Fresh data retrieved from YNAB API',
               transactions: transactions.map((transaction) => ({
                 id: transaction.id,
                 date: transaction.date,
@@ -218,12 +248,40 @@ export async function handleGetTransaction(
   params: GetTransactionParams,
 ): Promise<CallToolResult> {
   try {
-    const response = await ynabAPI.transactions.getTransactionById(
-      params.budget_id,
-      params.transaction_id,
-    );
+    const useCache = process.env['NODE_ENV'] !== 'test';
 
-    const transaction = ensureTransaction(response.data.transaction, 'Transaction not found');
+    let transaction: ynab.TransactionDetail;
+
+    if (useCache) {
+      // Use enhanced CacheManager wrap method
+      const cacheKey = CacheManager.generateKey(
+        'transaction',
+        'get',
+        params.budget_id,
+        params.transaction_id,
+      );
+      transaction = await cacheManager.wrap<ynab.TransactionDetail>(cacheKey, {
+        ttl: CACHE_TTLS.TRANSACTIONS,
+        loader: async () => {
+          const response = await ynabAPI.transactions.getTransactionById(
+            params.budget_id,
+            params.transaction_id,
+          );
+          return ensureTransaction(response.data.transaction, 'Transaction not found');
+        },
+      });
+    } else {
+      // Bypass cache in test environment
+      const response = await ynabAPI.transactions.getTransactionById(
+        params.budget_id,
+        params.transaction_id,
+      );
+      transaction = ensureTransaction(response.data.transaction, 'Transaction not found');
+    }
+
+    const cacheKey = useCache
+      ? CacheManager.generateKey('transaction', 'get', params.budget_id, params.transaction_id)
+      : null;
 
     return {
       content: [
@@ -250,6 +308,11 @@ export async function handleGetTransaction(
               payee_name: transaction.payee_name,
               category_name: transaction.category_name,
             },
+            cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+            cache_info:
+              useCache && cacheKey && cacheManager.has(cacheKey)
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
           }),
         },
       ],
@@ -301,6 +364,14 @@ export async function handleCreateTransaction(
     });
 
     const transaction = ensureTransaction(response.data.transaction, 'Transaction creation failed');
+
+    // Invalidate transaction-related caches after successful creation
+    const transactionsListCacheKey = CacheManager.generateKey(
+      'transactions',
+      'list',
+      params.budget_id,
+    );
+    cacheManager.delete(transactionsListCacheKey);
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(
@@ -411,6 +482,21 @@ export async function handleUpdateTransaction(
 
     const transaction = ensureTransaction(response.data.transaction, 'Transaction update failed');
 
+    // Invalidate transaction-related caches after successful update
+    const transactionsListCacheKey = CacheManager.generateKey(
+      'transactions',
+      'list',
+      params.budget_id,
+    );
+    const specificTransactionCacheKey = CacheManager.generateKey(
+      'transaction',
+      'get',
+      params.budget_id,
+      params.transaction_id,
+    );
+    cacheManager.delete(transactionsListCacheKey);
+    cacheManager.delete(specificTransactionCacheKey);
+
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(
       params.budget_id,
@@ -480,6 +566,21 @@ export async function handleDeleteTransaction(
     );
 
     const transaction = ensureTransaction(response.data.transaction, 'Transaction deletion failed');
+
+    // Invalidate transaction-related caches after successful deletion
+    const transactionsListCacheKey = CacheManager.generateKey(
+      'transactions',
+      'list',
+      params.budget_id,
+    );
+    const specificTransactionCacheKey = CacheManager.generateKey(
+      'transaction',
+      'get',
+      params.budget_id,
+      params.transaction_id,
+    );
+    cacheManager.delete(transactionsListCacheKey);
+    cacheManager.delete(specificTransactionCacheKey);
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(

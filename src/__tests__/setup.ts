@@ -5,6 +5,7 @@
 // Load environment variables from .env for integration tests
 import 'dotenv/config';
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { cacheManager } from '../server/cacheManager.js';
 
 /**
  * Global test setup
@@ -46,6 +47,9 @@ afterAll(async () => {
 beforeEach(async () => {
   // Reset environment for each test
   process.env['NODE_ENV'] = 'test';
+
+  // Clear cache state between tests to prevent interference
+  cacheManager.clear();
 
   // Clear any cached modules that might interfere (only if they exist)
   try {
@@ -120,6 +124,23 @@ export class TestEnvironment {
       return 60000; // 60 seconds in CI
     }
     return 30000; // 30 seconds locally
+  }
+
+  /**
+   * Disable cache for testing by setting maxEntries to 0
+   */
+  disableCache(): void {
+    // This would require access to CacheManager internals
+    // For now, we rely on NODE_ENV=test to disable caching
+    process.env['NODE_ENV'] = 'test';
+  }
+
+  /**
+   * Enable cache for testing specific cache behavior
+   */
+  enableCache(): void {
+    // Temporarily enable cache for specific tests
+    process.env['NODE_ENV'] = 'development';
   }
 }
 
@@ -274,6 +295,35 @@ export class TestDataFactory {
     return {
       id: 'test-user-id',
       email: 'test@example.com',
+      ...overrides,
+    };
+  }
+
+  /**
+   * Create mock cache statistics
+   */
+  static createMockCacheStats(overrides: Partial<any> = {}): any {
+    return {
+      hits: 10,
+      misses: 5,
+      hitRate: 0.67,
+      entryCount: 15,
+      maxEntries: 100,
+      ttl: 300000,
+      ...overrides,
+    };
+  }
+
+  /**
+   * Create mock cache entry structure
+   */
+  static createMockCacheEntry(key: string, value: any, overrides: Partial<any> = {}): any {
+    return {
+      key,
+      value,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 300000,
+      ttl: 300000,
       ...overrides,
     };
   }

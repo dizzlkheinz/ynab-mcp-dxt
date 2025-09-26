@@ -60,7 +60,7 @@ describe('resources module', () => {
             {
               uri: 'ynab://user',
               name: 'YNAB User Info',
-              description: 'Current user information and subscription details',
+              description: 'Current user information including ID and email address',
               mimeType: 'application/json',
             },
           ],

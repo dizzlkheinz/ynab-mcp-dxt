@@ -79,8 +79,12 @@ const defaultResourceHandlers: Record<string, ResourceHandler> = {
   'ynab://user': async (uri, { ynabAPI, responseFormatter }) => {
     try {
       const response = await ynabAPI.user.getUser();
+      const userInfo = response.data.user;
       const user = {
-        id: response.data.user.id,
+        id: userInfo.id,
+        ...(userInfo.email && { email: userInfo.email }),
+        ...(userInfo.name && { name: userInfo.name }),
+        ...(userInfo.date_created && { date_created: userInfo.date_created }),
       };
 
       return {
@@ -111,7 +115,7 @@ const defaultResourceDefinitions: ResourceDefinition[] = [
   {
     uri: 'ynab://user',
     name: 'YNAB User Info',
-    description: 'Current user information and subscription details',
+    description: 'Current user information including ID and email address',
     mimeType: 'application/json',
   },
 ];

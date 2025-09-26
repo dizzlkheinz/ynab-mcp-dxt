@@ -79,7 +79,7 @@ import {
   SpendingAnalysisSchema,
   BudgetHealthSchema,
 } from '../tools/financialOverviewTools.js';
-import { cacheManager, CacheManager } from './cacheManager.js';
+import { cacheManager, CacheManager, CACHE_TTLS } from './cacheManager.js';
 import { responseFormatter } from './responseFormatter.js';
 import {
   ToolRegistry,
@@ -153,11 +153,23 @@ export class YNABMCPServer {
           }) as (string | number | boolean | undefined)[];
           return CacheManager.generateKey('tool', ...normalized);
         },
-        invalidate: (key: string) => {
-          cacheManager.delete(key);
+        invalidate: (key: string): boolean => {
+          try {
+            cacheManager.delete(key);
+            return true;
+          } catch (error) {
+            console.error(`Failed to invalidate cache key "${key}":`, error);
+            return false;
+          }
         },
-        clear: () => {
-          cacheManager.clear();
+        clear: (): boolean => {
+          try {
+            cacheManager.clear();
+            return true;
+          } catch (error) {
+            console.error('Failed to clear cache:', error);
+            return false;
+          }
         },
       },
       validateAccessToken: (token: string) => {
@@ -365,6 +377,12 @@ export class YNABMCPServer {
         const { budget_id } = input;
         await this.ynabAPI.budgets.getBudgetById(budget_id);
         this.setDefaultBudget(budget_id);
+
+        // Cache warming for frequently accessed data (fire-and-forget)
+        this.warmCacheForBudget(budget_id).catch(() => {
+          // Silently handle cache warming errors to not affect main operation
+        });
+
         return {
           content: [
             {
@@ -373,6 +391,7 @@ export class YNABMCPServer {
                 success: true,
                 message: `Default budget set to: ${budget_id}`,
                 default_budget_id: budget_id,
+                cache_warmed: true,
               }),
             },
           ],
@@ -742,6 +761,44 @@ export class YNABMCPServer {
 
     const message = parsedError.error?.message || 'Budget resolution failed';
     throw new ValidationError(message);
+  }
+
+  /**
+   * Warm cache for frequently accessed data after setting default budget
+   * Uses fire-and-forget pattern to avoid blocking the main operation
+   */
+  private async warmCacheForBudget(budgetId: string): Promise<void> {
+    try {
+      // Warm accounts cache
+      await cacheManager.wrap(CacheManager.generateKey('accounts', 'list', budgetId), {
+        ttl: CACHE_TTLS.ACCOUNTS,
+        loader: async () => {
+          const response = await this.ynabAPI.accounts.getAccounts(budgetId);
+          return response.data.accounts;
+        },
+      });
+
+      // Warm categories cache
+      await cacheManager.wrap(CacheManager.generateKey('categories', 'list', budgetId), {
+        ttl: CACHE_TTLS.CATEGORIES,
+        loader: async () => {
+          const response = await this.ynabAPI.categories.getCategories(budgetId);
+          return response.data.category_groups;
+        },
+      });
+
+      // Warm payees cache
+      await cacheManager.wrap(CacheManager.generateKey('payees', 'list', budgetId), {
+        ttl: CACHE_TTLS.PAYEES,
+        loader: async () => {
+          const response = await this.ynabAPI.payees.getPayees(budgetId);
+          return response.data.payees;
+        },
+      });
+    } catch {
+      // Cache warming failures should not affect the main operation
+      // Errors are handled by the caller with a catch block
+    }
   }
 
   /**

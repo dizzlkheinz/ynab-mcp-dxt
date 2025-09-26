@@ -3,6 +3,7 @@ import * as ynab from 'ynab';
 import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
+import { cacheManager, CACHE_TTLS, CacheManager } from '../server/cacheManager.js';
 
 /**
  * Schema for ynab:list_payees tool parameters
@@ -37,8 +38,29 @@ export async function handleListPayees(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const response = await ynabAPI.payees.getPayees(params.budget_id);
-      const payees = response.data.payees;
+      const useCache = process.env['NODE_ENV'] !== 'test';
+
+      let payees: ynab.Payee[];
+
+      if (useCache) {
+        // Use enhanced CacheManager wrap method
+        const cacheKey = CacheManager.generateKey('payees', 'list', params.budget_id);
+        payees = await cacheManager.wrap<ynab.Payee[]>(cacheKey, {
+          ttl: CACHE_TTLS.PAYEES,
+          loader: async () => {
+            const response = await ynabAPI.payees.getPayees(params.budget_id);
+            return response.data.payees;
+          },
+        });
+      } else {
+        // Bypass cache in test environment
+        const response = await ynabAPI.payees.getPayees(params.budget_id);
+        payees = response.data.payees;
+      }
+
+      const cacheKey = useCache
+        ? CacheManager.generateKey('payees', 'list', params.budget_id)
+        : null;
 
       return {
         content: [
@@ -51,6 +73,11 @@ export async function handleListPayees(
                 transfer_account_id: payee.transfer_account_id,
                 deleted: payee.deleted,
               })),
+              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+              cache_info:
+                useCache && cacheKey && cacheManager.has(cacheKey)
+                  ? 'Data retrieved from cache for improved performance'
+                  : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],
@@ -71,8 +98,34 @@ export async function handleGetPayee(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
-      const payee = response.data.payee;
+      const useCache = process.env['NODE_ENV'] !== 'test';
+
+      let payee: ynab.Payee;
+
+      if (useCache) {
+        // Use enhanced CacheManager wrap method
+        const cacheKey = CacheManager.generateKey(
+          'payee',
+          'get',
+          params.budget_id,
+          params.payee_id,
+        );
+        payee = await cacheManager.wrap<ynab.Payee>(cacheKey, {
+          ttl: CACHE_TTLS.PAYEES,
+          loader: async () => {
+            const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
+            return response.data.payee;
+          },
+        });
+      } else {
+        // Bypass cache in test environment
+        const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
+        payee = response.data.payee;
+      }
+
+      const cacheKey = useCache
+        ? CacheManager.generateKey('payee', 'get', params.budget_id, params.payee_id)
+        : null;
 
       return {
         content: [
@@ -85,6 +138,11 @@ export async function handleGetPayee(
                 transfer_account_id: payee.transfer_account_id,
                 deleted: payee.deleted,
               },
+              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+              cache_info:
+                useCache && cacheKey && cacheManager.has(cacheKey)
+                  ? 'Data retrieved from cache for improved performance'
+                  : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],

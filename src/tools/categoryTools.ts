@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
 import { milliunitsToAmount } from '../utils/amountUtils.js';
+import { cacheManager, CACHE_TTLS, CacheManager } from '../server/cacheManager.js';
 
 /**
  * Schema for ynab:list_categories tool parameters
@@ -52,8 +53,25 @@ export async function handleListCategories(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const response = await ynabAPI.categories.getCategories(params.budget_id);
-      const categoryGroups = response.data.category_groups;
+      const useCache = process.env['NODE_ENV'] !== 'test';
+
+      let categoryGroups: ynab.CategoryGroupWithCategories[];
+
+      if (useCache) {
+        // Use enhanced CacheManager wrap method
+        const cacheKey = CacheManager.generateKey('categories', 'list', params.budget_id);
+        categoryGroups = await cacheManager.wrap<ynab.CategoryGroupWithCategories[]>(cacheKey, {
+          ttl: CACHE_TTLS.CATEGORIES,
+          loader: async () => {
+            const response = await ynabAPI.categories.getCategories(params.budget_id);
+            return response.data.category_groups;
+          },
+        });
+      } else {
+        // Bypass cache in test environment
+        const response = await ynabAPI.categories.getCategories(params.budget_id);
+        categoryGroups = response.data.category_groups;
+      }
 
       // Flatten categories from all category groups
       const allCategories = categoryGroups.flatMap((group) =>
@@ -76,6 +94,10 @@ export async function handleListCategories(
         })),
       );
 
+      const cacheKey = useCache
+        ? CacheManager.generateKey('categories', 'list', params.budget_id)
+        : null;
+
       return {
         content: [
           {
@@ -88,6 +110,11 @@ export async function handleListCategories(
                 hidden: group.hidden,
                 deleted: group.deleted,
               })),
+              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+              cache_info:
+                useCache && cacheKey && cacheManager.has(cacheKey)
+                  ? 'Data retrieved from cache for improved performance'
+                  : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],
@@ -107,8 +134,40 @@ export async function handleGetCategory(
   params: GetCategoryParams,
 ): Promise<CallToolResult> {
   try {
-    const response = await ynabAPI.categories.getCategoryById(params.budget_id, params.category_id);
-    const category = response.data.category;
+    const useCache = process.env['NODE_ENV'] !== 'test';
+
+    let category: ynab.Category;
+
+    if (useCache) {
+      // Use enhanced CacheManager wrap method
+      const cacheKey = CacheManager.generateKey(
+        'category',
+        'get',
+        params.budget_id,
+        params.category_id,
+      );
+      category = await cacheManager.wrap<ynab.Category>(cacheKey, {
+        ttl: CACHE_TTLS.CATEGORIES,
+        loader: async () => {
+          const response = await ynabAPI.categories.getCategoryById(
+            params.budget_id,
+            params.category_id,
+          );
+          return response.data.category;
+        },
+      });
+    } else {
+      // Bypass cache in test environment
+      const response = await ynabAPI.categories.getCategoryById(
+        params.budget_id,
+        params.category_id,
+      );
+      category = response.data.category;
+    }
+
+    const cacheKey = useCache
+      ? CacheManager.generateKey('category', 'get', params.budget_id, params.category_id)
+      : null;
 
     return {
       content: [
@@ -131,6 +190,11 @@ export async function handleGetCategory(
               goal_target_month: category.goal_target_month,
               goal_percentage_complete: category.goal_percentage_complete,
             },
+            cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+            cache_info:
+              useCache && cacheKey && cacheManager.has(cacheKey)
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
           }),
         },
       ],
@@ -182,6 +246,17 @@ export async function handleUpdateCategory(
     );
 
     const category = response.data.category;
+
+    // Invalidate category-related caches after successful update
+    const categoriesListCacheKey = CacheManager.generateKey('categories', 'list', params.budget_id);
+    const specificCategoryCacheKey = CacheManager.generateKey(
+      'category',
+      'get',
+      params.budget_id,
+      params.category_id,
+    );
+    cacheManager.delete(categoriesListCacheKey);
+    cacheManager.delete(specificCategoryCacheKey);
 
     return {
       content: [

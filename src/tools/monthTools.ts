@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
 import { milliunitsToAmount } from '../utils/amountUtils.js';
+import { cacheManager, CACHE_TTLS, CacheManager } from '../server/cacheManager.js';
 
 /**
  * Schema for ynab:get_month tool parameters
@@ -38,8 +39,29 @@ export async function handleGetMonth(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const response = await ynabAPI.months.getBudgetMonth(params.budget_id, params.month);
-      const month = response.data.month;
+      const useCache = process.env['NODE_ENV'] !== 'test';
+
+      let month: ynab.MonthDetail;
+
+      if (useCache) {
+        // Use enhanced CacheManager wrap method
+        const cacheKey = CacheManager.generateKey('month', 'get', params.budget_id, params.month);
+        month = await cacheManager.wrap<ynab.MonthDetail>(cacheKey, {
+          ttl: CACHE_TTLS.MONTHS,
+          loader: async () => {
+            const response = await ynabAPI.months.getBudgetMonth(params.budget_id, params.month);
+            return response.data.month;
+          },
+        });
+      } else {
+        // Bypass cache in test environment
+        const response = await ynabAPI.months.getBudgetMonth(params.budget_id, params.month);
+        month = response.data.month;
+      }
+
+      const cacheKey = useCache
+        ? CacheManager.generateKey('month', 'get', params.budget_id, params.month)
+        : null;
 
       return {
         content: [
@@ -78,6 +100,11 @@ export async function handleGetMonth(
                   deleted: category.deleted,
                 })),
               },
+              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+              cache_info:
+                useCache && cacheKey && cacheManager.has(cacheKey)
+                  ? 'Data retrieved from cache for improved performance'
+                  : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],
@@ -98,8 +125,29 @@ export async function handleListMonths(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const response = await ynabAPI.months.getBudgetMonths(params.budget_id);
-      const months = response.data.months;
+      const useCache = process.env['NODE_ENV'] !== 'test';
+
+      let months: ynab.MonthSummary[];
+
+      if (useCache) {
+        // Use enhanced CacheManager wrap method
+        const cacheKey = CacheManager.generateKey('months', 'list', params.budget_id);
+        months = await cacheManager.wrap<ynab.MonthSummary[]>(cacheKey, {
+          ttl: CACHE_TTLS.MONTHS,
+          loader: async () => {
+            const response = await ynabAPI.months.getBudgetMonths(params.budget_id);
+            return response.data.months;
+          },
+        });
+      } else {
+        // Bypass cache in test environment
+        const response = await ynabAPI.months.getBudgetMonths(params.budget_id);
+        months = response.data.months;
+      }
+
+      const cacheKey = useCache
+        ? CacheManager.generateKey('months', 'list', params.budget_id)
+        : null;
 
       return {
         content: [
@@ -116,6 +164,11 @@ export async function handleListMonths(
                 age_of_money: month.age_of_money,
                 deleted: month.deleted,
               })),
+              cached: useCache && cacheKey ? cacheManager.has(cacheKey) : false,
+              cache_info:
+                useCache && cacheKey && cacheManager.has(cacheKey)
+                  ? 'Data retrieved from cache for improved performance'
+                  : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],

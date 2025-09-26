@@ -13,6 +13,22 @@ import {
   DeleteTransactionSchema,
 } from '../transactionTools.js';
 
+// Mock the cache manager
+vi.mock('../server/cacheManager.js', () => ({
+  cacheManager: {
+    wrap: vi.fn(),
+    has: vi.fn(),
+    delete: vi.fn(),
+    clear: vi.fn(),
+  },
+  CacheManager: {
+    generateKey: vi.fn(),
+  },
+  CACHE_TTLS: {
+    TRANSACTIONS: 180000,
+  },
+}));
+
 // Mock the YNAB API
 const mockYnabAPI = {
   transactions: {
@@ -29,9 +45,14 @@ const mockYnabAPI = {
   },
 } as unknown as ynab.API;
 
+// Import mocked cache manager
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+
 describe('transactionTools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset NODE_ENV to test to ensure cache bypassing in tests
+    process.env['NODE_ENV'] = 'test';
   });
 
   describe('ListTransactionsSchema', () => {
@@ -112,6 +133,94 @@ describe('transactionTools', () => {
       import_id: null,
       deleted: false,
     };
+
+    it('should bypass cache in test environment for unfiltered requests', async () => {
+      const mockResponse = {
+        data: {
+          transactions: [mockTransaction],
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactions as any).mockResolvedValue(mockResponse);
+
+      const params = { budget_id: 'budget-123' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.transactions.getTransactions).toHaveBeenCalledWith(
+        'budget-123',
+        undefined,
+        undefined,
+      );
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+      expect(parsedContent.transactions[0].id).toBe('transaction-123');
+    });
+
+    it('should use cache when NODE_ENV is not test for unfiltered requests', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockCacheKey = 'transactions:list:budget-123:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue([mockTransaction]);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const params = { budget_id: 'budget-123' };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      // Verify cache was used for unfiltered request
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('transactions', 'list', 'budget-123');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.TRANSACTIONS,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
+    it('should not cache filtered requests (account_id)', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockResponse = {
+        data: {
+          transactions: [mockTransaction],
+        },
+      };
+
+      (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue(mockResponse);
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+      };
+      const result = await handleListTransactions(mockYnabAPI, params);
+
+      // Verify cache was NOT used for filtered request
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.transactions.getTransactionsByAccount).toHaveBeenCalledWith(
+        'budget-123',
+        'account-456',
+        undefined,
+      );
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
 
     it('should list all transactions when no filters are provided', async () => {
       const mockResponse = {
@@ -668,6 +777,83 @@ describe('transactionTools', () => {
       const response = JSON.parse(result.content[0].text);
       expect(response.error.message).toBe('Failed to create transaction');
     });
+
+    it('should invalidate transaction cache on successful transaction creation', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockCreatedTransaction,
+        },
+      };
+
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 100000,
+            cleared_balance: 95000,
+          },
+        },
+      };
+
+      (mockYnabAPI.transactions.createTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
+
+      const mockCacheKey = 'transactions:list:budget-123:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+
+      const result = await handleCreateTransaction(mockYnabAPI, {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+      });
+
+      // Verify cache was invalidated for transaction list
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('transactions', 'list', 'budget-123');
+      expect(cacheManager.delete).toHaveBeenCalledWith(mockCacheKey);
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.transaction.id).toBe('new-transaction-123');
+    });
+
+    it('should not invalidate cache on dry_run transaction creation', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockCreatedTransaction,
+        },
+      };
+
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 100000,
+            cleared_balance: 95000,
+          },
+        },
+      };
+
+      (mockYnabAPI.transactions.createTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
+
+      const result = await handleCreateTransaction(mockYnabAPI, {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+        dry_run: true,
+      });
+
+      // Verify cache was NOT invalidated for dry run
+      expect(cacheManager.delete).not.toHaveBeenCalled();
+      expect(CacheManager.generateKey).not.toHaveBeenCalled();
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.transaction.id).toBe('new-transaction-123');
+      expect(parsedContent.dry_run).toBe(true);
+    });
   });
 
   describe('UpdateTransactionSchema', () => {
@@ -931,6 +1117,81 @@ describe('transactionTools', () => {
       const response = JSON.parse(result.content[0].text);
       expect(response.error.message).toBe('Failed to update transaction');
     });
+
+    it('should invalidate transaction cache on successful transaction update', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockUpdatedTransaction,
+        },
+      };
+
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-789',
+            balance: 150000,
+            cleared_balance: 140000,
+          },
+        },
+      };
+
+      (mockYnabAPI.transactions.updateTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
+
+      const mockCacheKey = 'transactions:list:budget-123:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+
+      const result = await handleUpdateTransaction(mockYnabAPI, {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000,
+      });
+
+      // Verify cache was invalidated for transaction list
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('transactions', 'list', 'budget-123');
+      expect(cacheManager.delete).toHaveBeenCalledWith(mockCacheKey);
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.transaction.id).toBe('transaction-456');
+    });
+
+    it('should not invalidate cache on dry_run transaction update', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockUpdatedTransaction,
+        },
+      };
+
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-789',
+            balance: 150000,
+            cleared_balance: 140000,
+          },
+        },
+      };
+
+      (mockYnabAPI.transactions.updateTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
+
+      const result = await handleUpdateTransaction(mockYnabAPI, {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000,
+        dry_run: true,
+      });
+
+      // Verify cache was NOT invalidated for dry run
+      expect(cacheManager.delete).not.toHaveBeenCalled();
+      expect(CacheManager.generateKey).not.toHaveBeenCalled();
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.transaction.id).toBe('transaction-456');
+      expect(parsedContent.dry_run).toBe(true);
+    });
   });
 
   describe('DeleteTransactionSchema', () => {
@@ -1064,6 +1325,80 @@ describe('transactionTools', () => {
 
       const response = JSON.parse(result.content[0].text);
       expect(response.error.message).toBe('Failed to delete transaction');
+    });
+
+    it('should invalidate transaction cache on successful transaction deletion', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockDeletedTransaction,
+        },
+      };
+
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 50000,
+            cleared_balance: 45000,
+          },
+        },
+      };
+
+      (mockYnabAPI.transactions.deleteTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
+
+      const mockCacheKey = 'transactions:list:budget-123:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+
+      const result = await handleDeleteTransaction(mockYnabAPI, {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+      });
+
+      // Verify cache was invalidated for transaction list
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('transactions', 'list', 'budget-123');
+      expect(cacheManager.delete).toHaveBeenCalledWith(mockCacheKey);
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.transaction.id).toBe('transaction-456');
+      expect(parsedContent.transaction.deleted).toBe(true);
+    });
+
+    it('should not invalidate cache on dry_run transaction deletion', async () => {
+      const mockResponse = {
+        data: {
+          transaction: mockDeletedTransaction,
+        },
+      };
+
+      const mockAccountResponse = {
+        data: {
+          account: {
+            id: 'account-456',
+            balance: 50000,
+            cleared_balance: 45000,
+          },
+        },
+      };
+
+      (mockYnabAPI.transactions.deleteTransaction as any).mockResolvedValue(mockResponse);
+      (mockYnabAPI.accounts.getAccountById as any).mockResolvedValue(mockAccountResponse);
+
+      const result = await handleDeleteTransaction(mockYnabAPI, {
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        dry_run: true,
+      });
+
+      // Verify cache was NOT invalidated for dry run
+      expect(cacheManager.delete).not.toHaveBeenCalled();
+      expect(CacheManager.generateKey).not.toHaveBeenCalled();
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.transaction.id).toBe('transaction-456');
+      expect(parsedContent.dry_run).toBe(true);
     });
   });
 });

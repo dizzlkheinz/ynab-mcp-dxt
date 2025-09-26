@@ -2,7 +2,7 @@ import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
-import { cacheManager, CACHE_TTLS } from '../server/cacheManager.js';
+import { cacheManager, CACHE_TTLS, CacheManager } from '../server/cacheManager.js';
 import { responseFormatter } from '../server/responseFormatter.js';
 
 /**
@@ -23,44 +23,44 @@ export type GetBudgetParams = z.infer<typeof GetBudgetSchema>;
 export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      const cacheKey = 'budgets:list';
       const useCache = process.env['NODE_ENV'] !== 'test';
 
-      if (useCache) {
-        // Check cache first
-        const cached = cacheManager.get<ynab.BudgetSummary[]>(cacheKey);
-        if (cached) {
-          return {
-            content: [
-              {
-                type: 'text',
-                text: responseFormatter.format({
-                  budgets: cached.map((budget) => ({
-                    id: budget.id,
-                    name: budget.name,
-                    last_modified_on: budget.last_modified_on,
-                    first_month: budget.first_month,
-                    last_month: budget.last_month,
-                    date_format: budget.date_format,
-                    currency_format: budget.currency_format,
-                  })),
-                  cached: true,
-                  cache_info: 'Data retrieved from cache for improved performance',
-                }),
-              },
-            ],
-          };
-        }
+      if (!useCache) {
+        // Bypass cache in test environment
+        const response = await ynabAPI.budgets.getBudgets();
+        const budgets = response.data.budgets;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                budgets: budgets.map((budget) => ({
+                  id: budget.id,
+                  name: budget.name,
+                  last_modified_on: budget.last_modified_on,
+                  first_month: budget.first_month,
+                  last_month: budget.last_month,
+                  date_format: budget.date_format,
+                  currency_format: budget.currency_format,
+                })),
+                cached: false,
+                cache_info: 'Fresh data retrieved from YNAB API',
+              }),
+            },
+          ],
+        };
       }
 
-      // Fetch from API and cache
-      const response = await ynabAPI.budgets.getBudgets();
-      const budgets = response.data.budgets;
-
-      // Cache the result (skip in tests)
-      if (useCache) {
-        cacheManager.set(cacheKey, budgets, CACHE_TTLS.BUDGETS);
-      }
+      // Use enhanced CacheManager wrap method
+      const cacheKey = CacheManager.generateKey('budgets', 'list');
+      const budgets = await cacheManager.wrap<ynab.BudgetSummary[]>(cacheKey, {
+        ttl: CACHE_TTLS.BUDGETS,
+        loader: async () => {
+          const response = await ynabAPI.budgets.getBudgets();
+          return response.data.budgets;
+        },
+      });
 
       return {
         content: [
@@ -76,8 +76,10 @@ export async function handleListBudgets(ynabAPI: ynab.API): Promise<CallToolResu
                 date_format: budget.date_format,
                 currency_format: budget.currency_format,
               })),
-              cached: false,
-              cache_info: 'Fresh data retrieved from YNAB API',
+              cached: cacheManager.has(cacheKey),
+              cache_info: cacheManager.has(cacheKey)
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
             }),
           },
         ],

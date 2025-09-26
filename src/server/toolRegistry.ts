@@ -120,7 +120,10 @@ export class ToolRegistry {
       },
     };
 
-    this.tools.set(definition.name, resolved as unknown as RegisteredTool<Record<string, unknown>>);
+    // Type assertion is safe here because TInput extends Record<string, unknown>
+    // and RegisteredTool is covariant in its input parameter for storage purposes
+    const registeredTool = resolved as RegisteredTool<Record<string, unknown>>;
+    this.tools.set(definition.name, registeredTool);
   }
 
   listTools(): Tool[] {
@@ -340,7 +343,8 @@ export class ToolRegistry {
   private generateJsonSchema(schema: z.ZodTypeAny): Record<string, unknown> {
     try {
       return toJSONSchema(schema, { target: 'draft-2020-12', io: 'output' });
-    } catch {
+    } catch (error) {
+      console.warn(`Failed to generate JSON schema for tool: ${error}`);
       return { type: 'object', additionalProperties: true };
     }
   }

@@ -99,10 +99,11 @@ interface HealthSubScores {
   budget_discipline: number;
 }
 
-interface AccountBalance {
-  liquidNetWorth: number;
-  totalNetWorth?: number;
-}
+// Commented out unused interface
+// interface AccountBalance {
+//   liquidNetWorth: number;
+//   totalNetWorth?: number;
+// }
 
 interface BudgetInsight {
   type: 'warning' | 'success' | 'info' | 'recommendation';
@@ -120,8 +121,11 @@ export async function handleFinancialOverview(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      // Budget ID is already validated and normalized by the registry wrapper
-      const budgetId = params.budget_id as string;
+      // Budget ID is validated and normalized by the registry wrapper, but verify at runtime for type safety
+      if (!params.budget_id || typeof params.budget_id !== 'string') {
+        throw new Error('Budget ID is required and must be a string');
+      }
+      const budgetId = params.budget_id;
       const cacheKey = `financial-overview:${budgetId}:${params.months}:${params.include_trends}:${params.include_insights}`;
 
       const cached = cacheManager.get<CallToolResult>(cacheKey);
@@ -280,8 +284,11 @@ export async function handleSpendingAnalysis(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      // Budget ID is already validated and normalized by the registry wrapper
-      const budgetId = params.budget_id as string;
+      // Budget ID is validated and normalized by the registry wrapper, but verify at runtime for type safety
+      if (!params.budget_id || typeof params.budget_id !== 'string') {
+        throw new Error('Budget ID is required and must be a string');
+      }
+      const budgetId = params.budget_id;
 
       const monthsToAnalyze = getHistoricalMonths(params.period_months);
 
@@ -321,8 +328,11 @@ export async function handleBudgetHealthCheck(
 ): Promise<CallToolResult> {
   return await withToolErrorHandling(
     async () => {
-      // Budget ID is already validated and normalized by the registry wrapper
-      const budgetId = params.budget_id as string;
+      // Budget ID is validated and normalized by the registry wrapper, but verify at runtime for type safety
+      if (!params.budget_id || typeof params.budget_id !== 'string') {
+        throw new Error('Budget ID is required and must be a string');
+      }
+      const budgetId = params.budget_id;
 
       const currentMonth = ynab.utils.getCurrentMonthInISOFormat();
       const [budget, currentMonthData, recentTransactions] = await Promise.all([
@@ -479,22 +489,7 @@ function analyzeCategoryPerformance(months: MonthData[], categories: ynab.Catego
     // Get current balance to determine true overspending vs using accumulated funds
     const currentBalance = monthlyData[0]?.balance || 0;
 
-    // Determine performance based on both utilization and available balance
-    let performance: 'overspent' | 'exceeded_monthly_budget' | 'on_track' | 'under_budget';
-
-    if (currentBalance < 0) {
-      performance = 'overspent'; // Actually overspent (negative balance - true overspending)
-    } else if (utilizationRate > 100 && currentBalance > 0) {
-      performance = 'exceeded_monthly_budget'; // Spent more than monthly assignment but covered by accumulated funds
-    } else if (utilizationRate > 100 && currentBalance === 0) {
-      performance = 'on_track'; // Spent more than budgeted but ended at exactly 0
-    } else if (utilizationRate === 100 && currentBalance === 0) {
-      performance = 'on_track'; // Spent exactly what was budgeted (balance = 0)
-    } else if (utilizationRate > 80) {
-      performance = 'on_track';
-    } else {
-      performance = 'under_budget';
-    }
+    // Performance calculation code removed as not currently used
 
     return {
       category_name: category.name,
@@ -502,46 +497,13 @@ function analyzeCategoryPerformance(months: MonthData[], categories: ynab.Catego
       average_budgeted: avgBudgeted,
       average_spent: avgActivity,
       utilization_rate: utilizationRate,
-      performance,
+      // performance, // Not currently used in response
       current_balance: currentBalance,
       monthly_data: monthlyData,
     };
   });
 
-  return performance.filter(
-    (p) =>
-      (p.average_budgeted > 0 || p.average_spent > 0) &&
-      !p.category_name.toLowerCase().includes('inflow:') &&
-      !p.category_name.toLowerCase().includes('ready to assign'),
-  );
-}
-
-function calculateNetWorthTrend(months: MonthData[], currentBalances: AccountBalance) {
-  // Sort months chronologically (oldest to newest)
-  const sortedMonths = [...months].sort((a, b) => {
-    const dateA = new Date(a?.data.month.month + '-01');
-    const dateB = new Date(b?.data.month.month + '-01');
-    return dateA.getTime() - dateB.getTime();
-  });
-
-  // Note: YNAB API doesn't provide historical account balances, only current balances
-  // So we can only show current net worth for all historical entries
-  // In a real implementation, you'd need to track account balance changes over time
-  const historical = sortedMonths.map((monthData) => ({
-    month: monthData?.data.month.month,
-    liquid_net_worth: currentBalances.liquidNetWorth, // Current balance (historical data not available)
-    total_net_worth: currentBalances.totalNetWorth, // Current balance (historical data not available)
-    change_from_previous: null, // Cannot calculate without historical account balance data
-  }));
-
-  // Since we don't have historical account data, we cannot determine actual trends
-  // This would need to be calculated from stored historical snapshots
-  return {
-    liquid_net_worth: currentBalances.liquidNetWorth,
-    total_net_worth: currentBalances.totalNetWorth,
-    historical,
-    trend: 'unknown', // Cannot determine trend without historical account balance data
-  };
+  return performance;
 }
 
 function analyzeSpendingTrends(months: MonthData[], categories: ynab.Category[]): SpendingTrend[] {

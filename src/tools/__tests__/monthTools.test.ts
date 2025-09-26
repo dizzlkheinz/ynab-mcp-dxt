@@ -7,6 +7,21 @@ import {
   ListMonthsSchema,
 } from '../monthTools.js';
 
+// Mock the cache manager
+vi.mock('../server/cacheManager.js', () => ({
+  cacheManager: {
+    wrap: vi.fn(),
+    has: vi.fn(),
+    clear: vi.fn(),
+  },
+  CacheManager: {
+    generateKey: vi.fn(),
+  },
+  CACHE_TTLS: {
+    MONTHS: 600000,
+  },
+}));
+
 // Mock the YNAB API
 const mockYnabAPI = {
   months: {
@@ -15,12 +30,96 @@ const mockYnabAPI = {
   },
 } as unknown as ynab.API;
 
+// Import mocked cache manager
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+
 describe('Month Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset NODE_ENV to test to ensure cache bypassing in tests
+    process.env['NODE_ENV'] = 'test';
   });
 
   describe('handleGetMonth', () => {
+    it('should bypass cache in test environment', async () => {
+      const mockMonth = {
+        month: '2024-01-01',
+        note: 'January budget',
+        income: 500000,
+        budgeted: 450000,
+        activity: -400000,
+        to_be_budgeted: 50000,
+        age_of_money: 30,
+        deleted: false,
+        categories: [],
+      };
+
+      (mockYnabAPI.months.getBudgetMonth as any).mockResolvedValue({
+        data: { month: mockMonth },
+      });
+
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
+      });
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.months.getBudgetMonth).toHaveBeenCalledTimes(1);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+      expect(parsedContent.month.month).toBe('2024-01-01');
+    });
+
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockMonth = {
+        month: '2024-01-01',
+        note: 'January budget',
+        income: 500000,
+        budgeted: 450000,
+        activity: -400000,
+        to_be_budgeted: 50000,
+        age_of_money: 30,
+        deleted: false,
+        categories: [],
+      };
+
+      const mockCacheKey = 'month:get:budget-1:2024-01-01:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockMonth);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleGetMonth(mockYnabAPI, {
+        budget_id: 'budget-1',
+        month: '2024-01-01',
+      });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith(
+        'month',
+        'get',
+        'budget-1',
+        '2024-01-01',
+      );
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.MONTHS,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return formatted month data on success', async () => {
       const mockMonth = {
         month: '2024-01-01',
@@ -165,6 +264,76 @@ describe('Month Tools', () => {
   });
 
   describe('handleListMonths', () => {
+    it('should bypass cache in test environment', async () => {
+      const mockMonths = [
+        {
+          month: '2024-01-01',
+          note: 'January budget',
+          income: 500000,
+          budgeted: 450000,
+          activity: -400000,
+          to_be_budgeted: 50000,
+          age_of_money: 30,
+          deleted: false,
+        },
+      ];
+
+      (mockYnabAPI.months.getBudgetMonths as any).mockResolvedValue({
+        data: { months: mockMonths },
+      });
+
+      const result = await handleListMonths(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.months.getBudgetMonths).toHaveBeenCalledTimes(1);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+      expect(parsedContent.months).toHaveLength(1);
+    });
+
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockMonths = [
+        {
+          month: '2024-01-01',
+          note: 'January budget',
+          income: 500000,
+          budgeted: 450000,
+          activity: -400000,
+          to_be_budgeted: 50000,
+          age_of_money: 30,
+          deleted: false,
+        },
+      ];
+
+      const mockCacheKey = 'months:list:budget-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockMonths);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleListMonths(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('months', 'list', 'budget-1');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.MONTHS,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return formatted months list on success', async () => {
       const mockMonths = [
         {

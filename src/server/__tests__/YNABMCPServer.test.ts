@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+
 import { YNABMCPServer } from '../YNABMCPServer.js';
 import { AuthenticationError, ConfigurationError, ValidationError } from '../../types/index.js';
 import { ToolRegistry } from '../toolRegistry.js';
 import { cacheManager } from '../../server/cacheManager.js';
 import { responseFormatter } from '../../server/responseFormatter.js';
+
+function parseCallToolJson<T = Record<string, unknown>>(result: CallToolResult): T {
+  const text = result.content?.[0]?.text;
+  const raw = typeof text === 'string' ? text : (JSON.stringify(text ?? {}) ?? '{}');
+  return JSON.parse(raw) as T;
+}
 
 /**
  * Real YNAB API tests using token from .env (YNAB_ACCESS_TOKEN)
@@ -223,7 +231,7 @@ describe('YNABMCPServer', () => {
         accessToken: accessToken(),
         arguments: {},
       });
-      const budgetsPayload = JSON.parse(budgetsResult.content?.[0]?.text ?? '{}');
+      const budgetsPayload = parseCallToolJson(budgetsResult);
       const firstBudget = budgetsPayload.budgets?.[0];
       expect(firstBudget?.id).toBeDefined();
 
@@ -253,7 +261,7 @@ describe('YNABMCPServer', () => {
         accessToken: accessToken(),
         arguments: {},
       });
-      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      const payload = parseCallToolJson(result);
       expect(payload.user?.id).toBeDefined();
     });
 
@@ -265,9 +273,84 @@ describe('YNABMCPServer', () => {
         accessToken: accessToken(),
         arguments: {},
       });
-      const defaultPayload = JSON.parse(defaultResult.content?.[0]?.text ?? '{}');
+      const defaultPayload = parseCallToolJson(defaultResult);
       expect(defaultPayload.default_budget_id).toBe(budgetId);
       expect(defaultPayload.has_default).toBe(true);
+    });
+
+    it('should trigger cache warming after setting default budget', async () => {
+      // Clear cache before test
+      await registry.executeTool({
+        name: 'clear_cache',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+
+      const statsBeforeSet = cacheManager.getStats();
+      const initialSize = statsBeforeSet.size;
+
+      // Get a budget ID
+      const budgetsResult = await registry.executeTool({
+        name: 'list_budgets',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const budgetsPayload = parseCallToolJson(budgetsResult);
+      const firstBudget = budgetsPayload.budgets?.[0];
+      expect(firstBudget?.id).toBeDefined();
+
+      // Set default budget (this should trigger cache warming)
+      await registry.executeTool({
+        name: 'set_default_budget',
+        accessToken: accessToken(),
+        arguments: { budget_id: firstBudget.id },
+      });
+
+      // Wait a short moment for cache warming to complete (it's fire-and-forget)
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const statsAfterSet = cacheManager.getStats();
+
+      // Cache should have more entries due to warming
+      expect(statsAfterSet.size).toBeGreaterThan(initialSize);
+
+      // Verify that common data types were cached
+      const allKeys = cacheManager.getAllKeys();
+      const hasAccountsCache = allKeys.some((key) => key.includes('accounts:list'));
+      const hasCategoriesCache = allKeys.some((key) => key.includes('categories:list'));
+      const hasPayeesCache = allKeys.some((key) => key.includes('payees:list'));
+
+      // At least some cache warming should have occurred
+      expect(hasAccountsCache || hasCategoriesCache || hasPayeesCache).toBe(true);
+    });
+
+    it('should handle cache warming errors gracefully', async () => {
+      // Use an invalid budget ID to trigger cache warming errors
+      const invalidBudgetId = '00000000-0000-0000-0000-000000000000';
+
+      // This should not throw an error even though cache warming will fail
+      const result = await registry.executeTool({
+        name: 'set_default_budget',
+        accessToken: accessToken(),
+        arguments: { budget_id: invalidBudgetId },
+      });
+
+      // The set_default_budget operation should still succeed
+      const payload = parseCallToolJson(result);
+      expect(payload.message).toContain('Default budget set successfully');
+      expect(payload.budget_id).toBe(invalidBudgetId);
+
+      // Wait a moment for cache warming attempts to complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Server should still be functional (cache warming errors are silently handled)
+      const defaultResult = await registry.executeTool({
+        name: 'get_default_budget',
+        accessToken: accessToken(),
+        arguments: {},
+      });
+      const defaultPayload = parseCallToolJson(defaultResult);
+      expect(defaultPayload.default_budget_id).toBe(invalidBudgetId);
     });
 
     it('should execute list tools that rely on the default budget', async () => {
@@ -278,7 +361,7 @@ describe('YNABMCPServer', () => {
         accessToken: accessToken(),
         arguments: {},
       });
-      const accountsPayload = JSON.parse(accountsResult.content?.[0]?.text ?? '{}');
+      const accountsPayload = parseCallToolJson(accountsResult);
       expect(Array.isArray(accountsPayload.accounts)).toBe(true);
 
       const categoriesResult = await registry.executeTool({
@@ -286,7 +369,7 @@ describe('YNABMCPServer', () => {
         accessToken: accessToken(),
         arguments: {},
       });
-      const categoriesPayload = JSON.parse(categoriesResult.content?.[0]?.text ?? '{}');
+      const categoriesPayload = parseCallToolJson(categoriesResult);
       expect(Array.isArray(categoriesPayload.categories)).toBe(true);
     });
 
@@ -302,7 +385,7 @@ describe('YNABMCPServer', () => {
           include_environment: false,
         },
       });
-      const diagnostics = JSON.parse(diagResult.content?.[0]?.text ?? '{}');
+      const diagnostics = parseCallToolJson(diagResult);
       expect(diagnostics.timestamp).toBeDefined();
       expect(diagnostics.server).toBeDefined();
       expect(diagnostics.security).toBeDefined();
@@ -381,7 +464,7 @@ describe('YNABMCPServer', () => {
         },
       });
 
-      const diagnostics = JSON.parse(result.content?.[0]?.text ?? '{}');
+      const diagnostics = parseCallToolJson(result);
       expect(diagnostics.cache).toBeDefined();
       expect(diagnostics.cache.entries).toEqual(expect.any(Number));
       expect(diagnostics.cache.hits).toEqual(expect.any(Number));
@@ -420,7 +503,7 @@ describe('YNABMCPServer', () => {
         accessToken: accessToken(),
         arguments: {} as Record<string, unknown>,
       });
-      const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+      const payload = parseCallToolJson(result);
       expect(payload.error).toBeDefined();
       expect(payload.error.code).toBe('VALIDATION_ERROR');
     });
@@ -467,7 +550,7 @@ describe('YNABMCPServer', () => {
             arguments: {},
           });
 
-          const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+          const payload = parseCallToolJson(result);
           expect(payload.error).toBeDefined();
           expect(payload.error.code).toBe('VALIDATION_ERROR');
           expect(payload.error.message).toContain(
@@ -494,7 +577,7 @@ describe('YNABMCPServer', () => {
           arguments: { budget_id: invalidBudgetId },
         });
 
-        const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        const payload = parseCallToolJson(result);
         expect(payload.error).toBeDefined();
         expect(payload.error.code).toBe('VALIDATION_ERROR');
         expect(payload.error.message).toContain('Invalid budget ID format');
@@ -517,7 +600,7 @@ describe('YNABMCPServer', () => {
           arguments: {},
         });
 
-        let payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        let payload = parseCallToolJson(result);
         expect(payload.error).toBeDefined();
         expect(payload.error.code).toBe('VALIDATION_ERROR');
 
@@ -536,7 +619,7 @@ describe('YNABMCPServer', () => {
           arguments: {},
         });
 
-        payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+        payload = parseCallToolJson(result);
         // Should have accounts data or be valid response, not an error
         expect(payload.error).toBeUndefined();
       });
@@ -553,7 +636,7 @@ describe('YNABMCPServer', () => {
         const results = await Promise.all(promises);
 
         results.forEach((result) => {
-          const payload = JSON.parse(result.content?.[0]?.text ?? '{}');
+          const payload = parseCallToolJson(result);
 
           // All should have the same error structure
           expect(payload).toHaveProperty(
@@ -666,7 +749,7 @@ describe('YNABMCPServer', () => {
         },
       });
 
-      const diagnostics = JSON.parse(result.content?.[0]?.text ?? '{}');
+      const diagnostics = parseCallToolJson(result);
       expect(diagnostics.timestamp).toBeDefined();
       expect(diagnostics.server).toBeDefined();
       expect(diagnostics.server.name).toBe('ynab-mcp-server');

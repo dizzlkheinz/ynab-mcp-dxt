@@ -9,6 +9,22 @@ import {
   UpdateCategorySchema,
 } from '../categoryTools.js';
 
+// Mock the cache manager
+vi.mock('../server/cacheManager.js', () => ({
+  cacheManager: {
+    wrap: vi.fn(),
+    has: vi.fn(),
+    delete: vi.fn(),
+    clear: vi.fn(),
+  },
+  CacheManager: {
+    generateKey: vi.fn(),
+  },
+  CACHE_TTLS: {
+    CATEGORIES: 300000,
+  },
+}));
+
 // Mock the YNAB API
 const mockYnabAPI = {
   categories: {
@@ -18,12 +34,115 @@ const mockYnabAPI = {
   },
 } as unknown as ynab.API;
 
+// Import mocked cache manager
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+
 describe('Category Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset NODE_ENV to test to ensure cache bypassing in tests
+    process.env['NODE_ENV'] = 'test';
   });
 
   describe('handleListCategories', () => {
+    it('should bypass cache in test environment', async () => {
+      const mockCategoryGroups = [
+        {
+          id: 'group-1',
+          name: 'Immediate Obligations',
+          hidden: false,
+          deleted: false,
+          categories: [
+            {
+              id: 'category-1',
+              category_group_id: 'group-1',
+              name: 'Rent/Mortgage',
+              hidden: false,
+              original_category_group_id: null,
+              note: 'Monthly housing payment',
+              budgeted: 150000,
+              activity: -150000,
+              balance: 0,
+              goal_type: null,
+              goal_creation_month: null,
+              goal_target: null,
+              goal_target_month: null,
+              goal_percentage_complete: null,
+            },
+          ],
+        },
+      ];
+
+      (mockYnabAPI.categories.getCategories as any).mockResolvedValue({
+        data: { category_groups: mockCategoryGroups },
+      });
+
+      const result = await handleListCategories(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.categories.getCategories).toHaveBeenCalledTimes(1);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+      expect(parsedContent.categories).toHaveLength(1);
+    });
+
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockCategoryGroups = [
+        {
+          id: 'group-1',
+          name: 'Immediate Obligations',
+          hidden: false,
+          deleted: false,
+          categories: [
+            {
+              id: 'category-1',
+              category_group_id: 'group-1',
+              name: 'Rent/Mortgage',
+              hidden: false,
+              original_category_group_id: null,
+              note: 'Monthly housing payment',
+              budgeted: 150000,
+              activity: -150000,
+              balance: 0,
+              goal_type: null,
+              goal_creation_month: null,
+              goal_target: null,
+              goal_target_month: null,
+              goal_percentage_complete: null,
+            },
+          ],
+        },
+      ];
+
+      const mockCacheKey = 'categories:list:budget-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockCategoryGroups);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleListCategories(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('categories', 'list', 'budget-1');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.CATEGORIES,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return formatted category list on success', async () => {
       const mockCategoryGroups = [
         {
@@ -157,6 +276,57 @@ describe('Category Tools', () => {
   });
 
   describe('handleGetCategory', () => {
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockCategory = {
+        id: 'category-1',
+        category_group_id: 'group-1',
+        name: 'Groceries',
+        hidden: false,
+        original_category_group_id: null,
+        note: 'Food and household items',
+        budgeted: 50000,
+        activity: -45000,
+        balance: 5000,
+        goal_type: 'TBD',
+        goal_creation_month: '2024-01-01',
+        goal_target: 60000,
+        goal_target_month: '2024-12-01',
+        goal_percentage_complete: 83,
+      };
+
+      const mockCacheKey = 'category:get:budget-1:category-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockCategory);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleGetCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
+        category_id: 'category-1',
+      });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith(
+        'category',
+        'get',
+        'budget-1',
+        'category-1',
+      );
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.CATEGORIES,
+        loader: expect.any(Function),
+      });
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return detailed category information on success', async () => {
       const mockCategory = {
         id: 'category-1',
@@ -295,6 +465,97 @@ describe('Category Tools', () => {
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.error.message).toBe('Insufficient permissions to access YNAB data');
+    });
+
+    it('should invalidate category caches on successful category update', async () => {
+      const mockUpdatedCategory = {
+        id: 'category-1',
+        category_group_id: 'group-1',
+        name: 'Groceries',
+        hidden: false,
+        original_category_group_id: null,
+        note: 'Food and household items',
+        budgeted: 60000, // Updated amount
+        activity: -45000,
+        balance: 15000,
+        goal_type: 'TBD',
+        goal_creation_month: '2024-01-01',
+        goal_target: 60000,
+        goal_target_month: '2024-12-01',
+        goal_percentage_complete: 100,
+      };
+
+      (mockYnabAPI.categories.updateMonthCategory as any).mockResolvedValue({
+        data: { category: mockUpdatedCategory },
+      });
+
+      const mockCacheKeys = [
+        'categories:list:budget-1:generated-key',
+        'category:get:budget-1:category-1:generated-key',
+      ];
+      (CacheManager.generateKey as any)
+        .mockReturnValueOnce(mockCacheKeys[0])
+        .mockReturnValueOnce(mockCacheKeys[1]);
+
+      const result = await handleUpdateCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
+        category_id: 'category-1',
+        budgeted: 60000,
+      });
+
+      // Verify cache was invalidated for both category list and specific category
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('categories', 'list', 'budget-1');
+      expect(CacheManager.generateKey).toHaveBeenCalledWith(
+        'category',
+        'get',
+        'budget-1',
+        'category-1',
+      );
+      expect(cacheManager.delete).toHaveBeenCalledWith(mockCacheKeys[0]);
+      expect(cacheManager.delete).toHaveBeenCalledWith(mockCacheKeys[1]);
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.category.budgeted).toBe(60);
+    });
+
+    it('should not invalidate cache on dry_run category update', async () => {
+      const mockUpdatedCategory = {
+        id: 'category-1',
+        category_group_id: 'group-1',
+        name: 'Groceries',
+        hidden: false,
+        original_category_group_id: null,
+        note: 'Food and household items',
+        budgeted: 60000,
+        activity: -45000,
+        balance: 15000,
+        goal_type: 'TBD',
+        goal_creation_month: '2024-01-01',
+        goal_target: 60000,
+        goal_target_month: '2024-12-01',
+        goal_percentage_complete: 100,
+      };
+
+      (mockYnabAPI.categories.updateMonthCategory as any).mockResolvedValue({
+        data: { category: mockUpdatedCategory },
+      });
+
+      const result = await handleUpdateCategory(mockYnabAPI, {
+        budget_id: 'budget-1',
+        category_id: 'category-1',
+        budgeted: 60000,
+        dry_run: true,
+      });
+
+      // Verify cache was NOT invalidated for dry run
+      expect(cacheManager.delete).not.toHaveBeenCalled();
+      expect(CacheManager.generateKey).not.toHaveBeenCalled();
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.category.budgeted).toBe(60);
+      expect(parsedContent.dry_run).toBe(true);
     });
   });
 

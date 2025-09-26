@@ -24,17 +24,20 @@ export async function handleGetUser(ynabAPI: ynab.API): Promise<CallToolResult> 
   return await withToolErrorHandling(
     async () => {
       const response = await ynabAPI.user.getUser();
-      const user = response.data.user;
+      const userInfo = response.data.user;
+
+      const user = {
+        id: userInfo.id,
+        ...(userInfo.email && { email: userInfo.email }),
+        ...(userInfo.name && { name: userInfo.name }),
+        ...(userInfo.date_created && { date_created: userInfo.date_created }),
+      };
 
       return {
         content: [
           {
             type: 'text',
-            text: responseFormatter.format({
-              user: {
-                id: user.id,
-              },
-            }),
+            text: responseFormatter.format({ user }),
           },
         ],
       };

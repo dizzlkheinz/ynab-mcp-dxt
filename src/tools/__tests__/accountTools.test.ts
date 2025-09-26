@@ -9,6 +9,22 @@ import {
   CreateAccountSchema,
 } from '../accountTools.js';
 
+// Mock the cache manager
+vi.mock('../server/cacheManager.js', () => ({
+  cacheManager: {
+    wrap: vi.fn(),
+    has: vi.fn(),
+    delete: vi.fn(),
+    clear: vi.fn(),
+  },
+  CacheManager: {
+    generateKey: vi.fn(),
+  },
+  CACHE_TTLS: {
+    ACCOUNTS: 300000,
+  },
+}));
+
 // Mock the YNAB API
 const mockYnabAPI = {
   accounts: {
@@ -18,12 +34,94 @@ const mockYnabAPI = {
   },
 } as unknown as ynab.API;
 
+// Import mocked cache manager
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+
 describe('Account Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset NODE_ENV to test to ensure cache bypassing in tests
+    process.env['NODE_ENV'] = 'test';
   });
 
   describe('handleListAccounts', () => {
+    it('should bypass cache in test environment', async () => {
+      const mockAccounts = [
+        {
+          id: 'account-1',
+          name: 'Checking Account',
+          type: 'checking',
+          on_budget: true,
+          closed: false,
+          note: 'Main checking account',
+          balance: 100000,
+          cleared_balance: 95000,
+          uncleared_balance: 5000,
+          transfer_payee_id: 'payee-1',
+          direct_import_linked: false,
+          direct_import_in_error: false,
+        },
+      ];
+
+      (mockYnabAPI.accounts.getAccounts as any).mockResolvedValue({
+        data: { accounts: mockAccounts },
+      });
+
+      const result = await handleListAccounts(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.accounts.getAccounts).toHaveBeenCalledTimes(1);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+    });
+
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockAccounts = [
+        {
+          id: 'account-1',
+          name: 'Checking Account',
+          type: 'checking',
+          on_budget: true,
+          closed: false,
+          note: 'Main checking account',
+          balance: 100000,
+          cleared_balance: 95000,
+          uncleared_balance: 5000,
+          transfer_payee_id: 'payee-1',
+          direct_import_linked: false,
+          direct_import_in_error: false,
+        },
+      ];
+
+      const mockCacheKey = 'accounts:list:budget-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockAccounts);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleListAccounts(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('accounts', 'list', 'budget-1');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.ACCOUNTS,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return formatted account list on success', async () => {
       const mockAccounts = [
         {
@@ -117,6 +215,55 @@ describe('Account Tools', () => {
   });
 
   describe('handleGetAccount', () => {
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockAccount = {
+        id: 'account-1',
+        name: 'Checking Account',
+        type: 'checking',
+        on_budget: true,
+        closed: false,
+        note: 'Main checking account',
+        balance: 100000,
+        cleared_balance: 95000,
+        uncleared_balance: 5000,
+        transfer_payee_id: 'payee-1',
+        direct_import_linked: false,
+        direct_import_in_error: false,
+      };
+
+      const mockCacheKey = 'account:get:budget-1:account-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockAccount);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleGetAccount(mockYnabAPI, {
+        budget_id: 'budget-1',
+        account_id: 'account-1',
+      });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith(
+        'account',
+        'get',
+        'budget-1',
+        'account-1',
+      );
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.ACCOUNTS,
+        loader: expect.any(Function),
+      });
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return detailed account information on success', async () => {
       const mockAccount = {
         id: 'account-1',
@@ -326,6 +473,81 @@ describe('Account Tools', () => {
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
       expect(parsedContent.error.message).toBe('Failed to create account');
+    });
+
+    it('should invalidate account list cache on successful account creation', async () => {
+      const mockAccount = {
+        id: 'account-1',
+        name: 'New Account',
+        type: 'checking',
+        on_budget: true,
+        closed: false,
+        note: null,
+        balance: 100000,
+        cleared_balance: 100000,
+        uncleared_balance: 0,
+        transfer_payee_id: 'payee-1',
+        direct_import_linked: false,
+        direct_import_in_error: false,
+      };
+
+      (mockYnabAPI.accounts.createAccount as any).mockResolvedValue({
+        data: { account: mockAccount },
+      });
+
+      const mockCacheKey = 'accounts:list:budget-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+
+      const result = await handleCreateAccount(mockYnabAPI, {
+        budget_id: 'budget-1',
+        name: 'New Account',
+        type: 'checking',
+      });
+
+      // Verify cache was invalidated for account list
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('accounts', 'list', 'budget-1');
+      expect(cacheManager.delete).toHaveBeenCalledWith(mockCacheKey);
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.account.id).toBe('account-1');
+    });
+
+    it('should not invalidate cache on dry_run account creation', async () => {
+      const mockAccount = {
+        id: 'account-1',
+        name: 'New Account',
+        type: 'checking',
+        on_budget: true,
+        closed: false,
+        note: null,
+        balance: 100000,
+        cleared_balance: 100000,
+        uncleared_balance: 0,
+        transfer_payee_id: 'payee-1',
+        direct_import_linked: false,
+        direct_import_in_error: false,
+      };
+
+      (mockYnabAPI.accounts.createAccount as any).mockResolvedValue({
+        data: { account: mockAccount },
+      });
+
+      const result = await handleCreateAccount(mockYnabAPI, {
+        budget_id: 'budget-1',
+        name: 'New Account',
+        type: 'checking',
+        dry_run: true,
+      });
+
+      // Verify cache was NOT invalidated for dry run
+      expect(cacheManager.delete).not.toHaveBeenCalled();
+      expect(CacheManager.generateKey).not.toHaveBeenCalled();
+
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.account.id).toBe('account-1');
+      expect(parsedContent.dry_run).toBe(true);
     });
   });
 

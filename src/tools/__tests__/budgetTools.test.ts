@@ -2,6 +2,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
 import { handleListBudgets, handleGetBudget, GetBudgetSchema } from '../budgetTools.js';
 
+// Mock the cache manager
+vi.mock('../server/cacheManager.js', () => ({
+  cacheManager: {
+    wrap: vi.fn(),
+    has: vi.fn(),
+    clear: vi.fn(),
+  },
+  CacheManager: {
+    generateKey: vi.fn(),
+  },
+  CACHE_TTLS: {
+    BUDGETS: 300000,
+  },
+}));
+
 // Mock the YNAB API
 const mockYnabAPI = {
   budgets: {
@@ -10,12 +25,115 @@ const mockYnabAPI = {
   },
 } as unknown as ynab.API;
 
+// Import mocked cache manager
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+
 describe('Budget Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset NODE_ENV to test to ensure cache bypassing in tests
+    process.env['NODE_ENV'] = 'test';
   });
 
   describe('handleListBudgets', () => {
+    it('should bypass cache in test environment', async () => {
+      const mockBudgets = [
+        {
+          id: 'budget-1',
+          name: 'My Budget',
+          last_modified_on: '2024-01-01T00:00:00Z',
+          first_month: '2024-01-01',
+          last_month: '2024-12-01',
+          date_format: { format: 'MM/DD/YYYY' },
+          currency_format: { iso_code: 'USD', example_format: '$123.45' },
+        },
+      ];
+
+      (mockYnabAPI.budgets.getBudgets as any).mockResolvedValue({
+        data: { budgets: mockBudgets },
+      });
+
+      const result = await handleListBudgets(mockYnabAPI);
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.budgets.getBudgets).toHaveBeenCalledTimes(1);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+    });
+
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockBudgets = [
+        {
+          id: 'budget-1',
+          name: 'My Budget',
+          last_modified_on: '2024-01-01T00:00:00Z',
+          first_month: '2024-01-01',
+          last_month: '2024-12-01',
+          date_format: { format: 'MM/DD/YYYY' },
+          currency_format: { iso_code: 'USD', example_format: '$123.45' },
+        },
+      ];
+
+      const mockCacheKey = 'budgets:list:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockBudgets);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleListBudgets(mockYnabAPI);
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('budgets', 'list');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.BUDGETS,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
+    it('should handle cache miss scenario', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockBudgets = [
+        {
+          id: 'budget-1',
+          name: 'My Budget',
+          last_modified_on: '2024-01-01T00:00:00Z',
+          first_month: '2024-01-01',
+          last_month: '2024-12-01',
+          date_format: { format: 'MM/DD/YYYY' },
+          currency_format: { iso_code: 'USD', example_format: '$123.45' },
+        },
+      ];
+
+      const mockCacheKey = 'budgets:list:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockBudgets);
+      (cacheManager.has as any).mockReturnValue(false); // Cache miss
+
+      const result = await handleListBudgets(mockYnabAPI);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return formatted budget list on success', async () => {
       const mockBudgets = [
         {
@@ -114,6 +232,33 @@ describe('Budget Tools', () => {
   });
 
   describe('handleGetBudget', () => {
+    it('should not use cache (as per design - individual budgets change less frequently)', async () => {
+      const mockBudget = {
+        id: 'budget-1',
+        name: 'My Budget',
+        last_modified_on: '2024-01-01T00:00:00Z',
+        first_month: '2024-01-01',
+        last_month: '2024-12-01',
+        date_format: { format: 'MM/DD/YYYY' },
+        currency_format: { iso_code: 'USD', example_format: '$123.45' },
+      };
+
+      (mockYnabAPI.budgets.getBudgetById as any).mockResolvedValue({
+        data: { budget: mockBudget },
+      });
+
+      const result = await handleGetBudget(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // handleGetBudget should not use cache (direct API call)
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.budgets.getBudgetById).toHaveBeenCalledTimes(1);
+
+      // Verify result structure
+      expect(result.content).toHaveLength(1);
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.budget.id).toBe('budget-1');
+    });
+
     it('should return detailed budget information on success', async () => {
       const mockBudget = {
         id: 'budget-1',

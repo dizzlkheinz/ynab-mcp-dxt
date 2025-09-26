@@ -7,6 +7,21 @@ import {
   GetPayeeSchema,
 } from '../payeeTools.js';
 
+// Mock the cache manager
+vi.mock('../server/cacheManager.js', () => ({
+  cacheManager: {
+    wrap: vi.fn(),
+    has: vi.fn(),
+    clear: vi.fn(),
+  },
+  CacheManager: {
+    generateKey: vi.fn(),
+  },
+  CACHE_TTLS: {
+    PAYEES: 300000,
+  },
+}));
+
 // Mock the YNAB API
 const mockYnabAPI = {
   payees: {
@@ -15,12 +30,85 @@ const mockYnabAPI = {
   },
 } as unknown as ynab.API;
 
+// Import mocked cache manager
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+
 describe('Payee Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset NODE_ENV to test to ensure cache bypassing in tests
+    process.env['NODE_ENV'] = 'test';
   });
 
   describe('handleListPayees', () => {
+    it('should bypass cache in test environment', async () => {
+      const mockPayees = [
+        {
+          id: 'payee-1',
+          name: 'Grocery Store',
+          transfer_account_id: null,
+          deleted: false,
+        },
+        {
+          id: 'payee-2',
+          name: 'Gas Station',
+          transfer_account_id: null,
+          deleted: false,
+        },
+      ];
+
+      (mockYnabAPI.payees.getPayees as any).mockResolvedValue({
+        data: { payees: mockPayees },
+      });
+
+      const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // In test environment, cache should be bypassed
+      expect(cacheManager.wrap).not.toHaveBeenCalled();
+      expect(mockYnabAPI.payees.getPayees).toHaveBeenCalledTimes(1);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(false);
+      expect(parsedContent.cache_info).toBe('Fresh data retrieved from YNAB API');
+      expect(parsedContent.payees).toHaveLength(2);
+    });
+
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockPayees = [
+        {
+          id: 'payee-1',
+          name: 'Grocery Store',
+          transfer_account_id: null,
+          deleted: false,
+        },
+      ];
+
+      const mockCacheKey = 'payees:list:budget-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockPayees);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleListPayees(mockYnabAPI, { budget_id: 'budget-1' });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('payees', 'list', 'budget-1');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.PAYEES,
+        loader: expect.any(Function),
+      });
+      expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return formatted payee list on success', async () => {
       const mockPayees = [
         {
@@ -132,6 +220,42 @@ describe('Payee Tools', () => {
   });
 
   describe('handleGetPayee', () => {
+    it('should use cache when NODE_ENV is not test', async () => {
+      // Temporarily set NODE_ENV to non-test
+      process.env['NODE_ENV'] = 'development';
+
+      const mockPayee = {
+        id: 'payee-1',
+        name: 'Grocery Store',
+        transfer_account_id: null,
+        deleted: false,
+      };
+
+      const mockCacheKey = 'payee:get:budget-1:payee-1:generated-key';
+      (CacheManager.generateKey as any).mockReturnValue(mockCacheKey);
+      (cacheManager.wrap as any).mockResolvedValue(mockPayee);
+      (cacheManager.has as any).mockReturnValue(true);
+
+      const result = await handleGetPayee(mockYnabAPI, {
+        budget_id: 'budget-1',
+        payee_id: 'payee-1',
+      });
+
+      // Verify cache was used
+      expect(CacheManager.generateKey).toHaveBeenCalledWith('payee', 'get', 'budget-1', 'payee-1');
+      expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
+        ttl: CACHE_TTLS.PAYEES,
+        loader: expect.any(Function),
+      });
+
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
+      // Reset NODE_ENV
+      process.env['NODE_ENV'] = 'test';
+    });
+
     it('should return detailed payee information on success', async () => {
       const mockPayee = {
         id: 'payee-1',
