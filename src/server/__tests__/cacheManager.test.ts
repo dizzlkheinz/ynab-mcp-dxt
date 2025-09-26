@@ -411,6 +411,11 @@ describe('CacheManager', () => {
       vi.advanceTimersByTime(300); // Total 2300ms past refresh, should be in stale window
       const staleResult = cache.get('key1');
       expect(staleResult).toBe('refreshed-value'); // Should still be available due to preserved SWR
+
+      // Move beyond original TTL + stale window (5000ms) from the initial load to ensure expiry
+      vi.advanceTimersByTime(3000); // Total elapsed time ~7700ms from first load
+      await vi.runAllTimersAsync();
+      expect(cache.get('key1')).toBeNull(); // Entry should be expired after preserved TTL/SWR window
     });
   });
 
