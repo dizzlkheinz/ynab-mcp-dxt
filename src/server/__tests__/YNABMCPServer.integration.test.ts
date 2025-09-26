@@ -587,11 +587,11 @@ describe('YNABMCPServer', () => {
     });
 
     it('should complete end-to-end workflow with real YNAB API after setting default budget', async () => {
-      // Step 1: Verify error with no default budget
+      // Step 1: Verify error with no default budget for a tool that requires budget_id
       let result = await registry.executeTool({
-        name: 'financial_overview',
+        name: 'list_accounts',
         accessToken: accessToken(),
-        arguments: {},
+        arguments: {}, // No budget_id provided, should use default budget
       });
 
       let payload = JSON.parse(result.content?.[0]?.text ?? '{}');
@@ -606,17 +606,17 @@ describe('YNABMCPServer', () => {
         arguments: { budget_id: budgetId },
       });
 
-      // Step 3: Verify financial overview now works with real API
+      // Step 3: Verify list_accounts now works with real API using default budget
       result = await registry.executeTool({
-        name: 'financial_overview',
+        name: 'list_accounts',
         accessToken: accessToken(),
-        arguments: { months: 1, include_trends: false, include_insights: false },
+        arguments: {}, // No budget_id provided, should use default budget now
       });
 
       payload = JSON.parse(result.content?.[0]?.text ?? '{}');
       expect(payload.error).toBeUndefined();
-      expect(payload).toHaveProperty('overview');
-      expect(payload.overview).toHaveProperty('budgetName');
+      expect(payload).toHaveProperty('accounts');
+      expect(Array.isArray(payload.accounts)).toBe(true);
     });
 
     it('should handle real API errors properly with budget resolution', async () => {
