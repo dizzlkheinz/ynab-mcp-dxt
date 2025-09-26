@@ -442,6 +442,17 @@ export async function handleUpdateTransaction(
         ],
       };
     }
+
+    // Get the original transaction before updating to capture the original account_id
+    const originalTransactionResponse = await ynabAPI.transactions.getTransactionById(
+      params.budget_id,
+      params.transaction_id,
+    );
+    const originalTransaction = ensureTransaction(
+      originalTransactionResponse.data.transaction,
+      'Original transaction not found',
+    );
+
     // Prepare transaction update data - only include fields that are provided
     const transactionData: SaveTransaction = {};
 
@@ -502,16 +513,23 @@ export async function handleUpdateTransaction(
     cacheManager.delete(transactionsListCacheKey);
     cacheManager.delete(specificTransactionCacheKey);
 
-    // Invalidate account-related caches as the account balance has changed
+    // Invalidate account-related caches for all affected accounts
     const accountsListCacheKey = CacheManager.generateKey('accounts', 'list', params.budget_id);
-    const specificAccountCacheKey = CacheManager.generateKey(
-      'account',
-      'get',
-      params.budget_id,
-      transaction.account_id,
-    );
     cacheManager.delete(accountsListCacheKey);
-    cacheManager.delete(specificAccountCacheKey);
+
+    // Collect all affected account IDs (original and new, if different)
+    const affectedAccountIds = new Set([originalTransaction.account_id, transaction.account_id]);
+
+    // Invalidate caches for all affected accounts
+    for (const accountId of affectedAccountIds) {
+      const specificAccountCacheKey = CacheManager.generateKey(
+        'account',
+        'get',
+        params.budget_id,
+        accountId,
+      );
+      cacheManager.delete(specificAccountCacheKey);
+    }
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(

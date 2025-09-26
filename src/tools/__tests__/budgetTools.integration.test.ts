@@ -5,7 +5,10 @@ import { handleListBudgets, handleGetBudget } from '../budgetTools.js';
 /**
  * Integration tests for budget tools using real YNAB API
  */
-describe('Budget Tools Integration', () => {
+const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runIntegrationTests ? describe : describe.skip;
+
+describeIntegration('Budget Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
 

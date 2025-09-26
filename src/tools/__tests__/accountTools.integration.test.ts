@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
 import { handleListAccounts, handleGetAccount } from '../accountTools.js';
 
-describe('Account Tools Integration', () => {
+const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runIntegrationTests ? describe : describe.skip;
+
+describeIntegration('Account Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
 

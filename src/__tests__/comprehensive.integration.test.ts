@@ -3,9 +3,9 @@
  * These tests use mocked YNAB API responses to test complete workflows
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from 'vitest';
 import { YNABMCPServer } from '../server/YNABMCPServer.js';
-import { executeToolCall, parseToolResult, validateToolResult } from './testUtils.js';
+import { executeToolCall, parseToolResult, validateToolResult, waitFor } from './testUtils.js';
 import { cacheManager } from '../server/cacheManager.js';
 
 // Mock the YNAB SDK
@@ -55,6 +55,8 @@ vi.mock('ynab', () => {
     },
   };
 });
+
+const TEST_BUDGET_UUID = '00000000-0000-0000-0000-000000000001';
 
 describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
   let server: YNABMCPServer;
@@ -172,7 +174,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
 
   describe('Complete Account Management Integration', () => {
     it('should handle complete account workflow', async () => {
-      const budgetId = 'test-budget';
+      const budgetId = TEST_BUDGET_UUID;
 
       // Mock accounts list
       const mockAccounts = {
@@ -287,7 +289,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
 
   describe('Complete Transaction Management Integration', () => {
     it('should handle complete transaction workflow', async () => {
-      const budgetId = 'test-budget';
+      const budgetId = TEST_BUDGET_UUID;
       const accountId = 'test-account';
 
       // Mock transactions list
@@ -453,7 +455,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
     });
 
     it('should handle transaction filtering', async () => {
-      const budgetId = 'test-budget';
+      const budgetId = TEST_BUDGET_UUID;
 
       // Mock filtered transactions
       mockYnabAPI.transactions.getTransactions.mockResolvedValue({
@@ -769,9 +771,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
     });
 
     beforeEach(() => {
-      // Clear cache before each test to ensure clean state
       cacheManager.clear();
-      // Double-check NODE_ENV stays on for caching assertions
       process.env['NODE_ENV'] = 'development';
     });
 
@@ -782,7 +782,6 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         process.env['NODE_ENV'] = previousNodeEnv;
       }
     });
-
     it('should cache budget list requests and improve performance on subsequent calls', async () => {
       const mockBudgets = {
         data: {
@@ -834,7 +833,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
     });
 
     it('should invalidate cache on write operations', async () => {
-      const budgetId = 'test-budget';
+      const budgetId = TEST_BUDGET_UUID;
 
       // Mock responses
       const mockAccounts = {
@@ -895,7 +894,7 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
     });
 
     it('should not cache filtered transaction requests', async () => {
-      const budgetId = 'test-budget';
+      const budgetId = TEST_BUDGET_UUID;
 
       const mockTransactions = {
         data: {
@@ -948,11 +947,14 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
     });
 
     it('should handle cache warming after setting default budget', async () => {
-      const budgetId = 'test-budget';
+      const budgetId = TEST_BUDGET_UUID;
 
       // Mock all the responses for cache warming
       mockYnabAPI.accounts.getAccounts.mockResolvedValue({
         data: { accounts: [] },
+      });
+      mockYnabAPI.budgets.getBudgetById.mockResolvedValue({
+        data: { budget: { id: budgetId, name: 'Warm Cache Budget' } },
       });
       mockYnabAPI.categories.getCategories.mockResolvedValue({
         data: { category_groups: [] },
@@ -969,10 +971,16 @@ describe('YNAB MCP Server - Comprehensive Integration Tests', () => {
         budget_id: budgetId,
       });
 
-      // Wait a moment for cache warming to complete (it's fire-and-forget)
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      const statsAfterSet = cacheManager.getStats();
+      // Wait for cache warming to populate entries (fire-and-forget process)
+      let statsAfterSet = cacheManager.getStats();
+      await waitFor(
+        () => {
+          statsAfterSet = cacheManager.getStats();
+          return statsAfterSet.size > initialSize;
+        },
+        1000,
+        50,
+      );
 
       // Cache should have more entries due to warming
       expect(statsAfterSet.size).toBeGreaterThan(initialSize);

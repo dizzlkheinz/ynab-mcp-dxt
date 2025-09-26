@@ -5,7 +5,10 @@ import { handleListCategories, handleGetCategory, handleUpdateCategory } from '.
 /**
  * Integration tests for category tools using real YNAB API
  */
-describe('Category Tools Integration', () => {
+const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runIntegrationTests ? describe : describe.skip;
+
+describeIntegration('Category Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
   let testCategoryId: string;

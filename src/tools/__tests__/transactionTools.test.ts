@@ -851,8 +851,15 @@ describe('transactionTools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.transaction.id).toBe('new-transaction-123');
       expect(parsedContent.dry_run).toBe(true);
+      expect(parsedContent.action).toBe('create_transaction');
+      expect(parsedContent.request).toMatchObject({
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        amount: -50000,
+        date: '2024-01-01',
+        dry_run: true,
+      });
     });
   });
 
@@ -977,6 +984,20 @@ describe('transactionTools', () => {
       import_id: null,
       deleted: false,
     };
+
+    const mockOriginalTransaction = {
+      id: 'transaction-456',
+      account_id: 'account-123',
+      amount: -50000,
+      date: '2024-01-01',
+      memo: 'Original memo',
+    };
+
+    beforeEach(() => {
+      (mockYnabAPI.transactions.getTransactionById as any).mockResolvedValue({
+        data: { transaction: mockOriginalTransaction },
+      });
+    });
 
     it('should update transaction with single field', async () => {
       const mockResponse = {
@@ -1189,8 +1210,14 @@ describe('transactionTools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.transaction.id).toBe('transaction-456');
       expect(parsedContent.dry_run).toBe(true);
+      expect(parsedContent.action).toBe('update_transaction');
+      expect(parsedContent.request).toEqual({
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        amount: -60000,
+        dry_run: true,
+      });
     });
   });
 
@@ -1397,8 +1424,13 @@ describe('transactionTools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.transaction.id).toBe('transaction-456');
       expect(parsedContent.dry_run).toBe(true);
+      expect(parsedContent.action).toBe('delete_transaction');
+      expect(parsedContent.request).toEqual({
+        budget_id: 'budget-123',
+        transaction_id: 'transaction-456',
+        dry_run: true,
+      });
     });
   });
 });

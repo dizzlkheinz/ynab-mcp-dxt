@@ -5,7 +5,10 @@ import { handleGetMonth, handleListMonths } from '../monthTools.js';
 /**
  * Integration tests for month tools using real YNAB API
  */
-describe('Month Tools Integration', () => {
+const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runIntegrationTests ? describe : describe.skip;
+
+describeIntegration('Month Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
   let testMonth: string;

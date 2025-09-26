@@ -8,7 +8,10 @@ import { responseFormatter } from '../../server/responseFormatter.js';
 /**
  * Real YNAB API tests using token from .env (YNAB_ACCESS_TOKEN)
  */
-describe('YNABMCPServer', () => {
+const runRealIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runRealIntegrationTests ? describe : describe.skip;
+
+describeIntegration('YNABMCPServer', () => {
   const originalEnv = process.env;
 
   beforeAll(() => {

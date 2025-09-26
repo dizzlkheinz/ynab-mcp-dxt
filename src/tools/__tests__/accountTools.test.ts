@@ -10,7 +10,7 @@ import {
 } from '../accountTools.js';
 
 // Mock the cache manager
-vi.mock('../server/cacheManager.js', () => ({
+vi.mock('../../server/cacheManager.js', () => ({
   cacheManager: {
     wrap: vi.fn(),
     has: vi.fn(),
@@ -35,7 +35,7 @@ const mockYnabAPI = {
 } as unknown as ynab.API;
 
 // Import mocked cache manager
-const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../../server/cacheManager.js');
 
 describe('Account Tools', () => {
   beforeEach(() => {
@@ -546,8 +546,13 @@ describe('Account Tools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.account.id).toBe('account-1');
       expect(parsedContent.dry_run).toBe(true);
+      expect(parsedContent.action).toBe('create_account');
+      expect(parsedContent.request).toMatchObject({
+        budget_id: 'budget-1',
+        name: 'New Account',
+        type: 'checking',
+      });
     });
   });
 

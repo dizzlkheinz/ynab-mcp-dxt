@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
 import { handleListTransactions, handleGetTransaction } from '../transactionTools.js';
 
-describe('Transaction Tools Integration', () => {
+const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runIntegrationTests ? describe : describe.skip;
+
+describeIntegration('Transaction Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
   let testAccountId: string;

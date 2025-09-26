@@ -8,7 +8,7 @@ import {
 } from '../monthTools.js';
 
 // Mock the cache manager
-vi.mock('../server/cacheManager.js', () => ({
+vi.mock('../../server/cacheManager.js', () => ({
   cacheManager: {
     wrap: vi.fn(),
     has: vi.fn(),
@@ -31,7 +31,7 @@ const mockYnabAPI = {
 } as unknown as ynab.API;
 
 // Import mocked cache manager
-const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../../server/cacheManager.js');
 
 describe('Month Tools', () => {
   beforeEach(() => {
@@ -99,6 +99,10 @@ describe('Month Tools', () => {
         month: '2024-01-01',
       });
 
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
       // Verify cache was used
       expect(CacheManager.generateKey).toHaveBeenCalledWith(
         'month',
@@ -111,10 +115,6 @@ describe('Month Tools', () => {
         loader: expect.any(Function),
       });
       expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
-
-      const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.cached).toBe(true);
-      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
 
       // Reset NODE_ENV
       process.env['NODE_ENV'] = 'test';
@@ -318,6 +318,10 @@ describe('Month Tools', () => {
 
       const result = await handleListMonths(mockYnabAPI, { budget_id: 'budget-1' });
 
+      const parsedContent = JSON.parse(result.content[0].text);
+      expect(parsedContent.cached).toBe(true);
+      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
+
       // Verify cache was used
       expect(CacheManager.generateKey).toHaveBeenCalledWith('months', 'list', 'budget-1');
       expect(cacheManager.wrap).toHaveBeenCalledWith(mockCacheKey, {
@@ -325,10 +329,6 @@ describe('Month Tools', () => {
         loader: expect.any(Function),
       });
       expect(cacheManager.has).toHaveBeenCalledWith(mockCacheKey);
-
-      const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.cached).toBe(true);
-      expect(parsedContent.cache_info).toBe('Data retrieved from cache for improved performance');
 
       // Reset NODE_ENV
       process.env['NODE_ENV'] = 'test';

@@ -10,7 +10,7 @@ import {
 } from '../categoryTools.js';
 
 // Mock the cache manager
-vi.mock('../server/cacheManager.js', () => ({
+vi.mock('../../server/cacheManager.js', () => ({
   cacheManager: {
     wrap: vi.fn(),
     has: vi.fn(),
@@ -35,7 +35,7 @@ const mockYnabAPI = {
 } as unknown as ynab.API;
 
 // Import mocked cache manager
-const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../../server/cacheManager.js');
 
 describe('Category Tools', () => {
   beforeEach(() => {
@@ -554,8 +554,13 @@ describe('Category Tools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.category.budgeted).toBe(60);
       expect(parsedContent.dry_run).toBe(true);
+      expect(parsedContent.action).toBe('update_category');
+      expect(parsedContent.request).toMatchObject({
+        budget_id: 'budget-1',
+        category_id: 'category-1',
+        budgeted: 60,
+      });
     });
   });
 

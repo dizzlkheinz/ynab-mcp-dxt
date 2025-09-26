@@ -16,7 +16,10 @@ import {
   YNABAssertions,
 } from './testUtils.js';
 
-describe('YNAB MCP Server - End-to-End Workflows', () => {
+const runE2ETests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeE2E = runE2ETests ? describe : describe.skip;
+
+describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
   let server: YNABMCPServer;
   let testConfig: ReturnType<typeof getTestConfig>;
   let cleanup: TestDataCleanup;

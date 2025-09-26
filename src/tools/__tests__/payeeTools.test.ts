@@ -8,7 +8,7 @@ import {
 } from '../payeeTools.js';
 
 // Mock the cache manager
-vi.mock('../server/cacheManager.js', () => ({
+vi.mock('../../server/cacheManager.js', () => ({
   cacheManager: {
     wrap: vi.fn(),
     has: vi.fn(),
@@ -31,7 +31,7 @@ const mockYnabAPI = {
 } as unknown as ynab.API;
 
 // Import mocked cache manager
-const { cacheManager, CacheManager, CACHE_TTLS } = await import('../server/cacheManager.js');
+const { cacheManager, CacheManager, CACHE_TTLS } = await import('../../server/cacheManager.js');
 
 describe('Payee Tools', () => {
   beforeEach(() => {

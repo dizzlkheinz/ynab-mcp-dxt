@@ -5,7 +5,10 @@ import { handleListPayees, handleGetPayee } from '../payeeTools.js';
 /**
  * Integration tests for payee tools using real YNAB API
  */
-describe('Payee Tools Integration', () => {
+const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const describeIntegration = runIntegrationTests ? describe : describe.skip;
+
+describeIntegration('Payee Tools Integration', () => {
   let ynabAPI: ynab.API;
   let testBudgetId: string;
   let testPayeeId: string;

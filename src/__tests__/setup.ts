@@ -7,6 +7,12 @@ import 'dotenv/config';
 import { beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { cacheManager } from '../server/cacheManager.js';
 
+// Skip E2E tests by default unless explicitly enabled
+const hasAccessToken = !!process.env['YNAB_ACCESS_TOKEN'];
+if (!process.env['SKIP_E2E_TESTS']) {
+  process.env['SKIP_E2E_TESTS'] = hasAccessToken ? 'false' : 'true';
+}
+
 /**
  * Global test setup
  */

@@ -79,6 +79,30 @@ export class CacheManager {
   }
 
   /**
+   * Check if a valid cache entry exists without updating hit/miss counters
+   */
+  has(key: string): boolean {
+    const entry = this.cache.get(key);
+    if (!entry) {
+      return false;
+    }
+
+    const now = Date.now();
+    const age = now - entry.timestamp;
+    if (age > entry.ttl) {
+      const staleWindow = entry.staleWhileRevalidate || 0;
+      if (staleWindow > 0 && age <= entry.ttl + staleWindow) {
+        return true;
+      }
+
+      this.cache.delete(key);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
    * Set cache entry with optional TTL or options
    *
    * @param key - Cache key
