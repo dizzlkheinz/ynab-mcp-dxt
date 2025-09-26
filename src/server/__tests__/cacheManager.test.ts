@@ -206,6 +206,27 @@ describe('CacheManager', () => {
       expect(smallCache.getStats().evictions).toBe(1);
       expect(smallCache.get('key2')).toBe('value2'); // Most recent
     });
+
+    it('should not evict when updating existing key at maxEntries limit', () => {
+      // Fill cache to capacity
+      cache.set('key1', 'value1');
+      cache.set('key2', 'value2');
+      cache.set('key3', 'value3');
+
+      const initialStats = cache.getStats();
+      expect(initialStats.size).toBe(3);
+      expect(initialStats.evictions).toBe(0);
+
+      // Update an existing key - should not trigger eviction
+      cache.set('key2', 'updated-value2');
+
+      const updatedStats = cache.getStats();
+      expect(updatedStats.size).toBe(3); // Same size
+      expect(updatedStats.evictions).toBe(0); // No evictions
+      expect(cache.get('key1')).toBe('value1'); // Other keys still present
+      expect(cache.get('key2')).toBe('updated-value2'); // Updated value
+      expect(cache.get('key3')).toBe('value3'); // Other keys still present
+    });
   });
 
   describe('Per-Entry Options', () => {
@@ -572,6 +593,50 @@ describe('CacheManager', () => {
       const entries = cache.getEntriesForSizeEstimation();
       expect(entries).toHaveLength(1); // Only non-expired entry
       expect(entries[0][0]).toBe('key2');
+    });
+
+    it('should provide lightweight cache metadata without full entry data', () => {
+      cache.set('key1', 'string-value', 1000);
+      cache.set('key2', { prop: 'object' }, 2000);
+      cache.set('key3', 42, { ttl: 3000, staleWhileRevalidate: 1000 });
+
+      vi.advanceTimersByTime(1500); // key1 should be expired
+
+      const metadata = cache.getCacheMetadata();
+      expect(metadata).toHaveLength(3);
+
+      // Check expired entry
+      const key1Meta = metadata.find((m) => m.key === 'key1');
+      expect(key1Meta).toEqual({
+        key: 'key1',
+        timestamp: expect.any(Number),
+        ttl: 1000,
+        staleWhileRevalidate: undefined,
+        dataType: 'string',
+        isExpired: true,
+      });
+
+      // Check non-expired entry
+      const key2Meta = metadata.find((m) => m.key === 'key2');
+      expect(key2Meta).toEqual({
+        key: 'key2',
+        timestamp: expect.any(Number),
+        ttl: 2000,
+        staleWhileRevalidate: undefined,
+        dataType: 'object',
+        isExpired: false,
+      });
+
+      // Check entry with staleWhileRevalidate
+      const key3Meta = metadata.find((m) => m.key === 'key3');
+      expect(key3Meta).toEqual({
+        key: 'key3',
+        timestamp: expect.any(Number),
+        ttl: 3000,
+        staleWhileRevalidate: 1000,
+        dataType: 'number',
+        isExpired: false,
+      });
     });
   });
 

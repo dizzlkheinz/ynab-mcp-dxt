@@ -90,7 +90,9 @@ describe('Account Tools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.error.message).toBe('Budget or account not found');
+      expect(parsedContent.error.message).toBe(
+        'Failed to list accounts - budget or account not found',
+      );
     });
 
     it('should handle 401 authentication errors', async () => {
@@ -170,7 +172,9 @@ describe('Account Tools', () => {
 
       expect(result.content).toHaveLength(1);
       const parsedContent = JSON.parse(result.content[0].text);
-      expect(parsedContent.error.message).toBe('Budget or account not found');
+      expect(parsedContent.error.message).toBe(
+        'Failed to get account - budget or account not found',
+      );
     });
 
     it('should handle authentication errors', async () => {

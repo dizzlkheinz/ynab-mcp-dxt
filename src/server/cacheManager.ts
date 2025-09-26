@@ -12,6 +12,11 @@ interface CacheEntry<T> {
 
 interface CacheSetOptions {
   ttl?: number;
+  /**
+   * Stale-while-revalidate window in milliseconds.
+   * When explicitly set to undefined, uses the default stale window.
+   * When omitted entirely, no stale-while-revalidate is applied.
+   */
   staleWhileRevalidate?: number;
 }
 
@@ -75,6 +80,17 @@ export class CacheManager {
 
   /**
    * Set cache entry with optional TTL or options
+   *
+   * @param key - Cache key
+   * @param data - Data to cache
+   * @param ttlOrOptions - TTL in milliseconds (number) or options object
+   *
+   * Note: Default stale-while-revalidate window is applied only when:
+   * - An options object is provided AND
+   * - The staleWhileRevalidate property is explicitly present (even if undefined)
+   *
+   * When using the simple number interface or when staleWhileRevalidate property
+   * is not present in the options object, no default stale window is applied.
    */
   set<T>(key: string, data: T, ttlOrOptions?: number | CacheSetOptions): void {
     // Don't cache anything if maxEntries is 0
@@ -82,7 +98,10 @@ export class CacheManager {
       return;
     }
 
-    this.evictIfNeeded();
+    const isUpdate = this.cache.has(key);
+    if (!isUpdate) {
+      this.evictIfNeeded();
+    }
 
     let ttl: number;
     let staleWhileRevalidate: number | undefined;
@@ -108,6 +127,10 @@ export class CacheManager {
       staleWhileRevalidate,
     };
 
+    if (isUpdate) {
+      // When updating, delete then set to preserve MRU ordering
+      this.cache.delete(key);
+    }
     this.cache.set(key, entry);
   }
 
@@ -165,6 +188,29 @@ export class CacheManager {
     return Array.from(this.cache.entries()).filter(
       ([, entry]) => now - entry.timestamp <= entry.ttl,
     );
+  }
+
+  /**
+   * Get lightweight cache metadata for size estimation without full entry data.
+   * Returns summaries with keys, timestamps, and TTLs for estimating memory usage.
+   */
+  getCacheMetadata(): {
+    key: string;
+    timestamp: number;
+    ttl: number;
+    staleWhileRevalidate?: number;
+    dataType: string;
+    isExpired: boolean;
+  }[] {
+    const now = Date.now();
+    return Array.from(this.cache.entries()).map(([key, entry]) => ({
+      key,
+      timestamp: entry.timestamp,
+      ttl: entry.ttl,
+      staleWhileRevalidate: entry.staleWhileRevalidate,
+      dataType: typeof entry.data,
+      isExpired: now - entry.timestamp > entry.ttl,
+    }));
   }
 
   /**

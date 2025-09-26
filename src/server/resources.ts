@@ -51,42 +51,50 @@ export interface ResourceDependencies {
  */
 const defaultResourceHandlers: Record<string, ResourceHandler> = {
   'ynab://budgets': async (uri, { ynabAPI, responseFormatter }) => {
-    const response = await ynabAPI.budgets.getBudgets();
-    const budgets = response.data.budgets.map((budget) => ({
-      id: budget.id,
-      name: budget.name,
-      last_modified_on: budget.last_modified_on,
-      first_month: budget.first_month,
-      last_month: budget.last_month,
-      currency_format: budget.currency_format,
-    }));
+    try {
+      const response = await ynabAPI.budgets.getBudgets();
+      const budgets = response.data.budgets.map((budget) => ({
+        id: budget.id,
+        name: budget.name,
+        last_modified_on: budget.last_modified_on,
+        first_month: budget.first_month,
+        last_month: budget.last_month,
+        currency_format: budget.currency_format,
+      }));
 
-    return {
-      contents: [
-        {
-          uri: uri,
-          mimeType: 'application/json',
-          text: responseFormatter.format({ budgets }),
-        },
-      ],
-    };
+      return {
+        contents: [
+          {
+            uri: uri,
+            mimeType: 'application/json',
+            text: responseFormatter.format({ budgets }),
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Failed to fetch budgets: ${error}`);
+    }
   },
 
   'ynab://user': async (uri, { ynabAPI, responseFormatter }) => {
-    const response = await ynabAPI.user.getUser();
-    const user = {
-      id: response.data.user.id,
-    };
+    try {
+      const response = await ynabAPI.user.getUser();
+      const user = {
+        id: response.data.user.id,
+      };
 
-    return {
-      contents: [
-        {
-          uri: uri,
-          mimeType: 'application/json',
-          text: responseFormatter.format({ user }),
-        },
-      ],
-    };
+      return {
+        contents: [
+          {
+            uri: uri,
+            mimeType: 'application/json',
+            text: responseFormatter.format({ user }),
+          },
+        ],
+      };
+    } catch (error) {
+      throw new Error(`Failed to fetch user info: ${error}`);
+    }
   },
 };
 

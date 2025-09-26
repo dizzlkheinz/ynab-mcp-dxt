@@ -221,9 +221,9 @@ export class DiagnosticManager {
       const cacheStats = this.dependencies.cacheManager.getStats();
       const estimateCacheSize = () => {
         try {
-          const serialized = JSON.stringify(
-            this.dependencies.cacheManager.getEntriesForSizeEstimation(),
-          );
+          // Use lightweight metadata instead of full entry data for size estimation
+          const metadata = this.dependencies.cacheManager.getCacheMetadata();
+          const serialized = JSON.stringify(metadata);
           return Math.round(Buffer.byteLength(serialized, 'utf8') / 1024);
         } catch {
           return 0;

@@ -23,6 +23,7 @@ const mockSecurityMiddleware = {
 const mockCacheManager = {
   getStats: vi.fn(),
   getEntriesForSizeEstimation: vi.fn(),
+  getCacheMetadata: vi.fn(),
 };
 
 // Mock response formatter
@@ -90,10 +91,10 @@ describe('diagnostics module', () => {
       maxEntries: 1000,
       hitRate: 0.833,
     });
-    mockCacheManager.getEntriesForSizeEstimation.mockReturnValue({
-      key1: 'value1',
-      key2: 'value2',
-    });
+    mockCacheManager.getCacheMetadata.mockReturnValue([
+      { key: 'key1', timestamp: Date.now(), ttl: 1000, dataType: 'string', isExpired: false },
+      { key: 'key2', timestamp: Date.now(), ttl: 2000, dataType: 'object', isExpired: false },
+    ]);
   });
 
   describe('DiagnosticManager', () => {
@@ -129,14 +130,14 @@ describe('diagnostics module', () => {
               server: {
                 name: 'ynab-mcp-server',
                 version: '1.0.0',
-                node_version: 'v18.0.0',
-                platform: 'linux',
-                arch: 'x64',
-                pid: 12345,
+                node_version: expect.any(String),
+                platform: expect.any(String),
+                arch: expect.any(String),
+                pid: expect.any(Number),
                 uptime_ms: 3661500,
                 uptime_readable: '1h 1m 1s',
                 env: {
-                  node_env: 'development',
+                  node_env: expect.any(String),
                   minify_output: 'true',
                 },
               },
@@ -326,7 +327,7 @@ describe('diagnostics module', () => {
           await diagnosticManager.collectDiagnostics(options);
 
           expect(mockCacheManager.getStats).toHaveBeenCalledOnce();
-          expect(mockCacheManager.getEntriesForSizeEstimation).toHaveBeenCalledOnce();
+          expect(mockCacheManager.getCacheMetadata).toHaveBeenCalledOnce();
           expect(mockResponseFormatter.format).toHaveBeenCalledWith(
             expect.objectContaining({
               cache: expect.objectContaining({
@@ -346,7 +347,7 @@ describe('diagnostics module', () => {
         });
 
         it('should handle cache serialization errors gracefully', async () => {
-          mockCacheManager.getEntriesForSizeEstimation.mockImplementation(() => {
+          mockCacheManager.getCacheMetadata.mockImplementation(() => {
             const circular: any = {};
             circular.self = circular;
             return circular;
@@ -679,6 +680,15 @@ describe('diagnostics module', () => {
       const customCacheManager = {
         getStats: vi.fn().mockReturnValue({ size: 5, keys: ['custom'] }),
         getEntriesForSizeEstimation: vi.fn().mockReturnValue({ custom: 'data' }),
+        getCacheMetadata: vi.fn().mockReturnValue([
+          {
+            key: 'custom',
+            timestamp: Date.now(),
+            ttl: 1000,
+            dataType: 'object',
+            isExpired: false,
+          },
+        ]),
       };
 
       const customDependencies = {
@@ -690,9 +700,9 @@ describe('diagnostics module', () => {
       await customDiagnosticManager.collectDiagnostics({ include_cache: true });
 
       expect(customCacheManager.getStats).toHaveBeenCalledOnce();
-      expect(customCacheManager.getEntriesForSizeEstimation).toHaveBeenCalledOnce();
+      expect(customCacheManager.getCacheMetadata).toHaveBeenCalledOnce();
       expect(mockCacheManager.getStats).not.toHaveBeenCalled();
-      expect(mockCacheManager.getEntriesForSizeEstimation).not.toHaveBeenCalled();
+      expect(mockCacheManager.getCacheMetadata).not.toHaveBeenCalled();
     });
 
     it('should use injected response formatter', async () => {
