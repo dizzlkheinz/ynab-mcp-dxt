@@ -2,7 +2,10 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import * as ynab from 'ynab';
 import { handleListAccounts, handleGetAccount } from '../accountTools.js';
 
-const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const isSkip = ['true', '1', 'yes', 'y', 'on'].includes(
+  (process.env['SKIP_E2E_TESTS'] || '').toLowerCase().trim(),
+);
+const runIntegrationTests = !isSkip;
 const describeIntegration = runIntegrationTests ? describe : describe.skip;
 
 describeIntegration('Account Tools Integration', () => {

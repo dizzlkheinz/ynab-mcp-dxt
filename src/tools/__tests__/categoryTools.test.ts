@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import * as ynab from 'ynab';
 import {
   handleListCategories,
@@ -37,11 +37,23 @@ const mockYnabAPI = {
 // Import mocked cache manager
 const { cacheManager, CacheManager, CACHE_TTLS } = await import('../../server/cacheManager.js');
 
+// Capture original NODE_ENV for restoration
+const originalNodeEnv = process.env.NODE_ENV;
+
 describe('Category Tools', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset NODE_ENV to test to ensure cache bypassing in tests
     process.env['NODE_ENV'] = 'test';
+  });
+
+  afterAll(() => {
+    // Restore original NODE_ENV value
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 
   describe('handleListCategories', () => {
@@ -548,6 +560,9 @@ describe('Category Tools', () => {
         dry_run: true,
       });
 
+      // Verify the live API method was NOT called for dry run
+      expect(mockYnabAPI.categories.updateMonthCategory).not.toHaveBeenCalled();
+
       // Verify cache was NOT invalidated for dry run
       expect(cacheManager.delete).not.toHaveBeenCalled();
       expect(CacheManager.generateKey).not.toHaveBeenCalled();
@@ -561,6 +576,7 @@ describe('Category Tools', () => {
         category_id: 'category-1',
         budgeted: 60,
       });
+      expect(parsedContent.request.month).toMatch(/^\d{4}-\d{2}-01$/);
     });
   });
 

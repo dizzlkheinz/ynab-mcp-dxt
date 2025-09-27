@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import * as ynab from 'ynab';
 import {
   handleListAccounts,
@@ -37,11 +37,23 @@ const mockYnabAPI = {
 // Import mocked cache manager
 const { cacheManager, CacheManager, CACHE_TTLS } = await import('../../server/cacheManager.js');
 
+// Capture original NODE_ENV for restoration
+const originalNodeEnv = process.env.NODE_ENV;
+
 describe('Account Tools', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     // Reset NODE_ENV to test to ensure cache bypassing in tests
     process.env['NODE_ENV'] = 'test';
+  });
+
+  afterAll(() => {
+    // Restore original NODE_ENV value
+    if (originalNodeEnv === undefined) {
+      delete process.env.NODE_ENV;
+    } else {
+      process.env.NODE_ENV = originalNodeEnv;
+    }
   });
 
   describe('handleListAccounts', () => {
