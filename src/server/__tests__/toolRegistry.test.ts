@@ -7,6 +7,7 @@ import {
   ToolRegistryDependencies,
   ToolExecutionPayload,
 } from '../toolRegistry.js';
+import { createErrorHandler } from '../errorHandler.js';
 
 function createResult(label: string): CallToolResult {
   return {
@@ -27,18 +28,12 @@ function makeTestDeps() {
     params: Record<string, unknown>;
   }[] = [];
 
-  const errorHandler = {
-    handleError: vi.fn((error: unknown, context: string) =>
-      createResult(`handled:${context}:${error instanceof Error ? error.message : String(error)}`),
-    ),
-    createValidationError: vi.fn((message: string, details?: string) =>
-      createResult(`validation:${message}:${details ?? ''}`),
-    ),
-  };
-
   const responseFormatter = {
     runWithMinifyOverride: vi.fn(<T>(minifyOverride: boolean | undefined, fn: () => T): T => fn()),
+    format: vi.fn((value) => JSON.stringify(value)),
   };
+
+  const errorHandler = createErrorHandler(responseFormatter);
 
   const withSecurityWrapper = vi.fn(
     <T extends Record<string, unknown>>(
@@ -431,5 +426,47 @@ describe('ToolRegistry', () => {
     const emptyRegistry = new ToolRegistry(dependencies);
     expect(emptyRegistry.listTools()).toEqual([]);
     expect(emptyRegistry.getToolDefinitions()).toEqual([]);
+  });
+
+  describe('ErrorHandler integration', () => {
+    it('should use injected ErrorHandler instance', async () => {
+      const mockErrorHandler = {
+        handleError: vi.fn(() => ({ content: [{ type: 'text', text: 'Mock error' }] })),
+        createValidationError: vi.fn(() => ({
+          content: [{ type: 'text', text: 'Mock validation error' }],
+        })),
+      };
+
+      const customDeps = {
+        ...dependencies,
+        errorHandler: mockErrorHandler,
+      };
+
+      const customRegistry = new ToolRegistry(customDeps);
+
+      // Test that the registry uses the injected error handler
+      const result = await customRegistry.executeTool({
+        name: 'nonexistent_tool',
+        accessToken: 'test-token',
+      });
+
+      expect(mockErrorHandler.createValidationError).toHaveBeenCalled();
+      expect(result.content[0]?.text).toBe('Mock validation error');
+    });
+
+    it('should use the same formatter instance for both ErrorHandler and ToolRegistry', () => {
+      const { dependencies: deps, responseFormatter: formatter, errorHandler } = makeTestDeps();
+
+      // Both should use the same formatter
+      expect(deps.errorHandler).toBe(errorHandler);
+      expect(deps.responseFormatter).toBe(formatter);
+    });
+
+    it('should implement ErrorHandler contract interface', () => {
+      const { errorHandler } = makeTestDeps();
+
+      expect(typeof errorHandler.handleError).toBe('function');
+      expect(typeof errorHandler.createValidationError).toBe('function');
+    });
   });
 });

@@ -6,6 +6,7 @@ import {
   YNABErrorCode,
   handleToolError,
   withToolErrorHandling,
+  createErrorHandler,
 } from '../errorHandler.js';
 
 describe('ErrorHandler', () => {
@@ -225,5 +226,164 @@ describe('ValidationError', () => {
     expect(error.name).toBe('ValidationError');
     expect(error.message).toBe('Test message');
     expect(error.details).toBe('Test details');
+  });
+});
+
+describe('ErrorHandler with formatter injection', () => {
+  it('should use injected formatter for error responses', () => {
+    const mockFormatter = {
+      format: vi.fn((value) => `CUSTOM: ${JSON.stringify(value)}`),
+    };
+    const errorHandler = createErrorHandler(mockFormatter);
+
+    const error = new ValidationError('Test error');
+    const result = errorHandler.handleError(error, 'testing');
+
+    expect(mockFormatter.format).toHaveBeenCalledOnce();
+    expect(result.content[0].text).toContain('CUSTOM:');
+  });
+
+  it('should call formatter with error response object', () => {
+    const mockFormatter = {
+      format: vi.fn((value) => JSON.stringify(value)),
+    };
+    const errorHandler = createErrorHandler(mockFormatter);
+
+    const error = new YNABAPIError(YNABErrorCode.UNAUTHORIZED, 'Test');
+    errorHandler.handleError(error, 'testing');
+
+    expect(mockFormatter.format).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: expect.objectContaining({
+          code: YNABErrorCode.UNAUTHORIZED,
+          message: expect.any(String),
+          userMessage: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it('should create different instances with different formatters', () => {
+    const formatter1 = { format: (v: unknown) => `F1: ${JSON.stringify(v)}` };
+    const formatter2 = { format: (v: unknown) => `F2: ${JSON.stringify(v)}` };
+
+    const handler1 = createErrorHandler(formatter1);
+    const handler2 = createErrorHandler(formatter2);
+
+    const error = new ValidationError('Test');
+    const result1 = handler1.handleError(error, 'testing');
+    const result2 = handler2.handleError(error, 'testing');
+
+    expect(result1.content[0].text).toContain('F1:');
+    expect(result2.content[0].text).toContain('F2:');
+  });
+});
+
+describe('Static method delegation', () => {
+  it('should delegate static calls to default instance', () => {
+    const mockFormatter = {
+      format: vi.fn((value) => JSON.stringify(value)),
+    };
+    ErrorHandler.setFormatter(mockFormatter);
+
+    const error = new ValidationError('Test error');
+    ErrorHandler.handleError(error, 'testing');
+
+    expect(mockFormatter.format).toHaveBeenCalled();
+  });
+
+  it('should delegate createValidationError to default instance', () => {
+    const mockFormatter = {
+      format: vi.fn((value) => JSON.stringify(value)),
+    };
+    ErrorHandler.setFormatter(mockFormatter);
+
+    ErrorHandler.createValidationError('Test error');
+
+    expect(mockFormatter.format).toHaveBeenCalled();
+  });
+
+  it('should delegate withErrorHandling to default instance', async () => {
+    const mockFormatter = {
+      format: vi.fn((value) => JSON.stringify(value)),
+    };
+    ErrorHandler.setFormatter(mockFormatter);
+
+    const operation = vi.fn().mockRejectedValue(new Error('Test error'));
+    await ErrorHandler.withErrorHandling(operation, 'testing');
+
+    expect(mockFormatter.format).toHaveBeenCalled();
+  });
+});
+
+describe('Fallback formatter', () => {
+  it('should use fallback formatter when none is set initially', () => {
+    // Reset to ensure we start fresh
+    const error = new ValidationError('Test error');
+    const result = ErrorHandler.handleError(error, 'testing');
+
+    // Should still produce valid JSON
+    expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+  });
+});
+
+describe('Instance vs static behavior', () => {
+  it('should produce identical results for instance and static calls', () => {
+    const formatter = { format: (value: unknown) => JSON.stringify(value) };
+    const errorHandler = createErrorHandler(formatter);
+    ErrorHandler.setFormatter(formatter);
+
+    const error = new ValidationError('Test error');
+    const instanceResult = errorHandler.handleError(error, 'testing');
+    const staticResult = ErrorHandler.handleError(error, 'testing');
+
+    expect(instanceResult).toEqual(staticResult);
+  });
+
+  it('should produce identical results for createValidationError', () => {
+    const formatter = { format: (value: unknown) => JSON.stringify(value) };
+    const errorHandler = createErrorHandler(formatter);
+    ErrorHandler.setFormatter(formatter);
+
+    const instanceResult = errorHandler.createValidationError('Test error');
+    const staticResult = ErrorHandler.createValidationError('Test error');
+
+    expect(instanceResult).toEqual(staticResult);
+  });
+
+  it('should produce identical results for withErrorHandling', async () => {
+    const formatter = { format: (value: unknown) => JSON.stringify(value) };
+    const errorHandler = createErrorHandler(formatter);
+    ErrorHandler.setFormatter(formatter);
+
+    const operation = vi.fn().mockRejectedValue(new Error('Test error'));
+    const instanceResult = await errorHandler.withErrorHandling(operation, 'testing');
+
+    const operation2 = vi.fn().mockRejectedValue(new Error('Test error'));
+    const staticResult = await ErrorHandler.withErrorHandling(operation2, 'testing');
+
+    expect(instanceResult).toEqual(staticResult);
+  });
+});
+
+describe('Error scenarios', () => {
+  it('should handle formatter errors gracefully', () => {
+    const faultyFormatter = {
+      format: () => {
+        throw new Error('Formatter error');
+      },
+    };
+    const errorHandler = createErrorHandler(faultyFormatter);
+
+    const error = new ValidationError('Test error');
+
+    // Should not throw despite formatter error
+    expect(() => errorHandler.handleError(error, 'testing')).not.toThrow();
+
+    const result = errorHandler.handleError(error, 'testing');
+
+    // Should still return a valid CallToolResult
+    expect(result.content).toBeDefined();
+    expect(result.content[0].type).toBe('text');
   });
 });

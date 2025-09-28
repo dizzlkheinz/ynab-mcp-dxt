@@ -11,19 +11,24 @@ import type {
   BudgetHealthParams,
 } from '../../financialOverview/schemas.js';
 
+// Create shared mock instances
+const mockCacheManager = {
+  get: vi.fn(),
+  set: vi.fn(),
+};
+
+const CACHE_TTLS = {
+  MONTHS: 3600000,
+};
+
 // Mock all the dependencies
 vi.mock('../../../types/index.js', () => ({
   withToolErrorHandling: vi.fn(async (fn) => await fn()),
 }));
 
 vi.mock('../../../server/cacheManager.js', () => ({
-  cacheManager: {
-    get: vi.fn(),
-    set: vi.fn(),
-  },
-  CACHE_TTLS: {
-    MONTHS: 3600000,
-  },
+  cacheManager: mockCacheManager,
+  CACHE_TTLS,
 }));
 
 vi.mock('../../../utils/dateUtils.js', () => ({
@@ -227,14 +232,11 @@ function createMockYnabAPI(): ynab.API {
 
 describe('Handler Integration Tests', () => {
   let mockAPI: ynab.API;
-  const { cacheManager } = vi.hoisted(() => ({
-    cacheManager: { get: vi.fn(), set: vi.fn() },
-  }));
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockAPI = createMockYnabAPI();
-    cacheManager.get.mockReturnValue(null); // No cache by default
+    mockCacheManager.get.mockReturnValue(null); // No cache by default
   });
 
   describe('handleFinancialOverview', () => {
@@ -271,7 +273,7 @@ describe('Handler Integration Tests', () => {
         cached: true,
       };
 
-      cacheManager.get.mockReturnValue(cachedResult);
+      mockCacheManager.get.mockReturnValue(cachedResult);
 
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
@@ -353,7 +355,7 @@ describe('Handler Integration Tests', () => {
 
       await handleFinancialOverview(mockAPI, params);
 
-      expect(cacheManager.set).toHaveBeenCalledWith(
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
         expect.stringContaining('financial-overview:budget-1:3:true:true'),
         expect.any(Object),
         expect.any(Number),
@@ -634,7 +636,7 @@ describe('Handler Integration Tests', () => {
 
       await handleFinancialOverview(mockAPI, params);
 
-      expect(cacheManager.set).toHaveBeenCalledWith(
+      expect(mockCacheManager.set).toHaveBeenCalledWith(
         'financial-overview:budget-123:6:false:true',
         expect.any(Object),
         expect.any(Number),

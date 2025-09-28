@@ -236,8 +236,10 @@ export function generateBudgetOptimizationInsights(
         'Move excess funds to debt payoff or savings goals',
         'Reduce future budget assignments if funds consistently go unused',
         `Largest balances: ${largeUnusedBalances
+          .slice()
+          .sort((a, b) => b.balance - a.balance)
           .slice(0, 3)
-          .map((c) => `${c.name} ($${c.balance.toFixed(2)})`)
+          .map((c) => `${c.name} (${c.balance.toFixed(2)})`)
           .join(', ')}`,
       ],
     });

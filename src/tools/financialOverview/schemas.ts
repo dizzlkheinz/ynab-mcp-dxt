@@ -9,8 +9,8 @@ import { z } from 'zod/v4';
  */
 export const FinancialOverviewSchema = z
   .object({
-    budget_id: z.string(),
-    months: z.number().min(1).max(12).default(3),
+    budget_id: z.string().optional(),
+    months: z.number().int().min(1).max(12).default(3),
     include_trends: z.boolean().default(true),
     include_insights: z.boolean().default(true),
   })
@@ -24,8 +24,8 @@ export const FinancialOverviewSchema = z
  */
 export const SpendingAnalysisSchema = z
   .object({
-    budget_id: z.string(),
-    period_months: z.number().min(1).max(12).default(6),
+    budget_id: z.string().optional(),
+    period_months: z.number().int().min(1).max(12).default(6),
     category_id: z.string().optional(),
   })
   .strict();
@@ -37,7 +37,7 @@ export const SpendingAnalysisSchema = z
  */
 export const BudgetHealthSchema = z
   .object({
-    budget_id: z.string(),
+    budget_id: z.string().optional(),
     include_recommendations: z.boolean().default(true),
   })
   .strict();

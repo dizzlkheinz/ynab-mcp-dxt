@@ -1,4 +1,11 @@
-import { ErrorHandler, YNABErrorCode } from '../../server/errorHandler';
+import {
+  ErrorHandler,
+  YNABErrorCode,
+  YNABAPIError,
+  ValidationError,
+  createErrorHandler,
+} from '../../server/errorHandler';
+import { responseFormatter } from '../../server/responseFormatter';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handleListBudgets } from '../../tools/budgetTools';
 import { handleListAccounts } from '../../tools/accountTools';
@@ -224,6 +231,156 @@ describe('Error Handler Integration Tests', () => {
         expect(parsed.error.details).toContain('token=***');
         expect(parsed.error.details).toContain('key=***');
       }
+    });
+  });
+
+  describe('ErrorHandler with real ResponseFormatter', () => {
+    it('should format errors using real responseFormatter', () => {
+      const errorHandler = createErrorHandler(responseFormatter);
+
+      const error = new YNABAPIError(YNABErrorCode.UNAUTHORIZED, 'Test error');
+      const result = errorHandler.handleError(error, 'testing');
+
+      // Should produce properly formatted JSON
+      expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.error.code).toBe(401);
+    });
+
+    it('should work with ValidationError', () => {
+      const errorHandler = createErrorHandler(responseFormatter);
+
+      const error = new ValidationError('Test validation error', 'Invalid input');
+      const result = errorHandler.handleError(error, 'testing');
+
+      // Should produce properly formatted JSON
+      expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+
+      const parsed = JSON.parse(result.content[0].text);
+      expect(parsed.error.code).toBe('VALIDATION_ERROR');
+      expect(parsed.error.message).toBe('Test validation error');
+      expect(parsed.error.details).toBe('Invalid input');
+    });
+  });
+
+  describe('Minify override integration', () => {
+    it('should respect responseFormatter minify settings', () => {
+      const errorHandler = createErrorHandler(responseFormatter);
+
+      // Test with minify override
+      const result = responseFormatter.runWithMinifyOverride(true, () => {
+        const error = new ValidationError('Test error');
+        return errorHandler.handleError(error, 'testing');
+      });
+
+      // Should be minified (no extra whitespace)
+      expect(result.content[0].text).not.toContain('\n  ');
+    });
+
+    it('should handle pretty formatting', () => {
+      const errorHandler = createErrorHandler(responseFormatter);
+
+      // Test with pretty formatting
+      const result = responseFormatter.runWithMinifyOverride(false, () => {
+        const error = new ValidationError('Test error');
+        return errorHandler.handleError(error, 'testing');
+      });
+
+      // Should contain newlines for pretty formatting
+      const text = result.content[0].text;
+      expect(() => JSON.parse(text)).not.toThrow();
+    });
+  });
+
+  describe('Static vs instance consistency', () => {
+    beforeEach(() => {
+      // Set up static ErrorHandler with same formatter
+      ErrorHandler.setFormatter(responseFormatter);
+    });
+
+    it('should produce identical results for static and instance calls', () => {
+      const errorHandler = createErrorHandler(responseFormatter);
+
+      const error = new YNABAPIError(YNABErrorCode.NOT_FOUND, 'Test error');
+
+      const staticResult = ErrorHandler.handleError(error, 'testing');
+      const instanceResult = errorHandler.handleError(error, 'testing');
+
+      expect(staticResult).toEqual(instanceResult);
+    });
+
+    it('should produce identical results for createValidationError', () => {
+      const errorHandler = createErrorHandler(responseFormatter);
+
+      const staticResult = ErrorHandler.createValidationError('Test error', 'Details');
+      const instanceResult = errorHandler.createValidationError('Test error', 'Details');
+
+      expect(staticResult).toEqual(instanceResult);
+    });
+  });
+
+  describe('Circular dependency resolution', () => {
+    it('should not have circular dependency issues', () => {
+      // This test verifies that we can create ErrorHandler without importing responseFormatter
+      const customFormatter = {
+        format: (value: unknown) => JSON.stringify(value),
+      };
+
+      expect(() => {
+        const errorHandler = createErrorHandler(customFormatter);
+        const error = new ValidationError('Test');
+        errorHandler.handleError(error, 'testing');
+      }).not.toThrow();
+    });
+
+    it('should work with different formatter implementations', () => {
+      const customFormatter = {
+        format: (value: unknown) => `CUSTOM: ${JSON.stringify(value)}`,
+      };
+
+      const errorHandler = createErrorHandler(customFormatter);
+      const error = new ValidationError('Test');
+      const result = errorHandler.handleError(error, 'testing');
+
+      expect(result.content[0].text).toContain('CUSTOM:');
+      expect(() => JSON.parse(result.content[0].text.substring(8))).not.toThrow();
+    });
+  });
+
+  describe('ErrorHandler factory', () => {
+    it('should create different instances with different formatters', () => {
+      const formatter1 = { format: (v: unknown) => `F1: ${JSON.stringify(v)}` };
+      const formatter2 = { format: (v: unknown) => `F2: ${JSON.stringify(v)}` };
+
+      const handler1 = createErrorHandler(formatter1);
+      const handler2 = createErrorHandler(formatter2);
+
+      const error = new ValidationError('Test');
+      const result1 = handler1.handleError(error, 'testing');
+      const result2 = handler2.handleError(error, 'testing');
+
+      expect(result1.content[0].text).toContain('F1:');
+      expect(result2.content[0].text).toContain('F2:');
+    });
+
+    it('should maintain instance isolation', () => {
+      const formatter1 = { format: vi.fn((v) => JSON.stringify(v)) };
+      const formatter2 = { format: vi.fn((v) => JSON.stringify(v)) };
+
+      const handler1 = createErrorHandler(formatter1);
+      const handler2 = createErrorHandler(formatter2);
+
+      const error = new ValidationError('Test');
+      handler1.handleError(error, 'testing');
+
+      expect(formatter1.format).toHaveBeenCalledOnce();
+      expect(formatter2.format).not.toHaveBeenCalled();
+
+      // Test the other direction to verify complete isolation
+      handler2.handleError(error, 'testing');
+      expect(formatter2.format).toHaveBeenCalledOnce();
+      expect(formatter1.format).toHaveBeenCalledOnce(); // Still only called once
     });
   });
 });

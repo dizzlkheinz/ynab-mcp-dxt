@@ -21,6 +21,7 @@ import {
   YNABErrorCode,
   ValidationError,
 } from '../types/index.js';
+import { createErrorHandler } from './errorHandler.js';
 import { BudgetResolver } from './budgetResolver.js';
 import { SecurityMiddleware, withSecurityWrapper } from './securityMiddleware.js';
 import { handleListBudgets, handleGetBudget, GetBudgetSchema } from '../tools/budgetTools.js';
@@ -107,6 +108,7 @@ export class YNABMCPServer {
   private resourceManager: ResourceManager;
   private promptManager: PromptManager;
   private diagnosticManager: DiagnosticManager;
+  private errorHandler: ErrorHandler;
 
   constructor(exitOnError: boolean = true) {
     this.exitOnError = exitOnError;
@@ -134,9 +136,15 @@ export class YNABMCPServer {
       },
     );
 
+    // Create ErrorHandler instance with formatter injection
+    this.errorHandler = createErrorHandler(responseFormatter);
+
+    // Set the global default for backward compatibility with static usage
+    ErrorHandler.setFormatter(responseFormatter);
+
     this.toolRegistry = new ToolRegistry({
       withSecurityWrapper,
-      errorHandler: ErrorHandler,
+      errorHandler: this.errorHandler,
       responseFormatter,
       cacheHelpers: {
         generateKey: (...segments: unknown[]) => {
@@ -176,14 +184,14 @@ export class YNABMCPServer {
         const expected = this.config.accessToken.trim();
         const provided = typeof token === 'string' ? token.trim() : '';
         if (!provided) {
-          throw ErrorHandler.createYNABError(
+          throw this.errorHandler.createYNABError(
             YNABErrorCode.UNAUTHORIZED,
             'validating access token',
             new Error('Missing access token'),
           );
         }
         if (provided !== expected) {
-          throw ErrorHandler.createYNABError(
+          throw this.errorHandler.createYNABError(
             YNABErrorCode.UNAUTHORIZED,
             'validating access token',
             new Error('Access token mismatch'),
@@ -247,7 +255,7 @@ export class YNABMCPServer {
       try {
         return await this.resourceManager.readResource(uri);
       } catch (error) {
-        return ErrorHandler.handleError(error, `reading resource: ${uri}`);
+        return this.errorHandler.handleError(error, `reading resource: ${uri}`);
       }
     });
 
@@ -262,7 +270,7 @@ export class YNABMCPServer {
       try {
         return await this.promptManager.getPrompt(name, args);
       } catch (error) {
-        return ErrorHandler.handleError(error, `getting prompt: ${name}`);
+        return this.errorHandler.handleError(error, `getting prompt: ${name}`);
       }
     });
 
@@ -421,7 +429,7 @@ export class YNABMCPServer {
             ],
           };
         } catch (error) {
-          return ErrorHandler.createValidationError(
+          return this.errorHandler.createValidationError(
             'Error getting default budget',
             error instanceof Error ? error.message : 'Unknown error',
           );

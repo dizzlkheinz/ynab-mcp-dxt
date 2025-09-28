@@ -201,12 +201,37 @@ export function performDetailedSpendingAnalysis(
   // Generate clear date range
   const sortedMonths = [...months].sort(
     (a, b) =>
-      new Date(b.data.month.month || '').getTime() - new Date(a.data.month.month || '').getTime(),
+      new Date(b.data.month.month || '').getTime() -
+      new Date(a.data.month.month || '').getTime(),
   );
-  const startDate = new Date(sortedMonths[sortedMonths.length - 1]?.data.month.month || '');
-  const endDate = new Date(sortedMonths[0]?.data.month.month || '');
-  const dateRange = `${startDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} (${months.length} months)`;
 
+  // Bail out early if there are no valid month entries
+  if (!sortedMonths.length) {
+    return {
+      analysis_period: 'No data available',
+      category_analysis: [],
+      balance_insights: {
+        top_unused_balances: [],
+        under_budgeted_categories: [],
+      },
+    };
+  }
+
+  // Helper to safely parse and format an ISO month string
+  const formatMonth = (isoMonth?: string) => {
+    if (!isoMonth) return null;
+    const parsed = new Date(isoMonth);
+    return Number.isNaN(parsed.getTime())
+      ? null
+      : parsed.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
+  const startLabel = formatMonth(sortedMonths[sortedMonths.length - 1]?.data.month.month);
+  const endLabel = formatMonth(sortedMonths[0]?.data.month.month);
+  const dateRange =
+    startLabel && endLabel
+      ? `${startLabel} - ${endLabel} (${months.length} months)`
+      : `(${months.length} months)`;
   const categoryAnalysis = targetCategories
     .map((category) => {
       const monthlySpending = months.map((monthData) => {

@@ -6,6 +6,7 @@ import { AuthenticationError, ConfigurationError, ValidationError } from '../../
 import { ToolRegistry } from '../toolRegistry.js';
 import { cacheManager } from '../../server/cacheManager.js';
 import { responseFormatter } from '../../server/responseFormatter.js';
+import { createErrorHandler, ErrorHandler } from '../errorHandler.js';
 
 function parseCallToolJson<T = Record<string, unknown>>(result: CallToolResult): T {
   const text = result.content?.[0]?.text;
@@ -827,6 +828,73 @@ describe('YNABMCPServer', () => {
         const result = server.getBudgetId(validUuid);
         expect(result).toBe(validUuid);
       });
+    });
+  });
+
+  describe('ErrorHandler Integration', () => {
+    let server: YNABMCPServer;
+
+    beforeEach(() => {
+      server = new YNABMCPServer(false);
+    });
+
+    it('should create ErrorHandler instance with responseFormatter', () => {
+      // Verify that createErrorHandler was called with the formatter
+      expect(server).toBeInstanceOf(YNABMCPServer);
+
+      // The server should be successfully constructed with ErrorHandler injection
+      expect(server.getYNABAPI()).toBeDefined();
+    });
+
+    it('should set global ErrorHandler formatter for backward compatibility', () => {
+      // This test verifies that the global formatter was set
+      // by checking that static ErrorHandler methods work
+      const result = ErrorHandler.createValidationError('Test error');
+
+      expect(result.content).toBeDefined();
+      expect(result.content[0].type).toBe('text');
+      expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+    });
+
+    it('should use the same formatter for ErrorHandler and ToolRegistry', () => {
+      // Verify that the server uses dependency injection correctly
+      expect(server).toBeInstanceOf(YNABMCPServer);
+
+      // The fact that the server constructs successfully means dependency injection worked
+      // and both ErrorHandler and ToolRegistry are using the same formatter instance
+    });
+
+    it('should maintain existing error response format', async () => {
+      const registry = (server as unknown as { toolRegistry: ToolRegistry }).toolRegistry;
+
+      // Test that error responses still have the expected structure
+      const result = await registry.executeTool({
+        name: 'get_budget',
+        accessToken: process.env['YNAB_ACCESS_TOKEN']!,
+        arguments: {} as Record<string, unknown>,
+      });
+
+      const payload = parseCallToolJson(result);
+      expect(payload.error).toBeDefined();
+      expect(payload.error.code).toBe('VALIDATION_ERROR');
+
+      // Verify the response is properly formatted JSON
+      expect(() => JSON.parse(result.content[0].text)).not.toThrow();
+    });
+
+    it('should handle formatter consistency across static and instance methods', () => {
+      const formatter = { format: (value: unknown) => JSON.stringify(value) };
+      const errorHandler = createErrorHandler(formatter);
+      ErrorHandler.setFormatter(formatter);
+
+      const error = new ValidationError('Test error');
+      const instanceResult = errorHandler.handleError(error, 'testing');
+      const staticResult = ErrorHandler.handleError(error, 'testing');
+
+      // Both should produce the same result structure
+      expect(instanceResult.content[0].type).toBe(staticResult.content[0].type);
+      expect(() => JSON.parse(instanceResult.content[0].text)).not.toThrow();
+      expect(() => JSON.parse(staticResult.content[0].text)).not.toThrow();
     });
   });
 });

@@ -123,19 +123,23 @@ function createMockSpendingTrend(
 }
 
 function createMockFinancialMetrics(overrides: Partial<FinancialMetrics> = {}): FinancialMetrics {
+  const { emergency_fund_status: emergencyFundOverride, ...otherOverrides } = overrides;
+
   return {
     emergency_fund_status: {
       current_amount: 5000,
       recommended_minimum: 1000,
       status: 'adequate',
+      ...emergencyFundOverride,
     },
     budget_utilization: 95,
     overspent_categories: 0,
     underfunded_categories: 0,
     debt_to_asset_ratio: 15,
     unallocated_funds: 0,
-    ...overrides,
+    ...otherOverrides,
   };
+}
 }
 
 function createMockAccount(type: ynab.AccountType, balance: number): ynab.Account {

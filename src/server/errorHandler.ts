@@ -1,5 +1,11 @@
 import { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { responseFormatter } from './responseFormatter.js';
+
+/**
+ * Response formatter contract for dependency injection
+ */
+interface ResponseFormatterContract {
+  format(value: unknown): string;
+}
 
 /**
  * YNAB API error codes and their corresponding HTTP status codes
@@ -66,26 +72,67 @@ export class ValidationError extends Error {
  * Centralized error handling middleware for all YNAB MCP tools
  */
 export class ErrorHandler {
+  private formatter: ResponseFormatterContract;
+  private static defaultInstance: ErrorHandler;
+
+  constructor(formatter: ResponseFormatterContract) {
+    this.formatter = formatter;
+  }
+
+  /**
+   * Creates a fallback formatter for when no formatter is injected
+   */
+  private static createFallbackFormatter(): ResponseFormatterContract {
+    return {
+      format: (value: unknown) => JSON.stringify(value, null, 2),
+    };
+  }
+
+  /**
+   * Sets the formatter for the default instance (backward compatibility)
+   */
+  static setFormatter(formatter: ResponseFormatterContract): void {
+    ErrorHandler.defaultInstance = new ErrorHandler(formatter);
+  }
+
   /**
    * Handles errors from YNAB API calls and returns standardized MCP responses
    */
-  static handleError(error: unknown, context: string): CallToolResult {
+  handleError(error: unknown, context: string): CallToolResult {
     const errorResponse = this.createErrorResponse(error, context);
+
+    let formattedText: string;
+    try {
+      formattedText = this.formatter.format(errorResponse);
+    } catch {
+      // Fallback to JSON.stringify if formatter fails
+      formattedText = JSON.stringify(errorResponse, null, 2);
+    }
 
     return {
       content: [
         {
           type: 'text',
-          text: responseFormatter.format(errorResponse),
+          text: formattedText,
         },
       ],
     };
   }
 
   /**
+   * Static method for backward compatibility
+   */
+  static handleError(error: unknown, context: string): CallToolResult {
+    if (!ErrorHandler.defaultInstance) {
+      ErrorHandler.defaultInstance = new ErrorHandler(ErrorHandler.createFallbackFormatter());
+    }
+    return ErrorHandler.defaultInstance.handleError(error, context);
+  }
+
+  /**
    * Creates a standardized error response based on the error type
    */
-  private static createErrorResponse(error: unknown, context: string): ErrorResponse {
+  private createErrorResponse(error: unknown, context: string): ErrorResponse {
     // Handle custom error types
     if (error instanceof YNABAPIError) {
       const sanitizedDetails = this.sanitizeErrorDetails(error.originalError);
@@ -185,7 +232,7 @@ export class ErrorHandler {
   /**
    * Detects YNAB error codes from error messages
    */
-  private static detectErrorCode(error: Error): YNABErrorCode | null {
+  private detectErrorCode(error: Error): YNABErrorCode | null {
     const message = error.message.toLowerCase();
 
     if (message.includes('401') || message.includes('unauthorized')) {
@@ -210,10 +257,7 @@ export class ErrorHandler {
   /**
    * Returns user-friendly error messages for end users
    */
-  private static getUserFriendlyMessage(
-    code: YNABErrorCode | SecurityErrorCode,
-    context: string,
-  ): string {
+  private getUserFriendlyMessage(code: YNABErrorCode | SecurityErrorCode, context: string): string {
     switch (code) {
       case YNABErrorCode.UNAUTHORIZED:
         return 'Your YNAB access token is invalid or has expired. Please check your token and try again.';
@@ -237,10 +281,7 @@ export class ErrorHandler {
   /**
    * Returns actionable suggestions for users based on error type
    */
-  private static getErrorSuggestions(
-    code: YNABErrorCode | SecurityErrorCode,
-    context: string,
-  ): string[] {
+  private getErrorSuggestions(code: YNABErrorCode | SecurityErrorCode, context: string): string[] {
     switch (code) {
       case YNABErrorCode.UNAUTHORIZED:
         return [
@@ -286,7 +327,7 @@ export class ErrorHandler {
   /**
    * Returns user-friendly not found messages
    */
-  private static getUserFriendlyNotFoundMessage(context: string): string {
+  private getUserFriendlyNotFoundMessage(context: string): string {
     if (context.includes('account')) {
       return "We couldn't find the budget or account you're looking for.";
     }
@@ -308,7 +349,7 @@ export class ErrorHandler {
   /**
    * Returns suggestions for not found errors
    */
-  private static getNotFoundSuggestions(context: string): string[] {
+  private getNotFoundSuggestions(context: string): string[] {
     const baseSuggestions = [
       'Double-check that the name or ID is spelled correctly',
       'Try refreshing your budget data',
@@ -337,7 +378,7 @@ export class ErrorHandler {
   /**
    * Returns user-friendly generic error message
    */
-  private static getUserFriendlyGenericMessage(context: string): string {
+  private getUserFriendlyGenericMessage(context: string): string {
     if (context.includes('transaction')) {
       return 'There was a problem with your transaction. Please check your information and try again.';
     }
@@ -353,7 +394,7 @@ export class ErrorHandler {
   /**
    * Returns user-friendly error messages for different error codes
    */
-  private static getErrorMessage(code: YNABErrorCode, context: string): string {
+  private getErrorMessage(code: YNABErrorCode, context: string): string {
     switch (code) {
       case YNABErrorCode.UNAUTHORIZED:
         return 'Invalid or expired YNAB access token';
@@ -373,7 +414,7 @@ export class ErrorHandler {
   /**
    * Returns context-specific not found error messages
    */
-  private static getNotFoundMessage(context: string): string {
+  private getNotFoundMessage(context: string): string {
     if (context.includes('listing accounts')) {
       return 'Failed to list accounts - budget or account not found';
     }
@@ -401,7 +442,7 @@ export class ErrorHandler {
   /**
    * Returns context-specific generic error messages
    */
-  private static getGenericErrorMessage(context: string): string {
+  private getGenericErrorMessage(context: string): string {
     if (context.includes('listing accounts')) {
       return 'Failed to list accounts';
     }
@@ -459,7 +500,7 @@ export class ErrorHandler {
   /**
    * Extracts HTTP status code from various error shapes
    */
-  private static extractHttpStatus(error: unknown): number | null {
+  private extractHttpStatus(error: unknown): number | null {
     if (!error || typeof error !== 'object') {
       return null;
     }
@@ -487,7 +528,7 @@ export class ErrorHandler {
   /**
    * Maps HTTP status codes to standardized YNAB error codes
    */
-  private static mapHttpStatusToErrorCode(status: number): YNABErrorCode | null {
+  private mapHttpStatusToErrorCode(status: number): YNABErrorCode | null {
     switch (status) {
       case YNABErrorCode.UNAUTHORIZED:
       case YNABErrorCode.FORBIDDEN:
@@ -503,7 +544,7 @@ export class ErrorHandler {
   /**
    * Extracts sanitized details from HTTP error responses
    */
-  private static extractHttpStatusDetails(error: unknown): string | undefined {
+  private extractHttpStatusDetails(error: unknown): string | undefined {
     if (error && typeof error === 'object') {
       const response = (error as { response?: unknown }).response;
       if (response && typeof response === 'object') {
@@ -524,9 +565,7 @@ export class ErrorHandler {
   /**
    * Extracts structured YNAB API error information
    */
-  private static extractYNABApiError(
-    error: unknown,
-  ): { code: YNABErrorCode; details?: string } | null {
+  private extractYNABApiError(error: unknown): { code: YNABErrorCode; details?: string } | null {
     if (!error || typeof error !== 'object' || !('error' in (error as Record<string, unknown>))) {
       return null;
     }
@@ -575,7 +614,7 @@ export class ErrorHandler {
   /**
    * Sanitizes error details to prevent sensitive data leakage
    */
-  private static sanitizeErrorDetails(error: unknown): string | undefined {
+  private sanitizeErrorDetails(error: unknown): string | undefined {
     if (!error) return undefined;
 
     let details = '';
@@ -600,7 +639,7 @@ export class ErrorHandler {
   /**
    * Wraps async functions with error handling
    */
-  static async withErrorHandling<T>(
+  async withErrorHandling<T>(
     operation: () => Promise<T>,
     context: string,
   ): Promise<T | CallToolResult> {
@@ -612,13 +651,22 @@ export class ErrorHandler {
   }
 
   /**
+   * Static method for backward compatibility
+   */
+  static async withErrorHandling<T>(
+    operation: () => Promise<T>,
+    context: string,
+  ): Promise<T | CallToolResult> {
+    if (!ErrorHandler.defaultInstance) {
+      ErrorHandler.defaultInstance = new ErrorHandler(ErrorHandler.createFallbackFormatter());
+    }
+    return ErrorHandler.defaultInstance.withErrorHandling(operation, context);
+  }
+
+  /**
    * Creates a validation error for invalid parameters
    */
-  static createValidationError(
-    message: string,
-    details?: string,
-    suggestions?: string[],
-  ): CallToolResult {
+  createValidationError(message: string, details?: string, suggestions?: string[]): CallToolResult {
     return this.handleError(
       new ValidationError(message, details, suggestions),
       'validating parameters',
@@ -626,16 +674,47 @@ export class ErrorHandler {
   }
 
   /**
+   * Static method for backward compatibility
+   */
+  static createValidationError(
+    message: string,
+    details?: string,
+    suggestions?: string[],
+  ): CallToolResult {
+    if (!ErrorHandler.defaultInstance) {
+      ErrorHandler.defaultInstance = new ErrorHandler(ErrorHandler.createFallbackFormatter());
+    }
+    return ErrorHandler.defaultInstance.createValidationError(message, details, suggestions);
+  }
+
+  /**
    * Creates a YNAB API error with specific error code
+   */
+  createYNABError(code: YNABErrorCode, context: string, originalError?: unknown): YNABAPIError {
+    const message = this.getErrorMessage(code, context);
+    return new YNABAPIError(code, message, originalError);
+  }
+
+  /**
+   * Static method for backward compatibility
    */
   static createYNABError(
     code: YNABErrorCode,
     context: string,
     originalError?: unknown,
   ): YNABAPIError {
-    const message = this.getErrorMessage(code, context);
-    return new YNABAPIError(code, message, originalError);
+    if (!ErrorHandler.defaultInstance) {
+      ErrorHandler.defaultInstance = new ErrorHandler(ErrorHandler.createFallbackFormatter());
+    }
+    return ErrorHandler.defaultInstance.createYNABError(code, context, originalError);
   }
+}
+
+/**
+ * Factory function for creating ErrorHandler instances
+ */
+export function createErrorHandler(formatter: ResponseFormatterContract): ErrorHandler {
+  return new ErrorHandler(formatter);
 }
 
 /**

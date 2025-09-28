@@ -175,38 +175,23 @@ export function calculateNetWorthTrend(
     };
   }
 
-  // For a simplified implementation, we'll use the current balances as baseline
-  // In a full implementation, this would calculate historical net worth for each month
-  const monthlyNetWorth = months.map((monthData, index) => {
-    // Simplified: assume linear progression based on current state
-    // In reality, you'd want historical account balance data
-    const progressFactor = (index + 1) / months.length;
+  // Generate neutral monthly values using current net worth as baseline
+  // Until real historical balance data or transaction-derived computations are available
+  const monthlyNetWorth = months.map((monthData) => {
     return {
       month: monthData?.data.month.month || new Date().toISOString().slice(0, 7),
-      net_worth: accountBalances.totalNetWorth * progressFactor,
+      net_worth: accountBalances.totalNetWorth,
     };
   });
 
-  const firstValue = monthlyNetWorth[0]?.net_worth || 0;
-  const lastValue = monthlyNetWorth[monthlyNetWorth.length - 1]?.net_worth || 0;
-  const changeAmount = lastValue - firstValue;
-  const changePercentage = firstValue !== 0 ? (changeAmount / Math.abs(firstValue)) * 100 : 0;
-
-  let direction: 'increasing' | 'decreasing' | 'stable';
-  if (Math.abs(changePercentage) < 1) {
-    direction = 'stable';
-  } else if (changeAmount > 0) {
-    direction = 'increasing';
-  } else {
-    direction = 'decreasing';
-  }
-
+  // Return neutral/stable assessment without fabricated trends
   return {
-    direction,
-    change_amount: changeAmount,
-    change_percentage: changePercentage,
+    direction: 'stable' as const,
+    change_amount: 0,
+    change_percentage: 0,
     monthly_values: monthlyNetWorth,
-    analysis: `Net worth has ${direction === 'stable' ? 'remained stable' : direction === 'increasing' ? 'increased' : 'decreased'} by ${Math.abs(changePercentage).toFixed(1)}% over the analysis period`,
+    analysis:
+      'Net worth trend is neutral/stable. Accurate trend analysis requires real historical balance data or transaction-derived computations to be available.',
   };
 }
 
@@ -237,7 +222,8 @@ export function analyzeSpendingTrends(
           : 0;
         return { month: index, spending };
       })
-      .filter((data) => data.spending > 0); // Only include months with spending
+      .filter((data) => data.spending > 0) // Only include months with spending
+      .sort((a, b) => b.month - a.month); // Sort by month index descending (newest first)
 
     // Need at least 3 months of data to calculate meaningful analysis
     if (monthlySpending.length >= 3) {
