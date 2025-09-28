@@ -16,12 +16,16 @@
 
 A Model Context Protocol (MCP) server that provides AI assistants with secure access to You Need A Budget (YNAB) data and functionality. This server enables AI applications to help users manage their personal finances by interacting with YNAB budgets, accounts, transactions, and categories through a comprehensive set of tools.
 
-## 🎉 What's New in v0.7.0
+## 🎉 What's New in v0.8.0
 
-- **💰 Automatic Amount Conversion**: All monetary amounts now automatically convert from YNAB's internal milliunits to dollars for human-readable display
-- **🧠 AI-Friendly Responses**: Eliminates confusion where `-1924370` milliunits was misinterpreted as `-$1,924,370` instead of the correct `-$1,924.37`
-- **🔧 Enhanced Developer Experience**: No more manual conversion needed - all tools return amounts in standard dollar format
-- **✅ Updated Test Suite**: Comprehensive test coverage for amount conversion ensures reliability
+- **🏗️ Modular Architecture**: Redesigned server architecture with composable services (Config, Resources, Prompts, Diagnostics) for improved maintainability and testability
+- **🎯 Centralized Tool Registry**: Unified tool registration system with consistent validation, security, and error handling across all tools
+- **⚡ Enhanced Caching**: Advanced caching with LRU eviction, hit/miss tracking, stale-while-revalidate, and cache warming for improved performance
+- **🔧 Improved Error Handling**: Dependency injection pattern with consistent, actionable error messages across all tools
+- **📦 Decomposed Tool Modules**: Large tool files broken into focused sub-modules for better code organization and reusability
+- **⏱️ Cache Warming**: Automatic cache warming after budget selection for faster subsequent operations
+- **📊 Enhanced Observability**: Comprehensive cache metrics and diagnostics for better system monitoring
+- **🔄 100% Backward Compatibility**: All v0.7.x functionality preserved with identical API behavior
 
 ## 🎉 What's New in v0.6.0
 
@@ -37,6 +41,37 @@ A Model Context Protocol (MCP) server that provides AI assistants with secure ac
 - **Complete YNAB Integration**: Access all major YNAB features including budgets, accounts, transactions, categories, payees, and monthly data
 - **Automatic Amount Conversion**: All monetary values automatically converted from YNAB's internal milliunits to human-readable dollars
 - **Advanced Bank Reconciliation**: Smart duplicate matching, automatic date adjustment, exact balance matching, and comprehensive reporting
+- **Modular Architecture**: Composable service modules for improved maintainability and extensibility
+- **Enhanced Caching**: Advanced caching with observability, LRU eviction, and cache warming
+- **Centralized Tool Registry**: Consistent validation and error handling across all tools
+
+## Architecture Overview
+
+v0.8.0 introduces a completely refactored modular architecture that improves maintainability, testability, and performance while maintaining 100% backward compatibility.
+
+### Core Components
+
+- **Tool Registry**: Centralized metadata management, validation, and execution for all tools with consistent security and error handling
+- **Config Module**: Environment validation and server configuration management
+- **Resource Manager**: MCP resource definitions and handlers for seamless resource access
+- **Prompt Manager**: MCP prompt definitions and handlers for enhanced AI interactions
+- **Diagnostic Manager**: System diagnostics and health monitoring with comprehensive metrics
+- **YNABMCPServer**: Main orchestration layer that coordinates all service modules
+
+### Enhanced Caching System
+
+- **Hit/Miss Tracking**: Comprehensive cache observability with detailed metrics
+- **LRU Eviction**: Configurable maximum entries with least-recently-used eviction strategy
+- **Stale-While-Revalidate**: Serve stale data while refreshing in background for improved performance
+- **Cache Warming**: Automatic cache warming after budget selection for faster subsequent operations
+- **Concurrent Deduplication**: Prevent duplicate API calls for the same cache key
+
+### Budget Resolution & Error Handling
+
+- **Consistent Budget Resolution**: Standardized budget ID resolution across all tools
+- **Improved Error Messages**: Clear, actionable error messages with specific suggestions
+- **Dependency Injection**: Enhanced testability and maintainability through explicit dependencies
+- **Centralized Validation**: Uniform input validation and security checks via tool registry
 
 ## Quick Start
 
@@ -126,6 +161,12 @@ Tool responses are JSON strings. To save context, outputs are minified by defaul
 - `YNAB_MCP_MINIFY_OUTPUT` (default: `true`) — when `true`, responses are compact (no whitespace).
 - `YNAB_MCP_PRETTY_SPACES` (default: `2`) — number of spaces used only if minification is disabled.
 
+**Enhanced Caching (v0.8.0):**
+
+- `YNAB_MCP_CACHE_MAX_ENTRIES` (default: `1000`) — Maximum number of cache entries before LRU eviction
+- `YNAB_MCP_CACHE_DEFAULT_TTL_MS` (default: `1800000` - 30 minutes) — Default cache TTL in milliseconds
+- `YNAB_MCP_CACHE_STALE_MS` (default: `120000` - 2 minutes) — Stale-while-revalidate window in milliseconds
+
 **Export Settings:**
 
 - `YNAB_EXPORT_PATH` — Directory for exported transaction files. Defaults to platform-specific locations:
@@ -139,6 +180,11 @@ Examples:
 YNAB_MCP_MINIFY_OUTPUT=true
 YNAB_MCP_PRETTY_SPACES=2
 
+# Enhanced caching configuration
+YNAB_MCP_CACHE_MAX_ENTRIES=1000
+YNAB_MCP_CACHE_DEFAULT_TTL_MS=1800000
+YNAB_MCP_CACHE_STALE_MS=120000
+
 # Custom export location
 YNAB_EXPORT_PATH=~/Desktop
 # Or absolute paths
@@ -148,7 +194,7 @@ YNAB_EXPORT_PATH=/home/user/exports
 
 ## Available Tools
 
-The server provides 25 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 2 streamlined diagnostic tools (27 total):
+The server provides 25 core tools for budgets, accounts, transactions, categories, payees, months, and financial analysis, plus 2 streamlined diagnostic tools (27 total). All tools are managed through the centralized Tool Registry for consistent validation, security, and error handling:
 
 ### Budget Management
 
@@ -221,15 +267,38 @@ The server provides 25 core tools for budgets, accounts, transactions, categorie
 ```
 ynab-mcp-server/
 ├── src/
-│   ├── server/           # Core server implementation
-│   │   └── __tests__/    # Server component tests
-│   ├── tools/            # MCP tool implementations
-│   │   └── __tests__/    # Tool-specific tests
+│   ├── server/           # Core server implementation (v0.8.0 modular architecture)
+│   │   ├── YNABMCPServer.ts     # Main orchestration server
+│   │   ├── toolRegistry.ts     # Centralized tool registry
+│   │   ├── cacheManager.ts     # Enhanced caching with observability
+│   │   ├── config.ts           # Environment validation module
+│   │   ├── resources.ts        # Resource management module
+│   │   ├── prompts.ts          # Prompt management module
+│   │   ├── diagnostics.ts      # Diagnostic management module
+│   │   ├── budgetResolver.ts   # Consistent budget resolution
+│   │   ├── errorHandler.ts     # Dependency injection error handling
+│   │   └── __tests__/          # Server component tests
+│   ├── tools/            # MCP tool implementations (decomposed modules)
+│   │   ├── compareTransactions/ # Modular CSV comparison tools
+│   │   │   ├── types.ts        # Shared type definitions
+│   │   │   ├── parser.ts       # CSV parsing logic
+│   │   │   ├── matcher.ts      # Transaction matching algorithms
+│   │   │   ├── formatter.ts    # Response formatting
+│   │   │   └── index.ts        # Main handler & exports
+│   │   ├── financialOverview/  # Modular financial analysis tools
+│   │   │   ├── schemas.ts      # Zod schemas & types
+│   │   │   ├── trendAnalysis.ts # Statistical analysis
+│   │   │   ├── insightGenerator.ts # Business logic
+│   │   │   ├── formatter.ts    # Response formatting
+│   │   │   ├── handlers.ts     # Handler orchestration
+│   │   │   └── index.ts        # Barrel exports
+│   │   └── __tests__/          # Tool-specific tests
 │   ├── types/            # Type definitions and utilities
 │   │   └── __tests__/    # Type definition tests
 │   └── __tests__/        # Global test utilities and E2E tests
 ├── dist/                 # Built JavaScript output
 ├── docs/                 # Complete documentation
+│   └── ADR/              # Architecture Decision Records (v0.8.0)
 ├── scripts/              # Build and utility scripts
 └── README.md            # This file
 ```

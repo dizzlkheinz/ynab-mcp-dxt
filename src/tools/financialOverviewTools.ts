@@ -1,1 +1,1 @@
-export * from './financialOverview';
+export * from './financialOverview/index.js';

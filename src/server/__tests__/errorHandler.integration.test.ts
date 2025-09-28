@@ -289,6 +289,10 @@ describe('Error Handler Integration Tests', () => {
 
       // Should contain newlines for pretty formatting
       const text = result.content[0].text;
+      expect(text).toMatch(/[\r\n]/);
+      // Pretty text should be longer than its compact form
+      const compact = JSON.stringify(JSON.parse(text));
+      expect(text.length).toBeGreaterThan(compact.length);
       expect(() => JSON.parse(text)).not.toThrow();
     });
   });
