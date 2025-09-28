@@ -48,7 +48,7 @@ import { handleExportTransactions, ExportTransactionsSchema } from '../tools/exp
 import {
   handleCompareTransactions,
   CompareTransactionsSchema,
-} from '../tools/compareTransactions.js';
+} from '../tools/compareTransactions/index.js';
 import { handleReconcileAccount, ReconcileAccountSchema } from '../tools/reconcileAccount.js';
 import {
   handleListCategories,

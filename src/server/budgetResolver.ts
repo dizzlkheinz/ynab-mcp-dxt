@@ -15,7 +15,7 @@ export class BudgetResolver {
   /**
    * Special keywords that are allowed as budget IDs
    */
-  private static readonly ALLOWED_KEYWORDS = ['default'];
+  private static readonly ALLOWED_KEYWORDS = ['default'] as const;
 
   /**
    * Resolves a budget ID using provided ID or default, with standardized error handling.
@@ -73,7 +73,7 @@ export class BudgetResolver {
     }
 
     // Allow simplified identifiers in test environments
-    if (process.env.NODE_ENV === 'test') {
+    if (process.env['NODE_ENV'] === 'test') {
       const testIdentifierPattern =
         /^(test|budget|account|category|transaction|payee|mock)-[a-z0-9_-]+$/i;
       if (testIdentifierPattern.test(trimmed)) {
@@ -122,7 +122,7 @@ export class BudgetResolver {
 
 Valid formats:
 - UUID format (versions 1-5, e.g., "123e4567-e89b-12d3-a456-426614174000")
-- Special keywords: "default"
+- Special keywords: ${this.ALLOWED_KEYWORDS.map((k) => `"${k}"`).join(', ')}
 
 You can use the list_budgets tool to see available budget IDs.`;
 

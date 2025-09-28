@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as ynab from 'ynab';
-import { handleCompareTransactions, CompareTransactionsSchema } from '../compareTransactions.js';
+import {
+  handleCompareTransactions,
+  CompareTransactionsSchema,
+} from '../compareTransactions/index.js';
 import { readFileSync } from 'fs';
 
 // Mock filesystem
@@ -263,6 +266,77 @@ describe('compareTransactions', () => {
       expect(response.summary.bank_transactions_count).toBe(2);
       // Should successfully parse the date format and process the transactions
       expect(response.missing_in_ynab).toHaveLength(2); // No matches with mock transactions
+    });
+
+    it('should maintain backward compatibility with modular structure', async () => {
+      // This test verifies that the modular refactor maintains exact backward compatibility
+      const csvData = 'Date,Amount,Description\n2024-01-01,100.00,Test Transaction';
+
+      (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue({
+        data: { transactions: mockTransactions },
+      });
+
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [{ id: 'payee-1', name: 'Test' }] },
+        }),
+      };
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        csv_data: csvData,
+      };
+
+      const result = await handleCompareTransactions(mockYnabAPI, params);
+
+      // Verify response structure matches original exactly
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response).toHaveProperty('summary');
+      expect(response).toHaveProperty('matches');
+      expect(response).toHaveProperty('missing_in_ynab');
+      expect(response).toHaveProperty('missing_in_bank');
+
+      // Verify summary structure
+      expect(response.summary).toHaveProperty('bank_transactions_count');
+      expect(response.summary).toHaveProperty('ynab_transactions_count');
+      expect(response.summary).toHaveProperty('matches_found');
+      expect(response.summary).toHaveProperty('missing_in_ynab');
+      expect(response.summary).toHaveProperty('missing_in_bank');
+      expect(response.summary).toHaveProperty('date_range');
+      expect(response.summary).toHaveProperty('parameters');
+    });
+
+    it('should handle auto-detection correctly through modular structure', async () => {
+      const csvData =
+        'Date,Description,Debit,Credit\n2024-01-01,Test Transaction,100.00,\n2024-01-02,Credit Transaction,,50.00';
+
+      (mockYnabAPI.transactions.getTransactionsByAccount as any).mockResolvedValue({
+        data: { transactions: mockTransactions },
+      });
+
+      (mockYnabAPI as any).payees = {
+        getPayees: vi.fn().mockResolvedValue({
+          data: { payees: [] },
+        }),
+      };
+
+      const params = {
+        budget_id: 'budget-123',
+        account_id: 'account-456',
+        csv_data: csvData,
+        auto_detect_format: true,
+      };
+
+      const result = await handleCompareTransactions(mockYnabAPI, params);
+
+      expect(result.content).toHaveLength(1);
+      const response = JSON.parse(result.content[0].text);
+      expect(response.summary.bank_transactions_count).toBe(2);
+      // Should correctly detect debit/credit format and parse both transactions
     });
   });
 });

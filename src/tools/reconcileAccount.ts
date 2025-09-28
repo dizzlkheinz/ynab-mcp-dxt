@@ -3,7 +3,10 @@ import * as ynab from 'ynab';
 import { z } from 'zod/v4';
 import { withToolErrorHandling } from '../types/index.js';
 import { responseFormatter } from '../server/responseFormatter.js';
-import { handleCompareTransactions, CompareTransactionsParams } from './compareTransactions.js';
+import {
+  handleCompareTransactions,
+  CompareTransactionsParams,
+} from './compareTransactions/index.js';
 import { handleCreateTransaction, CreateTransactionParams } from './transactionTools.js';
 import { handleUpdateTransaction, UpdateTransactionParams } from './transactionTools.js';
 import { handleGetAccount } from './accountTools.js';

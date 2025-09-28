@@ -378,6 +378,17 @@ export async function handleCreateTransaction(
     cacheManager.delete(accountsListCacheKey);
     cacheManager.delete(specificAccountCacheKey);
 
+    // Invalidate month-related caches as transaction affects month summaries
+    const formatMonthKey = (date: string) => `${date.slice(0, 7)}-01`;
+    const monthKeys = new Set<string>([formatMonthKey(transaction.date)]);
+    cacheManager.delete(CacheManager.generateKey('months', 'list', params.budget_id));
+    for (const monthKey of monthKeys) {
+      cacheManager.delete(CacheManager.generateKey('month', 'get', params.budget_id, monthKey));
+    }
+
+    // Invalidate categories cache as transaction affects category activity
+    cacheManager.delete(CacheManager.generateKey('categories', 'list', params.budget_id));
+
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(
       params.budget_id,
@@ -520,6 +531,13 @@ export async function handleUpdateTransaction(
     // Collect all affected account IDs (original and new, if different)
     const affectedAccountIds = new Set([originalTransaction.account_id, transaction.account_id]);
 
+    if (originalTransaction.transfer_account_id) {
+      affectedAccountIds.add(originalTransaction.transfer_account_id);
+    }
+    if (transaction.transfer_account_id) {
+      affectedAccountIds.add(transaction.transfer_account_id);
+    }
+
     // Invalidate caches for all affected accounts
     for (const accountId of affectedAccountIds) {
       const specificAccountCacheKey = CacheManager.generateKey(
@@ -530,6 +548,15 @@ export async function handleUpdateTransaction(
       );
       cacheManager.delete(specificAccountCacheKey);
     }
+
+    // Invalidate month-related caches as transaction affects month summaries
+    const d = new Date();
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    cacheManager.delete(CacheManager.generateKey('months', 'list', params.budget_id));
+    cacheManager.delete(CacheManager.generateKey('month', 'get', params.budget_id, monthKey));
+
+    // Invalidate categories cache as transaction affects category activity
+    cacheManager.delete(CacheManager.generateKey('categories', 'list', params.budget_id));
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(
@@ -626,6 +653,15 @@ export async function handleDeleteTransaction(
     );
     cacheManager.delete(accountsListCacheKey);
     cacheManager.delete(specificAccountCacheKey);
+
+    // Invalidate month-related caches as transaction affects month summaries
+    const d = new Date();
+    const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+    cacheManager.delete(CacheManager.generateKey('months', 'list', params.budget_id));
+    cacheManager.delete(CacheManager.generateKey('month', 'get', params.budget_id, monthKey));
+
+    // Invalidate categories cache as transaction affects category activity
+    cacheManager.delete(CacheManager.generateKey('categories', 'list', params.budget_id));
 
     // Get the updated account balance
     const accountResponse = await ynabAPI.accounts.getAccountById(

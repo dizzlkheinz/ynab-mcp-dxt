@@ -5,7 +5,7 @@ import { handleListCategories, handleGetCategory, handleUpdateCategory } from '.
 /**
  * Integration tests for category tools using real YNAB API
  */
-const runIntegrationTests = process.env['SKIP_E2E_TESTS'] !== 'true';
+const runIntegrationTests = process.env['SKIP_E2E_TESTS']?.toLowerCase() !== 'true';
 const describeIntegration = runIntegrationTests ? describe : describe.skip;
 
 describeIntegration('Category Tools Integration', () => {

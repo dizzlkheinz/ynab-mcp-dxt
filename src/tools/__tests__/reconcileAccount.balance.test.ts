@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the dependencies
-vi.mock('../compareTransactions.js');
+vi.mock('../compareTransactions/index.js');
 vi.mock('../transactionTools.js');
 vi.mock('../accountTools.js');
 vi.mock('../../server/responseFormatter.js');
