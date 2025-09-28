@@ -118,11 +118,34 @@ function detectDelimiter(lines: string[]): string {
   for (const delimiter of candidates) {
     let score = 0;
     const columnCounts: number[] = [];
+    let parseFailed = false;
 
-    // Count columns for each sample line with this delimiter
     for (const line of sampleLines) {
-      const columns = line.split(delimiter);
-      columnCounts.push(columns.length);
+      try {
+        const rows = parse(line, {
+          delimiter,
+          quote: '"',
+          escape: '"',
+          skip_empty_lines: true,
+          trim: true,
+          relax_column_count: true,
+        });
+
+        // rows should be an array with one row (since we're parsing one line)
+        if (rows && rows.length > 0) {
+          const columns = Array.isArray(rows[0]) ? rows[0] : Object.values(rows[0]);
+          columnCounts.push(columns.length);
+        } else {
+          // If parsing failed or returned empty, fall back to simple split
+          const columns = line.split(delimiter);
+          columnCounts.push(columns.length);
+        }
+      } catch {
+        // If csv-parse fails, fall back to simple split method
+        parseFailed = true;
+        const columns = line.split(delimiter);
+        columnCounts.push(columns.length);
+      }
     }
 
     // Check consistency: all lines should have the same column count
@@ -137,6 +160,9 @@ function detectDelimiter(lines: string[]): string {
         // Bonus points for common delimiters
         if (delimiter === ',') score += 0.5;
         if (delimiter === ';') score += 0.3;
+
+        // Bonus points if csv-parse succeeded (indicates proper CSV format)
+        if (!parseFailed) score += 0.2;
       }
     }
 

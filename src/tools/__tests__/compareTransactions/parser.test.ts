@@ -316,6 +316,42 @@ describe('parser', () => {
       expect(format.amount_column).toBeUndefined();
     });
 
+    test('should detect semicolon delimiter when quoted fields contain delimiter', () => {
+      const csvContent =
+        'Date;Description;Amount\n2025-09-20;"Utility;Gas";-50.00\n2025-09-21;"Store;Purchase";-25.00';
+      const format = autoDetectCSVFormat(csvContent);
+
+      expect(format.has_header).toBe(true);
+      expect(format.delimiter).toBe(';');
+      expect(format.date_column).toBe('Date');
+      expect(format.amount_column).toBe('Amount');
+      expect(format.description_column).toBe('Description');
+    });
+
+    test('should detect comma delimiter when quoted fields contain commas', () => {
+      const csvContent =
+        'Date,Description,Amount\n2025-09-20,"Service, Inc",50.00\n2025-09-21,"Store, LLC",-25.00';
+      const format = autoDetectCSVFormat(csvContent);
+
+      expect(format.has_header).toBe(true);
+      expect(format.delimiter).toBe(',');
+      expect(format.date_column).toBe('Date');
+      expect(format.amount_column).toBe('Amount');
+      expect(format.description_column).toBe('Description');
+    });
+
+    test('should handle complex quoted fields with multiple delimiter types', () => {
+      const csvContent =
+        'Date;Description;Amount\n2025-09-20;"Utility;Gas,Electric";-50.00\n2025-09-21;"Store;Purchase,Tax";-25.00';
+      const format = autoDetectCSVFormat(csvContent);
+
+      expect(format.has_header).toBe(true);
+      expect(format.delimiter).toBe(';');
+      expect(format.date_column).toBe('Date');
+      expect(format.amount_column).toBe('Amount');
+      expect(format.description_column).toBe('Description');
+    });
+
     test('should detect tab delimiter with debit/credit columns', () => {
       const csvContent =
         'Date\tDescription\tDebit\tCredit\n09/15/2023\tTest\t123.45\t\n09/16/2023\tTest2\t\t67.89';
@@ -625,6 +661,27 @@ describe('parser', () => {
       expect(transactions).toHaveLength(2);
       expect(transactions[0].amount).toBe(-123450); // Debit is negative
       expect(transactions[1].amount).toBe(67890); // Credit is positive
+    });
+
+    test('should parse semicolon-delimited CSV with quoted fields containing delimiter', () => {
+      const csvContent =
+        'Date;Description;Amount\n2025-09-20;"Utility;Gas";-50.00\n2025-09-21;"Store;Purchase";-25.00';
+      const format: CSVFormat = {
+        date_column: 'Date',
+        amount_column: 'Amount',
+        description_column: 'Description',
+        date_format: 'YYYY-MM-DD',
+        has_header: true,
+        delimiter: ';',
+      };
+
+      const transactions = parseBankCSV(csvContent, format);
+
+      expect(transactions).toHaveLength(2);
+      expect(transactions[0].description).toBe('Utility;Gas');
+      expect(transactions[0].amount).toBe(-50000);
+      expect(transactions[1].description).toBe('Store;Purchase');
+      expect(transactions[1].amount).toBe(-25000);
     });
   });
 
