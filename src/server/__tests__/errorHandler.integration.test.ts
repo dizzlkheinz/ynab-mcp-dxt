@@ -1,11 +1,12 @@
+import { ErrorHandler, YNABErrorCode } from '../../server/errorHandler';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handleListBudgets } from '../../tools/budgetTools.js';
-import { handleListAccounts } from '../../tools/accountTools.js';
-import { handleListTransactions } from '../../tools/transactionTools.js';
-import { handleListCategories } from '../../tools/categoryTools.js';
-import { handleListPayees } from '../../tools/payeeTools.js';
-import { handleListMonths } from '../../tools/monthTools.js';
-import { handleGetUser } from '../../tools/utilityTools.js';
+import { handleListBudgets } from '../../tools/budgetTools';
+import { handleListAccounts } from '../../tools/accountTools';
+import { handleListTransactions } from '../../tools/transactionTools';
+import { handleListCategories } from '../../tools/categoryTools';
+import { handleListPayees } from '../../tools/payeeTools';
+import { handleListMonths } from '../../tools/monthTools';
+import { handleGetUser } from '../../tools/utilityTools';
 
 // Mock the YNAB API
 vi.mock('ynab');
@@ -204,8 +205,8 @@ describe('Error Handler Integration Tests', () => {
       const originalError = new Error(
         'Authentication failed with token: abc123xyz and key: secret456',
       );
-      const ynabError = new (await import('../../server/errorHandler.js')).YNABAPIError(
-        401,
+      const ynabError = ErrorHandler.createYNABError(
+        YNABErrorCode.UNAUTHORIZED,
         'Test error',
         originalError,
       );

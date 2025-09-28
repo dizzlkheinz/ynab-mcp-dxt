@@ -78,7 +78,7 @@ import {
   FinancialOverviewSchema,
   SpendingAnalysisSchema,
   BudgetHealthSchema,
-} from '../tools/financialOverviewTools.js';
+} from '../tools/financialOverview/index.js';
 import { cacheManager, CacheManager, CACHE_TTLS } from './cacheManager.js';
 import { responseFormatter } from './responseFormatter.js';
 import {
