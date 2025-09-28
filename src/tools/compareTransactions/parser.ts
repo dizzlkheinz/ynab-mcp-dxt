@@ -1,6 +1,7 @@
 import { parse } from 'csv-parse/sync';
 import { parse as parseDateFns } from 'date-fns';
-import { toMilli, Milli } from '../../utils/money.js';
+import { toMilli } from '../../utils/money.js';
+import type { Milli } from '../../utils/money.js';
 import { BankTransaction, CSVFormat } from './types.js';
 import { readFileSync } from 'fs';
 
@@ -228,10 +229,17 @@ export function autoDetectCSVFormat(csvContent: string): CSVFormat {
     const { dateColumn, amountColumn, descriptionColumn, debitColumn, creditColumn } =
       analyzeHeaders(firstLine);
 
+    const safe = (v?: string) => (v && v.trim() ? v : undefined);
+
     if (hasDebitCredit && debitColumn && creditColumn) {
+      const dateCol = safe(dateColumn) ?? safe(firstLine[0]);
+      if (!dateCol) throw new Error('Unable to detect date column name from header');
+      const descCol = safe(descriptionColumn) ?? safe(firstLine[1]);
+      if (!descCol) throw new Error('Unable to detect description column name from header');
+
       return {
-        date_column: dateColumn || firstLine[0] || 0,
-        description_column: descriptionColumn || firstLine[1] || 1,
+        date_column: dateCol,
+        description_column: descCol,
         debit_column: debitColumn,
         credit_column: creditColumn,
         date_format: detectDateFormat(linesRaw[1]?.split(delimiter)[0]),
@@ -239,13 +247,18 @@ export function autoDetectCSVFormat(csvContent: string): CSVFormat {
         delimiter: delimiter,
       };
     } else {
+      const dateCol = safe(dateColumn) ?? safe(firstLine[0]);
+      if (!dateCol) throw new Error('Unable to detect date column name from header');
+      const amountCol = safe(amountColumn) ?? safe(firstLine[1]);
+      if (!amountCol) throw new Error('Unable to detect amount column name from header');
+      const descCol =
+        safe(descriptionColumn) ?? safe(firstLine.length >= 3 ? firstLine[2] : firstLine[1]);
+      if (!descCol) throw new Error('Unable to detect description column name from header');
+
       return {
-        date_column: dateColumn || firstLine[0] || 'Date',
-        amount_column: amountColumn || firstLine[1] || 'Amount',
-        description_column:
-          descriptionColumn ||
-          (firstLine.length >= 3 ? firstLine[2] : firstLine[1]) ||
-          'Description',
+        date_column: dateCol,
+        amount_column: amountCol,
+        description_column: descCol,
         date_format: detectDateFormat(linesRaw[1]?.split(delimiter)[0]),
         has_header: hasHeader,
         delimiter: delimiter,

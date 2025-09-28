@@ -172,7 +172,7 @@ describe('compareTransactions index (main handler)', () => {
           description_column: 'Description',
           has_header: true,
         }),
-        { debug: true },
+        { debug: false },
       );
     });
 
@@ -191,7 +191,7 @@ describe('compareTransactions index (main handler)', () => {
       // Verify file reading and parsing
       expect(mockReadCSVFile).toHaveBeenCalledWith('/path/to/file.csv');
       expect(mockParseBankCSV).toHaveBeenCalledWith(csvContent, expect.any(Object), {
-        debug: true,
+        debug: false,
       });
     });
 
@@ -218,7 +218,7 @@ describe('compareTransactions index (main handler)', () => {
       // Verify auto-detection was called and used
       expect(mockAutoDetectCSVFormat).toHaveBeenCalledWith(params.csv_data);
       expect(mockParseBankCSV).toHaveBeenCalledWith(params.csv_data, autoDetectedFormat, {
-        debug: true,
+        debug: false,
       });
     });
 
@@ -376,7 +376,7 @@ describe('compareTransactions index (main handler)', () => {
         expect.objectContaining({
           date_column: 'Date', // Default format
         }),
-        { debug: true },
+        { debug: false },
       );
     });
   });

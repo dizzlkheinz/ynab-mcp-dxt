@@ -1,4 +1,4 @@
-import * as ynab from 'ynab';
+import type * as ynab from 'ynab';
 import { z } from 'zod/v4';
 import type { CompareTransactionsSchema } from './index.js';
 

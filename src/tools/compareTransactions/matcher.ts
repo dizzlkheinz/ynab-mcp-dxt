@@ -41,10 +41,10 @@ export function calculateMatchScore(
   const ynabPayee = (ynabTxn.payee_name || '').toLowerCase();
   const ynabMemo = (ynabTxn.memo || '').toLowerCase();
 
-  if (bankDesc && (ynabPayee.includes(bankDesc) || bankDesc.includes(ynabPayee))) {
+  if (bankDesc && ynabPayee && (ynabPayee.includes(bankDesc) || bankDesc.includes(ynabPayee))) {
     score += 10;
     reasons.push('Payee name similarity');
-  } else if (bankDesc && (ynabMemo.includes(bankDesc) || bankDesc.includes(ynabMemo))) {
+  } else if (bankDesc && ynabMemo && (ynabMemo.includes(bankDesc) || bankDesc.includes(ynabMemo))) {
     score += 5;
     reasons.push('Memo similarity');
   }

@@ -5,7 +5,7 @@ import { withToolErrorHandling } from '../../types/index.js';
 import { parseBankCSV, readCSVFile, autoDetectCSVFormat } from './parser.js';
 import { findMatches } from './matcher.js';
 import { buildComparisonResult } from './formatter.js';
-import { YNABTransaction } from './types.js';
+import type { YNABTransaction } from './types.js';
 import { inWindow } from '../../utils/money.js';
 
 // Re-export core types for consumers
@@ -28,6 +28,7 @@ export const CompareTransactionsSchema = z
     statement_start_date: z.string().optional(),
     statement_date: z.string().optional(),
     auto_detect_format: z.boolean().optional().default(false),
+    debug: z.boolean().optional().default(false),
     csv_format: z
       .object({
         date_column: z.union([z.string(), z.number()]).optional().default('Date'),
@@ -85,14 +86,18 @@ export async function handleCompareTransactions(
       if (parsed.auto_detect_format) {
         try {
           csvFormat = autoDetectCSVFormat(csvContent);
-          console.warn('Auto-detected CSV format:', csvFormat);
+          if (parsed.debug) {
+            console.warn('Auto-detected CSV format:', csvFormat);
+          }
         } catch (error) {
-          console.warn('Auto-detection failed, using provided format:', error);
+          if (parsed.debug) {
+            console.warn('Auto-detection failed, using provided format:', error);
+          }
         }
       }
 
       // Parse bank transactions from CSV
-      const bankTransactions = parseBankCSV(csvContent, csvFormat, { debug: true });
+      const bankTransactions = parseBankCSV(csvContent, csvFormat, { debug: parsed.debug });
 
       if (bankTransactions.length === 0) {
         throw new Error(
