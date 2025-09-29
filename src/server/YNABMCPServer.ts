@@ -2,7 +2,7 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import fs from 'fs';
 import path from 'path';
-import { z } from 'zod/v4';
+import { z } from 'zod';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -11,7 +11,7 @@ import {
   ReadResourceRequestSchema,
   GetPromptRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
-import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import * as ynab from 'ynab';
 import {
   AuthenticationError,
@@ -267,9 +267,9 @@ export class YNABMCPServer {
       try {
         const prompt = await this.promptManager.getPrompt(name, args);
         const tools = Array.isArray((prompt as { tools?: unknown[] }).tools)
-          ? ((prompt as { tools?: unknown[] }).tools as ToolDefinition[])
-          : [];
-        return { ...prompt, tools };
+          ? ((prompt as { tools?: unknown[] }).tools as Tool[])
+          : undefined;
+        return tools ? { ...prompt, tools } : prompt;
       } catch (error) {
         return this.errorHandler.handleError(error, `getting prompt: ${name}`);
       }
@@ -400,7 +400,7 @@ export class YNABMCPServer {
                 success: true,
                 message: `Default budget set to: ${budget_id}`,
                 default_budget_id: budget_id,
-                cache_warmed: true,
+                cache_warm_started: true,
               }),
             },
           ],
