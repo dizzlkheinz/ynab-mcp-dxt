@@ -8,6 +8,7 @@ import type {
   SpendingAnalysisParams,
   BudgetHealthParams,
   BudgetInsight,
+  SpendingTrend,
 } from './schemas.js';
 import {
   calculateAccountBalances,
@@ -94,8 +95,8 @@ export async function handleFinancialOverview(
       );
       const netWorthTrend = calculateNetWorthTrend(validMonths, accountBalances);
 
-      let trends = [];
-      let insights = [];
+      let trends: SpendingTrend[] = [];
+      let insights: BudgetInsight[] = [];
 
       if (params.include_trends) {
         trends = analyzeSpendingTrends(validMonths, budget.data.budget.categories || []);
@@ -280,8 +281,6 @@ export async function handleBudgetHealthCheck(
         : [];
 
       const healthCheck = performBudgetHealthCheck(
-        budget.data.budget,
-        currentMonthData.data.month,
         params.include_recommendations,
         analysisDateRange,
         healthMetrics,

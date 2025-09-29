@@ -212,7 +212,7 @@ export function withSecurityWrapper<T extends Record<string, unknown>>(
 ) {
   return (accessToken: string) =>
     (params: Record<string, unknown>) =>
-    (handler: (..._args: unknown[]) => Promise<CallToolResult>) => {
+    (handler: (validated: T) => Promise<CallToolResult>) => {
       const context: SecurityContext = {
         accessToken,
         toolName,
@@ -221,6 +221,11 @@ export function withSecurityWrapper<T extends Record<string, unknown>>(
         startTime: Date.now(),
       };
 
-      return SecurityMiddleware.withSecurity(context, schema, handler);
+      // Adapt the handler to the generic signature expected by withSecurity
+      const operationAdapter = async (validatedParams: unknown) => {
+        return handler(validatedParams as T);
+      };
+
+      return SecurityMiddleware.withSecurity(context, schema, operationAdapter);
     };
 }

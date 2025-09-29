@@ -114,6 +114,7 @@ export class YNABMCPServer {
     this.exitOnError = exitOnError;
     // Validate environment variables
     this.config = validateEnvironment();
+    this.defaultBudgetId = this.config.defaultBudgetId;
 
     // Initialize YNAB API
     this.ynabAPI = new ynab.API(this.config.accessToken);
@@ -161,22 +162,18 @@ export class YNABMCPServer {
           }) as (string | number | boolean | undefined)[];
           return CacheManager.generateKey('tool', ...normalized);
         },
-        invalidate: (key: string): boolean => {
+        invalidate: (key: string) => {
           try {
             cacheManager.delete(key);
-            return true;
           } catch (error) {
             console.error(`Failed to invalidate cache key "${key}":`, error);
-            return false;
           }
         },
-        clear: (): boolean => {
+        clear: () => {
           try {
             cacheManager.clear();
-            return true;
           } catch (error) {
             console.error('Failed to clear cache:', error);
-            return false;
           }
         },
       },
@@ -268,7 +265,8 @@ export class YNABMCPServer {
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
       try {
-        return await this.promptManager.getPrompt(name, args);
+        const prompt = await this.promptManager.getPrompt(name, args);
+        return { ...prompt, tools: [] };
       } catch (error) {
         return this.errorHandler.handleError(error, `getting prompt: ${name}`);
       }
@@ -330,7 +328,7 @@ export class YNABMCPServer {
         handler(this.ynabAPI);
 
     const resolveBudgetId = <
-      TInput extends { budget_id?: string },
+      TInput extends { budget_id?: string | undefined },
     >(): DefaultArgumentResolver<TInput> => {
       return ({ rawArguments }) => {
         const provided =
@@ -602,7 +600,7 @@ export class YNABMCPServer {
       description: 'Get comprehensive financial overview with insights, trends, and analysis',
       inputSchema: FinancialOverviewSchema,
       handler: async ({ input }) => {
-        return handleFinancialOverview(this.ynabAPI, input);
+        return handleFinancialOverview(this.ynabAPI, { ...input, budget_id: input.budget_id! });
       },
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof FinancialOverviewSchema>>(),
     });
@@ -612,7 +610,7 @@ export class YNABMCPServer {
       description: 'Detailed spending analysis with category breakdowns and trends',
       inputSchema: SpendingAnalysisSchema,
       handler: async ({ input }) => {
-        return handleSpendingAnalysis(this.ynabAPI, input);
+        return handleSpendingAnalysis(this.ynabAPI, { ...input, budget_id: input.budget_id! });
       },
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof SpendingAnalysisSchema>>(),
     });
@@ -622,7 +620,7 @@ export class YNABMCPServer {
       description: 'Comprehensive budget health assessment with recommendations',
       inputSchema: BudgetHealthSchema,
       handler: async ({ input }) => {
-        return handleBudgetHealthCheck(this.ynabAPI, input);
+        return handleBudgetHealthCheck(this.ynabAPI, { ...input, budget_id: input.budget_id! });
       },
       defaultArgumentResolver: resolveBudgetId<z.infer<typeof BudgetHealthSchema>>(),
     });

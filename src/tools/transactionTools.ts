@@ -124,20 +124,23 @@ export async function handleListTransactions(
       const shouldCache =
         useCache && !params.account_id && !params.category_id && !params.since_date && !params.type;
 
-      let transactions: ynab.TransactionDetail[];
+      let transactions: (ynab.TransactionDetail | ynab.HybridTransaction)[];
       let cacheHit = false;
 
       if (shouldCache) {
         // Use enhanced CacheManager wrap method
         const cacheKey = CacheManager.generateKey('transactions', 'list', params.budget_id);
         cacheHit = cacheManager.has(cacheKey);
-        transactions = await cacheManager.wrap<ynab.TransactionDetail[]>(cacheKey, {
-          ttl: CACHE_TTLS.TRANSACTIONS,
-          loader: async () => {
-            const response = await ynabAPI.transactions.getTransactions(params.budget_id);
-            return response.data.transactions;
+        transactions = await cacheManager.wrap<(ynab.TransactionDetail | ynab.HybridTransaction)[]>(
+          cacheKey,
+          {
+            ttl: CACHE_TTLS.TRANSACTIONS,
+            loader: async () => {
+              const response = await ynabAPI.transactions.getTransactions(params.budget_id);
+              return response.data.transactions;
+            },
           },
-        });
+        );
       } else {
         // Use conditional API calls based on filter parameters (no caching for filtered requests)
         let response;

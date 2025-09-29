@@ -132,7 +132,7 @@ function detectDelimiter(lines: string[]): string {
         });
 
         // rows should be an array with one row (since we're parsing one line)
-        if (rows && rows.length > 0) {
+        if (rows && rows.length > 0 && rows[0]) {
           const columns = Array.isArray(rows[0]) ? rows[0] : Object.values(rows[0]);
           columnCounts.push(columns.length);
         } else {
@@ -151,6 +151,7 @@ function detectDelimiter(lines: string[]): string {
     // Check consistency: all lines should have the same column count
     if (columnCounts.length > 1) {
       const firstCount = columnCounts[0];
+      if (firstCount === undefined) continue;
       const isConsistent = columnCounts.every((count) => count === firstCount);
 
       if (isConsistent && firstCount > 1) {
@@ -258,9 +259,9 @@ export function autoDetectCSVFormat(csvContent: string): CSVFormat {
     const safe = (v?: string) => (v && v.trim() ? v : undefined);
 
     if (hasDebitCredit && debitColumn && creditColumn) {
-      const dateCol = safe(dateColumn) ?? safe(firstLine[0]);
+      const dateCol = safe(dateColumn ?? undefined) ?? safe(firstLine[0]);
       if (!dateCol) throw new Error('Unable to detect date column name from header');
-      const descCol = safe(descriptionColumn) ?? safe(firstLine[1]);
+      const descCol = safe(descriptionColumn ?? undefined) ?? safe(firstLine[1]);
       if (!descCol) throw new Error('Unable to detect description column name from header');
 
       return {
@@ -273,12 +274,13 @@ export function autoDetectCSVFormat(csvContent: string): CSVFormat {
         delimiter: delimiter,
       };
     } else {
-      const dateCol = safe(dateColumn) ?? safe(firstLine[0]);
+      const dateCol = safe(dateColumn ?? undefined) ?? safe(firstLine[0]);
       if (!dateCol) throw new Error('Unable to detect date column name from header');
-      const amountCol = safe(amountColumn) ?? safe(firstLine[1]);
+      const amountCol = safe(amountColumn ?? undefined) ?? safe(firstLine[1]);
       if (!amountCol) throw new Error('Unable to detect amount column name from header');
       const descCol =
-        safe(descriptionColumn) ?? safe(firstLine.length >= 3 ? firstLine[2] : firstLine[1]);
+        safe(descriptionColumn ?? undefined) ??
+        safe(firstLine.length >= 3 ? firstLine[2] : firstLine[1]);
       if (!descCol) throw new Error('Unable to detect description column name from header');
 
       return {

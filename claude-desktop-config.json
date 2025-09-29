@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "ynab-mcp-server": {
+      "command": "node",
+      "args": ["dist/index.js"],
+      "cwd": "c:/Users/ksutk/projects/ynab-mcp-dxt",
+      "env": {
+        "YNAB_ACCESS_TOKEN": "your_token_here"
+      }
+    }
+  }
+}

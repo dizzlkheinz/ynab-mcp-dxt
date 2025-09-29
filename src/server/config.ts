@@ -15,6 +15,7 @@ import { ServerConfig, ConfigurationError } from '../types/index.js';
  */
 export function validateEnvironment(): ServerConfig {
   const accessToken = process.env['YNAB_ACCESS_TOKEN'];
+  const defaultBudgetId = process.env['YNAB_DEFAULT_BUDGET_ID'];
 
   if (accessToken === undefined) {
     throw new ConfigurationError('YNAB_ACCESS_TOKEN environment variable is required but not set');
@@ -26,6 +27,7 @@ export function validateEnvironment(): ServerConfig {
 
   return {
     accessToken: accessToken.trim(),
+    defaultBudgetId: defaultBudgetId?.trim(),
   };
 }
 

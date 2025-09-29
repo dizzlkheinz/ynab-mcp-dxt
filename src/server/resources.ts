@@ -82,9 +82,6 @@ const defaultResourceHandlers: Record<string, ResourceHandler> = {
       const userInfo = response.data.user;
       const user = {
         id: userInfo.id,
-        ...(userInfo.email && { email: userInfo.email }),
-        ...(userInfo.name && { name: userInfo.name }),
-        ...(userInfo.date_created && { date_created: userInfo.date_created }),
       };
 
       return {

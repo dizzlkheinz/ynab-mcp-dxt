@@ -148,8 +148,10 @@ export class CacheManager {
       data,
       timestamp: Date.now(),
       ttl,
-      staleWhileRevalidate,
     };
+    if (staleWhileRevalidate !== undefined) {
+      entry.staleWhileRevalidate = staleWhileRevalidate;
+    }
 
     if (isUpdate) {
       // When updating, delete then set to preserve MRU ordering
@@ -227,14 +229,26 @@ export class CacheManager {
     isExpired: boolean;
   }[] {
     const now = Date.now();
-    return Array.from(this.cache.entries()).map(([key, entry]) => ({
-      key,
-      timestamp: entry.timestamp,
-      ttl: entry.ttl,
-      staleWhileRevalidate: entry.staleWhileRevalidate,
-      dataType: typeof entry.data,
-      isExpired: now - entry.timestamp > entry.ttl,
-    }));
+    return Array.from(this.cache.entries()).map(([key, entry]) => {
+      const metadata: {
+        key: string;
+        timestamp: number;
+        ttl: number;
+        staleWhileRevalidate?: number;
+        dataType: string;
+        isExpired: boolean;
+      } = {
+        key,
+        timestamp: entry.timestamp,
+        ttl: entry.ttl,
+        dataType: typeof entry.data,
+        isExpired: now - entry.timestamp > entry.ttl,
+      };
+      if (entry.staleWhileRevalidate !== undefined) {
+        metadata.staleWhileRevalidate = entry.staleWhileRevalidate;
+      }
+      return metadata;
+    });
   }
 
   /**
@@ -279,11 +293,16 @@ export class CacheManager {
         const refreshPromise = options.loader().then(
           (result) => {
             // Preserve existing TTL/SWR if not specified in options
-            const refreshOptions: CacheSetOptions = {
-              ttl: options.ttl ?? existingEntry?.ttl,
-              staleWhileRevalidate:
-                options.staleWhileRevalidate ?? existingEntry?.staleWhileRevalidate,
-            };
+            const refreshOptions: CacheSetOptions = {};
+            const ttl = options.ttl ?? existingEntry?.ttl;
+            if (ttl !== undefined) {
+              refreshOptions.ttl = ttl;
+            }
+            const staleWhileRevalidate =
+              options.staleWhileRevalidate ?? existingEntry?.staleWhileRevalidate;
+            if (staleWhileRevalidate !== undefined) {
+              refreshOptions.staleWhileRevalidate = staleWhileRevalidate;
+            }
             // Cache the successful result
             this.set(key, result, refreshOptions);
             // Clean up

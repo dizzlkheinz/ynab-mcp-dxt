@@ -223,6 +223,8 @@ export async function handleReconcileAccount(
           statement_date: parsed.statement_date,
           date_range_days: 30, // Use default value
           auto_detect_format: false, // Use default value
+          enable_chronology_bonus: false, // Use default value
+          debug: false, // Use default value
         };
 
         const comparisonResult = await handleCompareTransactions(ynabAPI, compareParams);

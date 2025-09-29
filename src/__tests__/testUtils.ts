@@ -84,6 +84,48 @@ export function validateToolResult(result: CallToolResult): void {
 }
 
 /**
+ * Check if a CallToolResult contains an error
+ */
+export function isErrorResult(result: CallToolResult): boolean {
+  if (!result.content || result.content.length === 0) {
+    return false;
+  }
+
+  const content = result.content[0];
+  if (!content || content.type !== 'text') {
+    return false;
+  }
+
+  try {
+    const parsed = JSON.parse(content.text);
+    return parsed && typeof parsed === 'object' && 'error' in parsed;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Extract error message from a CallToolResult that contains an error
+ */
+export function getErrorMessage(result: CallToolResult): string {
+  if (!isErrorResult(result)) {
+    return '';
+  }
+
+  const content = result.content[0];
+  if (!content || content.type !== 'text') {
+    return '';
+  }
+
+  try {
+    const parsed = JSON.parse(content.text);
+    return parsed.error?.message || parsed.error?.userMessage || content.text;
+  } catch {
+    return content.text;
+  }
+}
+
+/**
  * Parse JSON from tool result
  */
 export function parseToolResult<T = any>(result: CallToolResult): T {

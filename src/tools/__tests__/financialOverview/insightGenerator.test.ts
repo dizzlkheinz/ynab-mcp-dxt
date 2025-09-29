@@ -140,7 +140,6 @@ function createMockFinancialMetrics(overrides: Partial<FinancialMetrics> = {}): 
     ...otherOverrides,
   };
 }
-}
 
 function createMockAccount(type: ynab.AccountType, balance: number): ynab.Account {
   return {

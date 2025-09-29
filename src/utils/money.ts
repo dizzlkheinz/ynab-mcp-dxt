@@ -22,5 +22,5 @@ export const addMilli = (a: Milli, b: Milli): Milli => {
   return s;
 };
 
-export const inWindow = (iso: string, start?: string, end?: string) =>
+export const inWindow = (iso: string, start: string | undefined = undefined, end: string | undefined = undefined) =>
   (!start || iso >= start) && (!end || iso <= end);

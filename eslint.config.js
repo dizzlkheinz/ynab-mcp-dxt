@@ -1,17 +1,14 @@
 import js from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
-import tsparser from '@typescript-eslint/parser';
 import eslintConfigPrettier from 'eslint-config-prettier';
+import tseslint from 'typescript-eslint';
 
-export default [
+export default tseslint.config(
   js.configs.recommended,
-  // Apply TypeScript ESLint strict and stylistic defaults (flat configs)
-  ...tseslint.configs['flat/strict'],
-  ...tseslint.configs['flat/stylistic'],
+  ...tseslint.configs.strict,
+  ...tseslint.configs.stylistic,
   {
     files: ['src/**/*.ts'],
     languageOptions: {
-      parser: tsparser,
       parserOptions: {
         ecmaVersion: 2020,
         sourceType: 'module',
@@ -23,9 +20,6 @@ export default [
         __dirname: 'readonly',
         __filename: 'readonly',
       },
-    },
-    plugins: {
-      '@typescript-eslint': tseslint,
     },
     rules: {
       '@typescript-eslint/no-inferrable-types': 'off',
@@ -49,6 +43,6 @@ export default [
   // Turn off formatting-related rules to defer to Prettier
   eslintConfigPrettier,
   {
-    ignores: ['dist/**/*', 'node_modules/**/*', 'scripts/**/*', '*.js', 'eslint.config.js'],
+    ignores: ['dist/**/*', 'node_modules/**/*', 'scripts/**/*', '*.js', '*.mjs'],
   },
-];
+);

@@ -201,8 +201,7 @@ export function performDetailedSpendingAnalysis(
   // Generate clear date range
   const sortedMonths = [...months].sort(
     (a, b) =>
-      new Date(b.data.month.month || '').getTime() -
-      new Date(a.data.month.month || '').getTime(),
+      new Date(b.data.month.month || '').getTime() - new Date(a.data.month.month || '').getTime(),
   );
 
   // Bail out early if there are no valid month entries
@@ -317,8 +316,6 @@ export function performDetailedSpendingAnalysis(
  * Used by health check handler to assess current financial health
  */
 export function performBudgetHealthCheck(
-  budget: ynab.BudgetDetail,
-  currentMonth: ynab.MonthDetail,
   includeRecommendations: boolean,
   analysisDateRange?: string,
   healthMetrics?: Record<string, unknown>,

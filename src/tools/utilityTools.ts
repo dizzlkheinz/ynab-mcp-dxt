@@ -28,8 +28,6 @@ export async function handleGetUser(ynabAPI: ynab.API): Promise<CallToolResult> 
 
       const user = {
         id: userInfo.id,
-        ...(userInfo.email && { email: userInfo.email }),
-        ...(userInfo.name && { name: userInfo.name }),
       };
 
       return {

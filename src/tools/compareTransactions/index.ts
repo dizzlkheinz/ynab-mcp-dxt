@@ -6,7 +6,6 @@ import { parseBankCSV, readCSVFile, autoDetectCSVFormat } from './parser.js';
 import { findMatches } from './matcher.js';
 import { buildComparisonResult } from './formatter.js';
 import type { YNABTransaction } from './types.js';
-import { inWindow } from '../../utils/money.js';
 
 // Re-export core types for consumers
 export type { BankTransaction, YNABTransaction, TransactionMatch } from './types.js';
@@ -148,12 +147,24 @@ export async function handleCompareTransactions(
 
       if (parsed.statement_start_date || parsed.statement_date) {
         filteredBankTransactions = bankTransactions.filter((t) => {
-          const dateStr = t.date.toISOString().split('T')[0];
-          return inWindow(dateStr, parsed.statement_start_date, parsed.statement_date);
+          const dateStr = t.date.toISOString().split('T')[0]!;
+          if (parsed.statement_start_date && dateStr < parsed.statement_start_date) {
+            return false;
+          }
+          if (parsed.statement_date && dateStr > parsed.statement_date) {
+            return false;
+          }
+          return true;
         });
         filteredYnabTransactions = ynabTransactions.filter((t) => {
-          const dateStr = t.date.toISOString().split('T')[0];
-          return inWindow(dateStr, parsed.statement_start_date, parsed.statement_date);
+          const dateStr = t.date.toISOString().split('T')[0]!;
+          if (parsed.statement_start_date && dateStr < parsed.statement_start_date) {
+            return false;
+          }
+          if (parsed.statement_date && dateStr > parsed.statement_date) {
+            return false;
+          }
+          return true;
         });
       }
 
@@ -175,27 +186,25 @@ export async function handleCompareTransactions(
           const filteredMinDate = new Date(Math.min(...filteredBankDates.map((d) => d.getTime())));
           const filteredMaxDate = new Date(Math.max(...filteredBankDates.map((d) => d.getTime())));
           dateRange = {
-            start: filteredMinDate.toISOString().split('T')[0],
-            end: filteredMaxDate.toISOString().split('T')[0],
+            start: filteredMinDate.toISOString().split('T')[0] as string,
+            end: filteredMaxDate.toISOString().split('T')[0] as string,
           };
         } else {
           // Fallback to statement window if no filtered transactions
           dateRange = {
-            start:
-              parsed.statement_start_date ||
+            start: (parsed.statement_start_date ||
               parsed.statement_date ||
-              minDate.toISOString().split('T')[0],
-            end:
-              parsed.statement_date ||
+              minDate.toISOString().split('T')[0]) as string,
+            end: (parsed.statement_date ||
               parsed.statement_start_date ||
-              maxDate.toISOString().split('T')[0],
+              maxDate.toISOString().split('T')[0]) as string,
           };
         }
       } else {
         // Use original unfiltered date range when no statement window filtering
         dateRange = {
-          start: minDate.toISOString().split('T')[0],
-          end: maxDate.toISOString().split('T')[0],
+          start: minDate.toISOString().split('T')[0] as string,
+          end: maxDate.toISOString().split('T')[0] as string,
         };
       }
 

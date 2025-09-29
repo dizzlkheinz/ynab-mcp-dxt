@@ -9,6 +9,7 @@ export interface AuthenticationConfig {
 
 export interface ServerConfig {
   accessToken: string;
+  defaultBudgetId?: string;
 }
 
 export class AuthenticationError extends Error {

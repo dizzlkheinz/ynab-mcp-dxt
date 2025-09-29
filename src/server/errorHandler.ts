@@ -608,7 +608,11 @@ export class ErrorHandler {
     }
 
     const details = typeof detail === 'string' ? detail : undefined;
-    return { code, details };
+    const result: { code: YNABErrorCode; details?: string } = { code };
+    if (details !== undefined) {
+      result.details = details;
+    }
+    return result;
   }
 
   /**

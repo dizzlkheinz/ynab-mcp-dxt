@@ -24,6 +24,13 @@ This document provides detailed information about environment variables and conf
 
 ### Optional Variables
 
+#### YNAB_DEFAULT_BUDGET_ID
+
+- **Type**: String
+- **Required**: No
+- **Description**: Sets the default budget ID to use for all operations if not explicitly provided.
+- **Example**: `YNAB_DEFAULT_BUDGET_ID=12345678-1234-1234-1234-123456789012`
+
 #### NODE_ENV
 
 - **Type**: String

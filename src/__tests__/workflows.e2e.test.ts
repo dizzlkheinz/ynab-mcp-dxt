@@ -11,6 +11,8 @@ import {
   createTestServer,
   executeToolCall,
   parseToolResult,
+  isErrorResult,
+  getErrorMessage,
   TestData,
   TestDataCleanup,
   YNABAssertions,
@@ -285,12 +287,10 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         budget_id: testBudgetId,
         transaction_id: testTransactionId,
       });
-      expect(getDeletedResult.isError).toBe(true);
-      if (getDeletedResult.isError) {
-        // Expected - transaction should not be found
-        expect(getDeletedResult.content).toBeDefined();
-        expect(getDeletedResult.content.length).toBeGreaterThan(0);
-      }
+      expect(isErrorResult(getDeletedResult)).toBe(true);
+      // Expected - transaction should not be found
+      expect(getDeletedResult.content).toBeDefined();
+      expect(getDeletedResult.content.length).toBeGreaterThan(0);
     });
 
     it('should filter transactions by date and account', async () => {
@@ -590,12 +590,10 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
 
         for (const toolName of toolsToTest) {
           const result = await executeToolCall(server, toolName, {});
-          expect(result.isError).toBe(true);
-          if (result.isError) {
-            const errorMessage = result.content[0]?.text || '';
-            expect(errorMessage).toContain('No default budget set');
-            expect(errorMessage).toContain('set_default_budget');
-          }
+          expect(isErrorResult(result)).toBe(true);
+          const errorMessage = getErrorMessage(result);
+          expect(errorMessage).toContain('No budget ID provided and no default budget set');
+          expect(errorMessage).toContain('set_default_budget');
         }
 
         // Restore default budget for other tests
@@ -610,12 +608,10 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
 
         for (const toolName of toolsToTest) {
           const result = await executeToolCall(server, toolName, { budget_id: invalidBudgetId });
-          expect(result.isError).toBe(true);
-          if (result.isError) {
-            // All tools should provide similar error handling
-            expect(result.content).toBeDefined();
-            expect(result.content.length).toBeGreaterThan(0);
-          }
+          expect(isErrorResult(result)).toBe(true);
+          // All tools should provide similar error handling
+          expect(result.content).toBeDefined();
+          expect(result.content.length).toBeGreaterThan(0);
         }
       });
     });
@@ -826,15 +822,13 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         server['defaultBudgetId'] = undefined;
 
         const result = await executeToolCall(server, 'ynab:list_accounts', {});
-        expect(result.isError).toBe(true);
-        if (result.isError) {
-          const errorMessage = result.content[0]?.text || '';
+        expect(isErrorResult(result)).toBe(true);
+        const errorMessage = getErrorMessage(result);
 
-          // Error should provide actionable guidance
-          expect(errorMessage).toContain('No default budget set');
-          expect(errorMessage).toContain('set_default_budget');
-          expect(errorMessage).toContain('provide budget_id parameter');
-        }
+        // Error should provide actionable guidance
+        expect(errorMessage).toContain('No budget ID provided and no default budget set');
+        expect(errorMessage).toContain('set_default_budget');
+        expect(errorMessage).toContain('provide budget_id parameter');
 
         // Restore default budget
         await executeToolCall(server, 'ynab:set_default_budget', { budget_id: testBudgetId });
@@ -849,12 +843,10 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
       const result = await executeToolCall(server, 'ynab:get_budget', {
         budget_id: 'invalid-budget-id',
       });
-      expect(result.isError).toBe(true);
-      if (result.isError) {
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
-        // Error should be handled gracefully without exposing sensitive information
-      }
+      expect(isErrorResult(result)).toBe(true);
+      expect(result.content).toBeDefined();
+      expect(result.content.length).toBeGreaterThan(0);
+      // Error should be handled gracefully without exposing sensitive information
     });
 
     it('should handle invalid account ID gracefully', async () => {
@@ -864,11 +856,9 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         budget_id: testBudgetId,
         account_id: 'invalid-account-id',
       });
-      expect(result.isError).toBe(true);
-      if (result.isError) {
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
-      }
+      expect(isErrorResult(result)).toBe(true);
+      expect(result.content).toBeDefined();
+      expect(result.content.length).toBeGreaterThan(0);
     });
 
     it('should handle invalid transaction ID gracefully', async () => {
@@ -878,11 +868,9 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         budget_id: testBudgetId,
         transaction_id: 'invalid-transaction-id',
       });
-      expect(result.isError).toBe(true);
-      if (result.isError) {
-        expect(result.content).toBeDefined();
-        expect(result.content.length).toBeGreaterThan(0);
-      }
+      expect(isErrorResult(result)).toBe(true);
+      expect(result.content).toBeDefined();
+      expect(result.content.length).toBeGreaterThan(0);
     });
   });
 });
