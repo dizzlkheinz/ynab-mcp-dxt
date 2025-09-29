@@ -266,7 +266,10 @@ export class YNABMCPServer {
       const { name, arguments: args } = request.params;
       try {
         const prompt = await this.promptManager.getPrompt(name, args);
-        return { ...prompt, tools: [] };
+        const tools = Array.isArray((prompt as { tools?: unknown[] }).tools)
+          ? ((prompt as { tools?: unknown[] }).tools as ToolDefinition[])
+          : [];
+        return { ...prompt, tools };
       } catch (error) {
         return this.errorHandler.handleError(error, `getting prompt: ${name}`);
       }

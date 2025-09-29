@@ -119,7 +119,23 @@ export function getErrorMessage(result: CallToolResult): string {
 
   try {
     const parsed = JSON.parse(content.text);
-    return parsed.error?.message || parsed.error?.userMessage || content.text;
+    const error = parsed?.error;
+    if (typeof error === 'string' && error.length > 0) {
+      return error;
+    }
+    if (error && typeof error === 'object') {
+      const {
+        message,
+        userMessage,
+        detail,
+        name,
+      } = error as Record<string, unknown>;
+      if (typeof message === 'string' && message.length > 0) return message;
+      if (typeof userMessage === 'string' && userMessage.length > 0) return userMessage;
+      if (typeof detail === 'string' && detail.length > 0) return detail;
+      if (typeof name === 'string' && name.length > 0) return name;
+    }
+    return content.text;
   } catch {
     return content.text;
   }
