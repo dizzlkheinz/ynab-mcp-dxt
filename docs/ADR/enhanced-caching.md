@@ -57,11 +57,14 @@ interface CacheSetOptions {
 }
 
 interface CacheStats {
-  total_hits: number;
-  total_misses: number;
-  hit_rate: number;
-  total_entries: number;
+  size: number;
+  keys: string[];
+  hits: number;
+  misses: number;
   evictions: number;
+  lastCleanup: number | null;
+  maxEntries: number;
+  hitRate: number;
 }
 
 export class CacheManager {

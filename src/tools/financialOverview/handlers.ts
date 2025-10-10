@@ -8,14 +8,12 @@ import type {
   SpendingAnalysisParams,
   BudgetHealthParams,
   BudgetInsight,
-  SpendingTrend,
 } from './schemas.js';
 import {
   calculateAccountBalances,
   analyzeCategoryPerformance,
   calculateNetWorthTrend,
-  analyzeSpendingTrends,
-} from './trendAnalysis.js';
+} from './formatter.js';
 import {
   generateFinancialInsights,
   calculateOverallHealthScore,
@@ -69,7 +67,7 @@ export async function handleFinancialOverview(
         throw new Error('Budget ID is required and must be a string');
       }
       const budgetId = params.budget_id;
-      const cacheKey = `financial-overview:${budgetId}:${params.months}:${params.include_trends}:${params.include_insights}`;
+      const cacheKey = `financial-overview:${budgetId}:${params.months}:${params.include_insights}`;
 
       const cached = cacheManager.get<FinancialOverviewCacheEntry>(cacheKey);
       if (cached) {
@@ -95,15 +93,10 @@ export async function handleFinancialOverview(
       );
       const netWorthTrend = calculateNetWorthTrend(validMonths, accountBalances);
 
-      let trends: SpendingTrend[] = [];
       let insights: BudgetInsight[] = [];
 
-      if (params.include_trends) {
-        trends = analyzeSpendingTrends(validMonths, budget.data.budget.categories || []);
-      }
-
       if (params.include_insights) {
-        insights = generateFinancialInsights(validMonths, budget.data.budget, trends);
+        insights = generateFinancialInsights(validMonths, budget.data.budget, []);
       }
 
       // Generate clear date range for summary
@@ -173,7 +166,7 @@ export async function handleFinancialOverview(
         ),
         category_performance: categoryAnalysis,
         net_worth_trend: netWorthTrend,
-        spending_trends: formatSpendingTrends(trends),
+        spending_trends: formatSpendingTrends([]),
         insights: insights,
       };
 

@@ -55,26 +55,65 @@ export async function handleListCategories(
     async () => {
       const useCache = process.env['NODE_ENV'] !== 'test';
 
-      let categoryGroups: ynab.CategoryGroupWithCategories[];
+      if (!useCache) {
+        // Bypass cache in test environment
+        const response = await ynabAPI.categories.getCategories(params.budget_id);
+        const categoryGroups = response.data.category_groups;
 
-      let wasCached = false;
+        // Flatten categories from all category groups
+        const allCategories = categoryGroups.flatMap((group) =>
+          group.categories.map((category) => ({
+            id: category.id,
+            category_group_id: category.category_group_id,
+            category_group_name: group.name,
+            name: category.name,
+            hidden: category.hidden,
+            original_category_group_id: category.original_category_group_id,
+            note: category.note,
+            budgeted: milliunitsToAmount(category.budgeted),
+            activity: milliunitsToAmount(category.activity),
+            balance: milliunitsToAmount(category.balance),
+            goal_type: category.goal_type,
+            goal_creation_month: category.goal_creation_month,
+            goal_target: category.goal_target,
+            goal_target_month: category.goal_target_month,
+            goal_percentage_complete: category.goal_percentage_complete,
+          })),
+        );
 
-      if (useCache) {
-        // Use enhanced CacheManager wrap method
-        const cacheKey = CacheManager.generateKey('categories', 'list', params.budget_id);
-        wasCached = cacheManager.has(cacheKey);
-        categoryGroups = await cacheManager.wrap<ynab.CategoryGroupWithCategories[]>(cacheKey, {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                categories: allCategories,
+                category_groups: categoryGroups.map((group) => ({
+                  id: group.id,
+                  name: group.name,
+                  hidden: group.hidden,
+                  deleted: group.deleted,
+                })),
+                cached: false,
+                cache_info: 'Fresh data retrieved from YNAB API',
+              }),
+            },
+          ],
+        };
+      }
+
+      // Use enhanced CacheManager wrap method
+      const cacheKey = CacheManager.generateKey('categories', 'list', params.budget_id);
+      const wasCached = cacheManager.has(cacheKey);
+      const categoryGroups = await cacheManager.wrap<ynab.CategoryGroupWithCategories[]>(
+        cacheKey,
+        {
           ttl: CACHE_TTLS.CATEGORIES,
           loader: async () => {
             const response = await ynabAPI.categories.getCategories(params.budget_id);
             return response.data.category_groups;
           },
-        });
-      } else {
-        // Bypass cache in test environment
-        const response = await ynabAPI.categories.getCategories(params.budget_id);
-        categoryGroups = response.data.category_groups;
-      }
+        },
+      );
 
       // Flatten categories from all category groups
       const allCategories = categoryGroups.flatMap((group) =>
@@ -131,13 +170,47 @@ export async function handleGetCategory(
   ynabAPI: ynab.API,
   params: GetCategoryParams,
 ): Promise<CallToolResult> {
-  try {
-    const useCache = process.env['NODE_ENV'] !== 'test';
+  return await withToolErrorHandling(
+    async () => {
+      const useCache = process.env['NODE_ENV'] !== 'test';
 
-    let category: ynab.Category;
-    let wasCached = false;
+      if (!useCache) {
+        // Bypass cache in test environment
+        const response = await ynabAPI.categories.getCategoryById(
+          params.budget_id,
+          params.category_id,
+        );
+        const category = response.data.category;
 
-    if (useCache) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                category: {
+                  id: category.id,
+                  category_group_id: category.category_group_id,
+                  name: category.name,
+                  hidden: category.hidden,
+                  original_category_group_id: category.original_category_group_id,
+                  note: category.note,
+                  budgeted: milliunitsToAmount(category.budgeted),
+                  activity: milliunitsToAmount(category.activity),
+                  balance: milliunitsToAmount(category.balance),
+                  goal_type: category.goal_type,
+                  goal_creation_month: category.goal_creation_month,
+                  goal_target: category.goal_target,
+                  goal_target_month: category.goal_target_month,
+                  goal_percentage_complete: category.goal_percentage_complete,
+                },
+                cached: false,
+                cache_info: 'Fresh data retrieved from YNAB API',
+              }),
+            },
+          ],
+        };
+      }
+
       // Use enhanced CacheManager wrap method
       const cacheKey = CacheManager.generateKey(
         'category',
@@ -145,8 +218,8 @@ export async function handleGetCategory(
         params.budget_id,
         params.category_id,
       );
-      wasCached = cacheManager.has(cacheKey);
-      category = await cacheManager.wrap<ynab.Category>(cacheKey, {
+      const wasCached = cacheManager.has(cacheKey);
+      const category = await cacheManager.wrap<ynab.Category>(cacheKey, {
         ttl: CACHE_TTLS.CATEGORIES,
         loader: async () => {
           const response = await ynabAPI.categories.getCategoryById(
@@ -156,47 +229,40 @@ export async function handleGetCategory(
           return response.data.category;
         },
       });
-    } else {
-      // Bypass cache in test environment
-      const response = await ynabAPI.categories.getCategoryById(
-        params.budget_id,
-        params.category_id,
-      );
-      category = response.data.category;
-    }
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: responseFormatter.format({
-            category: {
-              id: category.id,
-              category_group_id: category.category_group_id,
-              name: category.name,
-              hidden: category.hidden,
-              original_category_group_id: category.original_category_group_id,
-              note: category.note,
-              budgeted: milliunitsToAmount(category.budgeted),
-              activity: milliunitsToAmount(category.activity),
-              balance: milliunitsToAmount(category.balance),
-              goal_type: category.goal_type,
-              goal_creation_month: category.goal_creation_month,
-              goal_target: category.goal_target,
-              goal_target_month: category.goal_target_month,
-              goal_percentage_complete: category.goal_percentage_complete,
-            },
-            cached: wasCached,
-            cache_info: wasCached
-              ? 'Data retrieved from cache for improved performance'
-              : 'Fresh data retrieved from YNAB API',
-          }),
-        },
-      ],
-    };
-  } catch (error) {
-    return handleCategoryError(error, 'Failed to get category');
-  }
+      return {
+        content: [
+          {
+            type: 'text',
+            text: responseFormatter.format({
+              category: {
+                id: category.id,
+                category_group_id: category.category_group_id,
+                name: category.name,
+                hidden: category.hidden,
+                original_category_group_id: category.original_category_group_id,
+                note: category.note,
+                budgeted: milliunitsToAmount(category.budgeted),
+                activity: milliunitsToAmount(category.activity),
+                balance: milliunitsToAmount(category.balance),
+                goal_type: category.goal_type,
+                goal_creation_month: category.goal_creation_month,
+                goal_target: category.goal_target,
+                goal_target_month: category.goal_target_month,
+                goal_percentage_complete: category.goal_percentage_complete,
+              },
+              cached: wasCached,
+              cache_info: wasCached
+                ? 'Data retrieved from cache for improved performance'
+                : 'Fresh data retrieved from YNAB API',
+            }),
+          },
+        ],
+      };
+    },
+    'ynab:get_category',
+    'getting category',
+  );
 }
 
 /**

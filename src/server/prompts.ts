@@ -121,22 +121,6 @@ const defaultPromptDefinitions: PromptDefinition[] = [
 ];
 
 /**
- * Validates required arguments and returns validation messages
- */
-function validateRequiredArguments(
-  definition: PromptDefinition,
-  args: Record<string, unknown> | undefined,
-): string[] {
-  const missing: string[] = [];
-  for (const arg of definition.arguments) {
-    if (arg.required && (!args || args[arg.name] === undefined || args[arg.name] === '')) {
-      missing.push(arg.name);
-    }
-  }
-  return missing;
-}
-
-/**
  * Default prompt handlers
  */
 const defaultPromptHandlers: Record<string, PromptHandler> = {
@@ -300,22 +284,7 @@ export class PromptManager {
       throw new Error(`Prompt definition not found: ${name}`);
     }
 
-    const missing = validateRequiredArguments(definition, args);
-    if (missing.length > 0) {
-      const response = await handler(name, args);
-      // Append validation note to the prompt text without changing response shape
-      const validationNote = `\n\n⚠️ Missing required arguments: ${missing.join(', ')}`;
-      return {
-        ...response,
-        messages: response.messages.map((message) => ({
-          ...message,
-          content: {
-            ...message.content,
-            text: message.content.text + validationNote,
-          },
-        })),
-      };
-    }
+    // Let handlers deal with missing arguments - they provide placeholders when args are missing
 
     return await handler(name, args);
   }

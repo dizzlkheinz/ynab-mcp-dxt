@@ -25,10 +25,17 @@ export function validateEnvironment(): ServerConfig {
     throw new ConfigurationError('YNAB_ACCESS_TOKEN must be a non-empty string');
   }
 
-  return {
+  const trimmedDefaultBudgetId = defaultBudgetId?.trim();
+
+  const config: ServerConfig = {
     accessToken: accessToken.trim(),
-    defaultBudgetId: defaultBudgetId?.trim(),
   };
+
+  if (trimmedDefaultBudgetId && trimmedDefaultBudgetId.length > 0) {
+    config.defaultBudgetId = trimmedDefaultBudgetId;
+  }
+
+  return config;
 }
 
 export type { ServerConfig } from '../types/index.js';

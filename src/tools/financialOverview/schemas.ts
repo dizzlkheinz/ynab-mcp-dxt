@@ -4,14 +4,12 @@ import { z } from 'zod/v4';
  * Schema for financial overview tool parameters
  * - budget_id: Optional budget ID, defaults to default budget
  * - months: Number of months to analyze (1-12), defaults to 3
- * - include_trends: Whether to include spending trend analysis, defaults to true
  * - include_insights: Whether to include financial insights, defaults to true
  */
 export const FinancialOverviewSchema = z
   .object({
     budget_id: z.string().optional(),
     months: z.number().int().min(1).max(12).default(3),
-    include_trends: z.boolean().default(true),
     include_insights: z.boolean().default(true),
   })
   .strict();

@@ -19,7 +19,6 @@ describe('FinancialOverviewSchema', () => {
     expect(result).toEqual({
       budget_id: 'test-budget',
       months: 3,
-      include_trends: true,
       include_insights: true,
     });
   });
@@ -28,7 +27,6 @@ describe('FinancialOverviewSchema', () => {
     const input = {
       budget_id: 'test-budget',
       months: 6,
-      include_trends: false,
       include_insights: false,
     };
     const result = FinancialOverviewSchema.parse(input);
@@ -61,7 +59,6 @@ describe('FinancialOverviewSchema', () => {
       budget_id: 'test-budget',
     });
     expect(parsed.months).toBe(3);
-    expect(parsed.include_trends).toBe(true);
     expect(parsed.include_insights).toBe(true);
   });
 });
@@ -243,7 +240,6 @@ describe('Backward Compatibility', () => {
     // Test that default values match original behavior
     const financial = FinancialOverviewSchema.parse({ budget_id: 'test-budget' });
     expect(financial.months).toBe(3);
-    expect(financial.include_trends).toBe(true);
     expect(financial.include_insights).toBe(true);
 
     const spending = SpendingAnalysisSchema.parse({ budget_id: 'test-budget' });
@@ -257,7 +253,7 @@ describe('Backward Compatibility', () => {
     // These were valid inputs in the original implementation
     const inputs = [
       { budget_id: 'test', months: 1 },
-      { budget_id: 'test', months: 12, include_trends: false },
+      { budget_id: 'test', months: 12, include_insights: false },
       { budget_id: 'test', period_months: 3, category_id: 'cat-123' },
       { budget_id: 'test', include_recommendations: false },
     ];

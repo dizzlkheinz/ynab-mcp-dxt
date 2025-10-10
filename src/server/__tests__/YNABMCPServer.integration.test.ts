@@ -512,18 +512,19 @@ describeIntegration('YNABMCPServer', () => {
 
     it('should handle modular service errors gracefully in integration', async () => {
       // Test error handling through the modules with real API
-      try {
-        await registry.executeTool({
-          name: 'get_budget',
-          accessToken: accessToken(),
-          arguments: {} as Record<string, unknown>, // Missing required budget_id
-        });
-        // Should not reach here
-        expect(false).toBe(true);
-      } catch (error) {
-        // Error handling should still work properly
-        expect(error).toBeDefined();
-      }
+      const result = await registry.executeTool({
+        name: 'get_budget',
+        accessToken: accessToken(),
+        arguments: {} as Record<string, unknown>, // Missing required budget_id
+      });
+
+      // Should return an error result, not throw an exception
+      expect(result.content).toBeDefined();
+      expect(result.content[0]).toBeDefined();
+      expect(result.content[0].type).toBe('text');
+      // Should contain validation error about missing budget_id
+      expect(result.content[0].text).toContain('VALIDATION_ERROR');
+      expect(result.content[0].text).toContain('budget_id');
     });
   });
 

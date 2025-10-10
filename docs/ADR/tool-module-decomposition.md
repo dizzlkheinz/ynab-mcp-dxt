@@ -77,7 +77,7 @@ We decided to decompose large tool modules into focused sub-modules using a dire
 
 ### Target Module Structure
 
-```
+```text
 tools/
 ├── compareTransactions/
 │   ├── types.ts           # Shared type definitions

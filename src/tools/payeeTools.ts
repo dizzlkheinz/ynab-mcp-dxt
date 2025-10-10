@@ -40,25 +40,40 @@ export async function handleListPayees(
     async () => {
       const useCache = process.env['NODE_ENV'] !== 'test';
 
-      let payees: ynab.Payee[];
-      let wasCached = false;
-
-      if (useCache) {
-        // Use enhanced CacheManager wrap method
-        const cacheKey = CacheManager.generateKey('payees', 'list', params.budget_id);
-        wasCached = cacheManager.has(cacheKey);
-        payees = await cacheManager.wrap<ynab.Payee[]>(cacheKey, {
-          ttl: CACHE_TTLS.PAYEES,
-          loader: async () => {
-            const response = await ynabAPI.payees.getPayees(params.budget_id);
-            return response.data.payees;
-          },
-        });
-      } else {
+      if (!useCache) {
         // Bypass cache in test environment
         const response = await ynabAPI.payees.getPayees(params.budget_id);
-        payees = response.data.payees;
+        const payees = response.data.payees;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                payees: payees.map((payee) => ({
+                  id: payee.id,
+                  name: payee.name,
+                  transfer_account_id: payee.transfer_account_id,
+                  deleted: payee.deleted,
+                })),
+                cached: false,
+                cache_info: 'Fresh data retrieved from YNAB API',
+              }),
+            },
+          ],
+        };
       }
+
+      // Use enhanced CacheManager wrap method
+      const cacheKey = CacheManager.generateKey('payees', 'list', params.budget_id);
+      const wasCached = cacheManager.has(cacheKey);
+      const payees = await cacheManager.wrap<ynab.Payee[]>(cacheKey, {
+        ttl: CACHE_TTLS.PAYEES,
+        loader: async () => {
+          const response = await ynabAPI.payees.getPayees(params.budget_id);
+          return response.data.payees;
+        },
+      });
 
       return {
         content: [
@@ -97,30 +112,45 @@ export async function handleGetPayee(
     async () => {
       const useCache = process.env['NODE_ENV'] !== 'test';
 
-      let payee: ynab.Payee;
-      let wasCached = false;
-
-      if (useCache) {
-        // Use enhanced CacheManager wrap method
-        const cacheKey = CacheManager.generateKey(
-          'payee',
-          'get',
-          params.budget_id,
-          params.payee_id,
-        );
-        wasCached = cacheManager.has(cacheKey);
-        payee = await cacheManager.wrap<ynab.Payee>(cacheKey, {
-          ttl: CACHE_TTLS.PAYEES,
-          loader: async () => {
-            const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
-            return response.data.payee;
-          },
-        });
-      } else {
+      if (!useCache) {
         // Bypass cache in test environment
         const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
-        payee = response.data.payee;
+        const payee = response.data.payee;
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: responseFormatter.format({
+                payee: {
+                  id: payee.id,
+                  name: payee.name,
+                  transfer_account_id: payee.transfer_account_id,
+                  deleted: payee.deleted,
+                },
+                cached: false,
+                cache_info: 'Fresh data retrieved from YNAB API',
+              }),
+            },
+          ],
+        };
       }
+
+      // Use enhanced CacheManager wrap method
+      const cacheKey = CacheManager.generateKey(
+        'payee',
+        'get',
+        params.budget_id,
+        params.payee_id,
+      );
+      const wasCached = cacheManager.has(cacheKey);
+      const payee = await cacheManager.wrap<ynab.Payee>(cacheKey, {
+        ttl: CACHE_TTLS.PAYEES,
+        loader: async () => {
+          const response = await ynabAPI.payees.getPayeeById(params.budget_id, params.payee_id);
+          return response.data.payee;
+        },
+      });
 
       return {
         content: [

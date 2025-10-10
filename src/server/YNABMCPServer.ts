@@ -114,7 +114,9 @@ export class YNABMCPServer {
     this.exitOnError = exitOnError;
     // Validate environment variables
     this.config = validateEnvironment();
-    this.defaultBudgetId = this.config.defaultBudgetId;
+    if (this.config.defaultBudgetId !== undefined) {
+      this.defaultBudgetId = this.config.defaultBudgetId;
+    }
 
     // Initialize YNAB API
     this.ynabAPI = new ynab.API(this.config.accessToken);
@@ -264,15 +266,9 @@ export class YNABMCPServer {
     // Handle get prompt requests
     this.server.setRequestHandler(GetPromptRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      try {
-        const prompt = await this.promptManager.getPrompt(name, args);
-        const tools = Array.isArray((prompt as { tools?: unknown[] }).tools)
-          ? ((prompt as { tools?: unknown[] }).tools as Tool[])
-          : undefined;
-        return tools ? { ...prompt, tools } : prompt;
-      } catch (error) {
-        return this.errorHandler.handleError(error, `getting prompt: ${name}`);
-      }
+      const result = await this.promptManager.getPrompt(name, args);
+      // The SDK expects the result to match the protocol's PromptResponse shape
+      return result as unknown as { description?: string; messages: unknown[] };
     });
 
     // Handle list tools requests
@@ -299,12 +295,22 @@ export class YNABMCPServer {
           })()
         : undefined;
 
-      return await this.toolRegistry.executeTool({
+      const executionOptions: {
+        name: string;
+        accessToken: string;
+        arguments: Record<string, unknown>;
+        minifyOverride?: boolean;
+      } = {
         name: request.params.name,
         accessToken: this.config.accessToken,
         arguments: sanitizedArgs ?? {},
-        minifyOverride: minifyOverride ?? false,
-      });
+      };
+
+      if (minifyOverride !== undefined) {
+        executionOptions.minifyOverride = minifyOverride;
+      }
+
+      return await this.toolRegistry.executeTool(executionOptions);
     });
   }
 
@@ -811,6 +817,61 @@ export class YNABMCPServer {
     } catch {
       // Cache warming failures should not affect the main operation
       // Errors are handled by the caller with a catch block
+    }
+  }
+
+  /**
+   * Public handler methods for testing and external access
+   */
+
+  /**
+   * Handle list tools request - public method for testing
+   */
+  public async handleListTools() {
+    return {
+      tools: this.toolRegistry.listTools(),
+    };
+  }
+
+  /**
+   * Handle list resources request - public method for testing
+   */
+  public async handleListResources() {
+    return this.resourceManager.listResources();
+  }
+
+  /**
+   * Handle read resource request - public method for testing
+   */
+  public async handleReadResource(params: { uri: string }) {
+    const { uri } = params;
+    try {
+      return await this.resourceManager.readResource(uri);
+    } catch (error) {
+      return this.errorHandler.handleError(error, `reading resource: ${uri}`);
+    }
+  }
+
+  /**
+   * Handle list prompts request - public method for testing
+   */
+  public async handleListPrompts() {
+    return this.promptManager.listPrompts();
+  }
+
+  /**
+   * Handle get prompt request - public method for testing
+   */
+  public async handleGetPrompt(params: { name: string; arguments?: Record<string, unknown> }) {
+    const { name, arguments: args } = params;
+    try {
+      const prompt = await this.promptManager.getPrompt(name, args);
+      const tools = Array.isArray((prompt as { tools?: unknown[] }).tools)
+        ? ((prompt as { tools?: unknown[] }).tools as Tool[])
+        : undefined;
+      return tools ? { ...prompt, tools } : prompt;
+    } catch (error) {
+      return this.errorHandler.handleError(error, `getting prompt: ${name}`);
     }
   }
 

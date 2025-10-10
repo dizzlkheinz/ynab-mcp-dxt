@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   ErrorHandler,
   YNABAPIError,
@@ -280,6 +280,12 @@ describe('ErrorHandler with formatter injection', () => {
 });
 
 describe('Static method delegation', () => {
+  afterEach(() => {
+    // Reset the global ErrorHandler formatter after each test
+    // This ensures the fallback formatter test runs in a clean environment
+    (ErrorHandler as any).defaultInstance = undefined;
+  });
+
   it('should delegate static calls to default instance', () => {
     const mockFormatter = {
       format: vi.fn((value) => JSON.stringify(value)),

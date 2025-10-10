@@ -507,49 +507,17 @@ describe('Analysis Functions', () => {
 
   describe('performBudgetHealthCheck', () => {
     test('should return formatted health check with all parameters', () => {
-      const mockBudget: ynab.BudgetDetail = {
-        id: 'budget-1',
-        name: 'Test Budget',
-        last_modified_on: new Date().toISOString(),
-        first_month: '2024-01-01',
-        last_month: '2024-12-01',
-        date_format: { format: 'MM/DD/YYYY' },
-        currency_format: {
-          iso_code: 'USD',
-          example_format: '123,456.78',
-          decimal_digits: 2,
-          decimal_separator: '.',
-          symbol_first: true,
-          group_separator: ',',
-          currency_symbol: '$',
-          display_symbol: true,
-        },
-        accounts: [],
-        payees: [],
-        payee_locations: [],
-        category_groups: [],
-        categories: [],
-        months: [],
-        transactions: [],
-        subtransactions: [],
-        scheduled_transactions: [],
-        scheduled_subtransactions: [],
-      };
-
-      const month = createMockMonthDetail();
       const metrics = { budget_utilization: 95 };
       const subScores = createMockHealthSubScores();
 
       const result = performBudgetHealthCheck(
-        mockBudget,
-        month,
-        true,
-        'January 2024',
-        metrics,
-        85,
-        subScores,
-        'Good health',
-        ['Test recommendation'],
+        true, // includeRecommendations
+        'January 2024', // analysisDateRange
+        metrics, // healthMetrics
+        85, // healthScore
+        subScores, // subScores
+        'Good health', // scoreExplanation
+        ['Test recommendation'], // recommendations
       );
 
       expect(result.analysis_period).toBe('January 2024');
@@ -562,12 +530,7 @@ describe('Analysis Functions', () => {
     });
 
     test('should exclude recommendations when not requested', () => {
-      const mockBudget = {} as ynab.BudgetDetail;
-      const month = createMockMonthDetail();
-
       const result = performBudgetHealthCheck(
-        mockBudget,
-        month,
         false, // Don't include recommendations
       );
 
@@ -575,11 +538,9 @@ describe('Analysis Functions', () => {
     });
 
     test('should use default analysis period when not provided', () => {
-      const mockBudget = {} as ynab.BudgetDetail;
-      const month = createMockMonthDetail();
+      const result = performBudgetHealthCheck(true);
 
-      const result = performBudgetHealthCheck(mockBudget, month, true);
-
+      expect(typeof result.analysis_period).toBe('string');
       expect(result.analysis_period).toMatch(/\w+ \d{4}/); // Should be a month and year
     });
   });

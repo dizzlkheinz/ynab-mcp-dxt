@@ -132,16 +132,23 @@ export class CacheManager {
 
     if (typeof ttlOrOptions === 'number') {
       ttl = Number.isFinite(ttlOrOptions) ? ttlOrOptions : this.defaultTTL;
-      // When using simple number interface, don't apply default stale window
+      // When using simple number interface, no stale window is applied
+      staleWhileRevalidate = undefined;
+    } else if (ttlOrOptions === undefined) {
+      // When called without any options (simple set), use defaults but NO stale window
+      ttl = this.defaultTTL;
       staleWhileRevalidate = undefined;
     } else {
       const providedTtl = ttlOrOptions?.ttl;
       ttl = providedTtl !== undefined ? providedTtl : this.defaultTTL;
-      // Only use default stale window when staleWhileRevalidate property exists but is undefined
       if (ttlOrOptions && 'staleWhileRevalidate' in ttlOrOptions) {
-        staleWhileRevalidate = ttlOrOptions.staleWhileRevalidate ?? this.defaultStaleWindow;
+        staleWhileRevalidate = ttlOrOptions.staleWhileRevalidate;
       } else {
         staleWhileRevalidate = ttlOrOptions?.staleWhileRevalidate;
+      }
+      // Apply default stale window only when options object is provided and staleWhileRevalidate is undefined
+      if (staleWhileRevalidate === undefined && this.defaultStaleWindow > 0) {
+        staleWhileRevalidate = this.defaultStaleWindow;
       }
     }
     const entry: CacheEntry<T> = {

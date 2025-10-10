@@ -63,9 +63,9 @@ export default defineConfig({
         },
       },
     },
-    reporters: ['verbose', 'json'],
+    reporters: ['verbose', 'html', './vitest-reporters/split-json-reporter.ts'],
     outputFile: {
-      json: './test-results.json',
+      html: './test-results/index.html',
     },
   },
   resolve: {

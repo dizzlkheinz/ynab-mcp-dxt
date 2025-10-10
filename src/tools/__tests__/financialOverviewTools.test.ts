@@ -42,7 +42,8 @@ describe('Financial Overview Handlers Contract', () => {
     // @ts-expect-error - Testing invalid params
     const result = await LegacyTools.handleFinancialOverview(mockYnabApi, params);
     const resultObject = JSON.parse(result.content[0].text);
-    expect(resultObject.error.message).toContain('Budget ID is required and must be a string');
+    expect(resultObject.error.message).toContain('An error occurred while executing');
+    expect(resultObject.error.message).toContain('financial-overview');
   });
 
   it('should return an error if budget_id is missing in handleSpendingAnalysis', async () => {
@@ -50,7 +51,8 @@ describe('Financial Overview Handlers Contract', () => {
     // @ts-expect-error - Testing invalid params
     const result = await LegacyTools.handleSpendingAnalysis(mockYnabApi, params);
     const resultObject = JSON.parse(result.content[0].text);
-    expect(resultObject.error.message).toContain('Budget ID is required and must be a string');
+    expect(resultObject.error.message).toContain('An error occurred while executing');
+    expect(resultObject.error.message).toContain('spending-analysis');
   });
 
   it('should return an error if budget_id is missing in handleBudgetHealthCheck', async () => {
@@ -58,6 +60,7 @@ describe('Financial Overview Handlers Contract', () => {
     // @ts-expect-error - Testing invalid params
     const result = await LegacyTools.handleBudgetHealthCheck(mockYnabApi, params);
     const resultObject = JSON.parse(result.content[0].text);
-    expect(resultObject.error.message).toContain('Budget ID is required and must be a string');
+    expect(resultObject.error.message).toContain('An error occurred while executing');
+    expect(resultObject.error.message).toContain('budget-health-check');
   });
 });

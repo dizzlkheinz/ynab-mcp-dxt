@@ -119,6 +119,7 @@ pids/
 
 # Test results
 test-results.json
+test-results/
 coverage/
 
 # Temporary files
@@ -155,4 +156,4 @@ ynab-mcp-dxt-updated/
 .mcp.json
 
 # CSV files (test data)
-*.csv
+*.csv/test-results/

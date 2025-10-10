@@ -7,7 +7,6 @@ import {
   ToolRegistryDependencies,
   ToolExecutionPayload,
 } from '../toolRegistry.js';
-import { createErrorHandler } from '../errorHandler.js';
 
 function createResult(label: string): CallToolResult {
   return {
@@ -33,7 +32,20 @@ function makeTestDeps() {
     format: vi.fn((value) => JSON.stringify(value)),
   };
 
-  const errorHandler = createErrorHandler(responseFormatter);
+  const errorHandler = {
+    createValidationError: vi.fn((message: string, details?: string) => ({
+      content: [{
+        type: 'text',
+        text: `validation:${message}${details ? `:${details}` : ''}`
+      }]
+    })),
+    handleError: vi.fn((error: unknown, context: string) => ({
+      content: [{
+        type: 'text',
+        text: `handled:${context}:${error instanceof Error ? error.message : String(error)}`
+      }]
+    }))
+  };
 
   const withSecurityWrapper = vi.fn(
     <T extends Record<string, unknown>>(
@@ -89,6 +101,10 @@ describe('ToolRegistry', () => {
     const setup = makeTestDeps();
     ({ dependencies, securityInvocations, responseFormatter } = setup);
     registry = new ToolRegistry(dependencies);
+
+    // Spy on error handler methods for testing
+    vi.spyOn(dependencies.errorHandler, 'createValidationError');
+    vi.spyOn(dependencies.errorHandler, 'handleError');
   });
 
   const registerSampleTool = (definition?: Partial<ToolDefinition>) => {
@@ -388,6 +404,10 @@ describe('ToolRegistry', () => {
     };
 
     const customRegistry = new ToolRegistry(customDeps);
+
+    // Spy on custom error handler methods for testing
+    vi.spyOn(customDeps.errorHandler, 'handleError');
+
     customRegistry.register({
       name: 'security_tool',
       description: 'Security throws',

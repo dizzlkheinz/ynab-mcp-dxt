@@ -30,17 +30,28 @@ export class BudgetResolver {
     if (providedId !== undefined && providedId !== null) {
       const trimmed = providedId.trim();
 
-      // Handle special keywords before validation
+      // Handle special keywords
       if (trimmed === 'default') {
+        // For "default" keyword, we need to use the actual default budget ID if available
         if (defaultId) {
           return this.validateBudgetId(defaultId);
-        } else {
-          return this.createMissingBudgetError();
         }
+        // No default budget set, return error
+        return this.createMissingBudgetError();
       }
 
       if (trimmed === 'last-used') {
-        return this.createInvalidBudgetError('The "last-used" keyword is not supported yet');
+        // "last-used" keyword is not currently supported
+        return ErrorHandler.createValidationError(
+          'Unsupported keyword',
+          'The "last-used" keyword is not supported yet. Please use a specific budget ID or set a default budget.',
+          [
+            'Use a specific budget ID (UUID format)',
+            'Set a default budget using the set_default_budget tool',
+            'Use the "default" keyword after setting a default budget',
+            'Run the list_budgets tool to see available budget IDs'
+          ]
+        );
       }
 
       // For non-keyword IDs, validate normally (including empty strings)
@@ -106,7 +117,7 @@ export class BudgetResolver {
       detailMessage,
       [
         'Set a default budget first using the set_default_budget tool',
-        'Provide a budget_id argument when invoking the tool',
+        'Provide a budget_id parameter when invoking the tool',
       ],
     );
   }

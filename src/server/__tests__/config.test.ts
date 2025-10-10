@@ -31,6 +31,7 @@ describe('config module', () => {
 
       expect(result).toEqual({
         accessToken: testToken,
+        defaultBudgetId: undefined,
       });
     });
 
@@ -43,6 +44,7 @@ describe('config module', () => {
 
       expect(result).toEqual({
         accessToken: expectedToken,
+        defaultBudgetId: undefined,
       });
     });
 
@@ -100,6 +102,7 @@ describe('config module', () => {
         process.env.YNAB_ACCESS_TOKEN = token;
         const result = validateEnvironment();
         expect(result.accessToken).toBe(token);
+        expect(result.defaultBudgetId).toBeUndefined();
       });
     });
 
@@ -114,6 +117,7 @@ describe('config module', () => {
         process.env.YNAB_ACCESS_TOKEN = input;
         const result = validateEnvironment();
         expect(result.accessToken).toBe(expected);
+        expect(result.defaultBudgetId).toBeUndefined();
       });
     });
   });

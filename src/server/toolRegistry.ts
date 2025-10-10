@@ -300,6 +300,7 @@ export class ToolRegistry {
     for (const key of MINIFY_HINT_KEYS) {
       const value = args[key];
       if (typeof value === 'boolean') {
+        delete args[key];
         return value;
       }
     }

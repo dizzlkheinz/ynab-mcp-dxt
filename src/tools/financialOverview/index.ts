@@ -6,7 +6,6 @@
  *
  * Architecture:
  * - schemas.ts: Shared type definitions and validation schemas
- * - trendAnalysis.ts: Pure functions for trend calculations and statistical analysis
  * - insightGenerator.ts: Business logic for insights and health scoring
  * - formatter.ts: Response formatting and utility functions
  * - handlers.ts: Main orchestration logic that coordinates all modules
@@ -38,15 +37,6 @@ export {
 
 // Re-export utility functions for sharing with prompts and other modules
 export {
-  calculateAccountBalances,
-  analyzeCategoryPerformance,
-  calculateNetWorthTrend,
-  analyzeSpendingTrends,
-  calculateConsistencyScore,
-  calculateScoreConfidence,
-} from './trendAnalysis.js';
-
-export {
   generateFinancialInsights,
   generateBudgetOptimizationInsights,
   calculateOverallHealthScore,
@@ -62,6 +52,9 @@ export {
 } from './insightGenerator.js';
 
 export {
+  calculateAccountBalances,
+  analyzeCategoryPerformance,
+  calculateNetWorthTrend,
   formatCurrency,
   calculateBudgetUtilization,
   formatAccountBalances,

@@ -11,7 +11,7 @@ describe('CacheManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.useFakeTimers();
+    vi.useFakeTimers({ now: 0 }); // Start fake timers at timestamp 0
     // Clear environment variables
     delete process.env.YNAB_MCP_CACHE_MAX_ENTRIES;
     delete process.env.YNAB_MCP_CACHE_STALE_MS;
@@ -231,8 +231,8 @@ describe('CacheManager', () => {
 
   describe('Per-Entry Options', () => {
     it('should use custom TTL from options', () => {
-      cache.set('key1', 'value1', { ttl: 500 });
-      cache.set('key2', 'value2', { ttl: 1500 });
+      cache.set('key1', 'value1', { ttl: 500, staleWhileRevalidate: 0 });
+      cache.set('key2', 'value2', { ttl: 1500, staleWhileRevalidate: 0 });
 
       vi.advanceTimersByTime(1000);
       expect(cache.get('key1')).toBeNull(); // Expired
@@ -241,10 +241,13 @@ describe('CacheManager', () => {
 
     it('should use default TTL when no options provided', () => {
       cache.set('key1', 'value1');
-      vi.advanceTimersByTime(4 * 60 * 1000); // Less than 5 minutes
+
+      // Advance to just before expiration (5 minutes is default TTL)
+      vi.advanceTimersByTime(299000); // Just under 5 minutes - should still be valid
       expect(cache.get('key1')).toBe('value1');
 
-      vi.advanceTimersByTime(2 * 60 * 1000); // Total 6 minutes
+      // Advance past the TTL (using simple set should have NO stale window)
+      vi.advanceTimersByTime(2000); // Total ~5 minutes - should be expired
       expect(cache.get('key1')).toBeNull();
     });
 
@@ -511,6 +514,10 @@ describe('CacheManager', () => {
       process.env.YNAB_MCP_CACHE_STALE_MS = 'not-a-number';
       process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS = 'invalid-ttl';
 
+      // Reset timers for new cache instance
+      vi.useRealTimers();
+      vi.useFakeTimers({ now: 0 });
+
       const configuredCache = new CacheManager();
       const stats = configuredCache.getStats();
 
@@ -518,22 +525,27 @@ describe('CacheManager', () => {
 
       // Test that invalid default TTL falls back to 300000ms (5 minutes)
       configuredCache.set('key1', 'value1');
-      vi.advanceTimersByTime(4 * 60 * 1000); // 4 minutes - within default TTL
+      vi.advanceTimersByTime(299000); // Just under 5 minutes - should be valid
       expect(configuredCache.get('key1')).toBe('value1');
 
-      vi.advanceTimersByTime(2 * 60 * 1000); // 6 minutes total - past default TTL
+      vi.advanceTimersByTime(2000); // ~5 minutes total - should expire
       expect(configuredCache.get('key1')).toBeNull();
     });
 
     it('should use environment variable for default TTL', () => {
       process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS = '60000'; // 1 minute
+
+      // Reset timers for new cache instance
+      vi.useRealTimers();
+      vi.useFakeTimers({ now: 0 });
+
       const configuredCache = new CacheManager();
 
       configuredCache.set('key1', 'value1'); // Use default TTL
-      vi.advanceTimersByTime(30000); // 30 seconds - within TTL
+      vi.advanceTimersByTime(59000); // Just under 1 minute - should be valid
       expect(configuredCache.get('key1')).toBe('value1');
 
-      vi.advanceTimersByTime(35000); // 65 seconds total - past TTL
+      vi.advanceTimersByTime(2000); // ~1 minute total - should expire
       expect(configuredCache.get('key1')).toBeNull();
     });
 
@@ -542,6 +554,10 @@ describe('CacheManager', () => {
       delete process.env.YNAB_MCP_CACHE_STALE_MS;
       delete process.env.YNAB_MCP_CACHE_DEFAULT_TTL_MS;
 
+      // Reset timers for new cache instance
+      vi.useRealTimers();
+      vi.useFakeTimers({ now: 0 });
+
       const configuredCache = new CacheManager();
       const stats = configuredCache.getStats();
 
@@ -549,10 +565,10 @@ describe('CacheManager', () => {
 
       // Test default TTL (300000ms = 5 minutes)
       configuredCache.set('key1', 'value1');
-      vi.advanceTimersByTime(4 * 60 * 1000); // 4 minutes - within default TTL
+      vi.advanceTimersByTime(299000); // Just under 5 minutes - should be valid
       expect(configuredCache.get('key1')).toBe('value1');
 
-      vi.advanceTimersByTime(2 * 60 * 1000); // 6 minutes total - past default TTL
+      vi.advanceTimersByTime(2000); // ~5 minutes total - should expire
       expect(configuredCache.get('key1')).toBeNull();
     });
   });

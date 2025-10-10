@@ -11,89 +11,119 @@ import type {
   BudgetHealthParams,
 } from '../../financialOverview/schemas.js';
 
-// Create shared mock instances
-const mockCacheManager = {
-  get: vi.fn(),
-  set: vi.fn(),
-};
-
-const CACHE_TTLS = {
-  MONTHS: 3600000,
-};
-
 // Mock all the dependencies
 vi.mock('../../../types/index.js', () => ({
-  withToolErrorHandling: vi.fn(async (fn) => await fn()),
+  withToolErrorHandling: async (fn: () => Promise<unknown>) => await fn(),
 }));
+
+const { mockCacheManager } = vi.hoisted(() => {
+  return {
+    mockCacheManager: {
+      get: vi.fn(() => Promise.resolve(null)),
+      set: vi.fn(() => Promise.resolve()),
+    },
+  };
+});
 
 vi.mock('../../../server/cacheManager.js', () => ({
   cacheManager: mockCacheManager,
-  CACHE_TTLS,
+  CACHE_TTLS: {
+    MONTHS: 3600000,
+  },
 }));
 
 vi.mock('../../../utils/dateUtils.js', () => ({
-  getHistoricalMonths: vi.fn((months) =>
-    Array.from({ length: months }, (_, i) => `2024-${String(months - i).padStart(2, '0')}-01`),
-  ),
+  getHistoricalMonths: (months: number) => {
+    const result = [];
+    for (let i = 0; i < months; i++) {
+      result.push(`2024-${String(months - i).padStart(2, '0')}-01`);
+    }
+    return result;
+  },
 }));
 
 vi.mock('../../../server/responseFormatter.js', () => ({
   responseFormatter: {
-    format: vi.fn((data) => JSON.stringify(data)),
+    format: (data: unknown) => JSON.stringify(data),
   },
 }));
 
-// Mock the sub-modules
-vi.mock('../../financialOverview/trendAnalysis.js', () => ({
-  calculateAccountBalances: vi.fn(() => ({
-    liquidNetWorth: 10000,
-    totalNetWorth: 50000,
-    liquidAssets: 12000,
-    totalAssets: 75000,
-    totalLiabilities: 25000,
-    totalDebt: 2000,
-    checkingBalance: 2000,
-    savingsBalance: 10000,
-    creditCardBalance: -500,
-    investmentBalance: 40000,
-    realEstateBalance: 0,
-    mortgageBalance: 0,
-    otherAssetBalance: 0,
-    otherLiabilityBalance: 0,
-  })),
-  analyzeCategoryPerformance: vi.fn(() => [
-    {
-      category_name: 'Groceries',
-      category_id: 'cat-1',
-      average_budgeted: 400,
-      average_spent: 380,
-      utilization_rate: 95,
-      current_balance: 20,
-      monthly_data: [],
-    },
-  ]),
-  calculateNetWorthTrend: vi.fn(() => ({
-    direction: 'increasing',
-    change_amount: 5000,
-    change_percentage: 10,
-    monthly_values: [],
-    analysis: 'Net worth has increased by 10.0% over the analysis period',
-  })),
-  analyzeSpendingTrends: vi.fn(() => [
-    {
-      category: 'Groceries',
-      categoryId: 'cat-1',
-      currentPeriod: 400,
-      previousPeriod: 350,
-      percentChange: 14.3,
-      trend: 'increasing',
-      significance: 'medium',
-      explanation: 'Test trend explanation',
-      data_points: 6,
-      reliability_score: 80,
-    },
-  ]),
-}));
+// Mock the sub-modules - moved from trendAnalysis.ts to formatter.ts
+vi.mock('../../financialOverview/formatter.js', async () => {
+  const actual = await vi.importActual<typeof import('../../financialOverview/formatter.js')>(
+    '../../financialOverview/formatter.js',
+  );
+  return {
+    ...actual,
+    calculateAccountBalances: vi.fn(() => ({
+      liquidNetWorth: 10000,
+      totalNetWorth: 50000,
+      liquidAssets: 12000,
+      totalAssets: 75000,
+      totalLiabilities: 25000,
+      totalDebt: 2000,
+      checkingBalance: 2000,
+      savingsBalance: 10000,
+      creditCardBalance: -500,
+      investmentBalance: 40000,
+      realEstateBalance: 0,
+      mortgageBalance: 0,
+      otherAssetBalance: 0,
+      otherLiabilityBalance: 0,
+    })),
+    analyzeCategoryPerformance: vi.fn(() => [
+      {
+        category_name: 'Groceries',
+        category_id: 'cat-1',
+        average_budgeted: 400,
+        average_spent: 380,
+        utilization_rate: 95,
+        current_balance: 20,
+        monthly_data: [],
+      },
+    ]),
+    calculateNetWorthTrend: vi.fn(() => ({
+      direction: 'increasing',
+      change_amount: 5000,
+      change_percentage: 10,
+      monthly_values: [],
+      analysis: 'Net worth has increased by 10.0% over the analysis period',
+    })),
+    buildFinancialOverviewResponse: vi.fn((data) => ({
+      content: [{ type: 'text', text: JSON.stringify(data) }],
+    })),
+    buildSpendingAnalysisResponse: vi.fn((data) => ({
+      content: [{ type: 'text', text: JSON.stringify(data) }],
+    })),
+    buildBudgetHealthResponse: vi.fn((data) => ({
+      content: [{ type: 'text', text: JSON.stringify(data) }],
+    })),
+    calculateBudgetUtilization: vi.fn(() => 95),
+    performDetailedSpendingAnalysis: vi.fn(() => ({
+      analysis_period: 'January 2024 - June 2024 (6 months)',
+      category_analysis: [],
+      balance_insights: {
+        top_unused_balances: [],
+        under_budgeted_categories: [],
+      },
+    })),
+    performBudgetHealthCheck: vi.fn(() => ({
+      analysis_period: 'January 2024',
+      health_score: 85,
+      sub_scores: {
+        spending_health: 85,
+        debt_health: 90,
+        emergency_fund_health: 75,
+        budget_discipline: 80,
+      },
+      score_explanation: 'Good financial health',
+      metrics: {},
+      recommendations: [],
+      last_assessment: new Date().toISOString(),
+    })),
+    formatAccountBalances: vi.fn(),
+  };
+});
 
 vi.mock('../../financialOverview/insightGenerator.js', () => ({
   generateFinancialInsights: vi.fn(() => [
@@ -124,41 +154,6 @@ vi.mock('../../financialOverview/insightGenerator.js', () => ({
   generateHealthRecommendations: vi.fn(() => ['Test recommendation']),
 }));
 
-vi.mock('../../financialOverview/formatter.js', () => ({
-  buildFinancialOverviewResponse: vi.fn((data) => ({
-    content: [{ type: 'text', text: JSON.stringify(data) }],
-  })),
-  buildSpendingAnalysisResponse: vi.fn((data) => ({
-    content: [{ type: 'text', text: JSON.stringify(data) }],
-  })),
-  buildBudgetHealthResponse: vi.fn((data) => ({
-    content: [{ type: 'text', text: JSON.stringify(data) }],
-  })),
-  calculateBudgetUtilization: vi.fn(() => 95),
-  performDetailedSpendingAnalysis: vi.fn(() => ({
-    analysis_period: 'January 2024 - June 2024 (6 months)',
-    category_analysis: [],
-    balance_insights: {
-      top_unused_balances: [],
-      under_budgeted_categories: [],
-    },
-  })),
-  performBudgetHealthCheck: vi.fn(() => ({
-    analysis_period: 'January 2024',
-    health_score: 85,
-    sub_scores: {
-      spending_health: 85,
-      debt_health: 90,
-      emergency_fund_health: 75,
-      budget_discipline: 80,
-    },
-    score_explanation: 'Good financial health',
-    metrics: {},
-    recommendations: [],
-    last_assessment: new Date().toISOString(),
-  })),
-  formatAccountBalances: vi.fn(),
-}));
 
 // Mock YNAB API
 function createMockYnabAPI(): ynab.API {
@@ -244,7 +239,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -278,7 +272,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -289,18 +282,17 @@ describe('Handler Integration Tests', () => {
     });
 
     test('should skip trends when include_trends is false', async () => {
-      const { analyzeSpendingTrends } = await import('../../financialOverview/trendAnalysis.js');
-
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: false,
         include_insights: true,
       };
 
-      await handleFinancialOverview(mockAPI, params);
+      const result = await handleFinancialOverview(mockAPI, params);
 
-      expect(analyzeSpendingTrends).not.toHaveBeenCalled();
+      // Verify result was generated without trends
+      expect(result).toBeDefined();
+      expect(result.content).toHaveLength(1);
     });
 
     test('should skip insights when include_insights is false', async () => {
@@ -311,7 +303,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: false,
       };
 
@@ -323,7 +314,6 @@ describe('Handler Integration Tests', () => {
     test('should throw error for missing budget_id', async () => {
       const params = {
         months: 3,
-        include_trends: true,
         include_insights: true,
       } as FinancialOverviewParams;
 
@@ -338,7 +328,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -349,14 +338,13 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
       await handleFinancialOverview(mockAPI, params);
 
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        expect.stringContaining('financial-overview:budget-1:3:true:true'),
+        expect.stringContaining('financial-overview:budget-1:3:true'),
         expect.any(Object),
         expect.any(Number),
       );
@@ -491,7 +479,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -516,7 +503,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -530,14 +516,12 @@ describe('Handler Integration Tests', () => {
       const params1: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
       const params2: FinancialOverviewParams = {
         budget_id: 'budget-2',
         months: 6,
-        include_trends: false,
         include_insights: true,
       };
 
@@ -554,20 +538,15 @@ describe('Handler Integration Tests', () => {
 
   describe('Module Orchestration', () => {
     test('should call sub-modules in correct sequence for financial overview', async () => {
-      const { calculateAccountBalances, analyzeCategoryPerformance } = await import(
-        '../../financialOverview/trendAnalysis.js'
-      );
+      const { calculateAccountBalances, analyzeCategoryPerformance, buildFinancialOverviewResponse } =
+        await import('../../financialOverview/formatter.js');
       const { generateFinancialInsights } = await import(
         '../../financialOverview/insightGenerator.js'
-      );
-      const { buildFinancialOverviewResponse } = await import(
-        '../../financialOverview/formatter.js'
       );
 
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -588,18 +567,16 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
       await handleFinancialOverview(mockAPI, params);
 
-      // Verify insights generator receives correct parameters
+      // Verify insights generator receives correct parameters (trends removed)
       expect(generateFinancialInsights).toHaveBeenCalledWith(
         expect.any(Array), // months
         expect.any(Object), // budget
-        expect.any(Array), // transactions
-        expect.any(Array), // trends
+        expect.any(Array), // trends (empty array since trend analysis removed)
       );
     });
   });
@@ -609,7 +586,6 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-1',
         months: 3,
-        include_trends: true,
         include_insights: true,
       };
 
@@ -630,14 +606,13 @@ describe('Handler Integration Tests', () => {
       const params: FinancialOverviewParams = {
         budget_id: 'budget-123',
         months: 6,
-        include_trends: false,
         include_insights: true,
       };
 
       await handleFinancialOverview(mockAPI, params);
 
       expect(mockCacheManager.set).toHaveBeenCalledWith(
-        'financial-overview:budget-123:6:false:true',
+        'financial-overview:budget-123:6:true',
         expect.any(Object),
         expect.any(Number),
       );

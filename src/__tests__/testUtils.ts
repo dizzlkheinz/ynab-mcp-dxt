@@ -127,13 +127,37 @@ export function getErrorMessage(result: CallToolResult): string {
       const {
         message,
         userMessage,
-        detail,
+        details,
+        suggestions,
         name,
       } = error as Record<string, unknown>;
-      if (typeof message === 'string' && message.length > 0) return message;
-      if (typeof userMessage === 'string' && userMessage.length > 0) return userMessage;
-      if (typeof detail === 'string' && detail.length > 0) return detail;
-      if (typeof name === 'string' && name.length > 0) return name;
+
+      let errorMessage = '';
+      if (typeof message === 'string' && message.length > 0) {
+        errorMessage = message;
+      } else if (typeof userMessage === 'string' && userMessage.length > 0) {
+        errorMessage = userMessage;
+      } else if (typeof name === 'string' && name.length > 0) {
+        errorMessage = name;
+      }
+
+      // Include details if available
+      if (typeof details === 'string' && details.length > 0) {
+        errorMessage += `\n\n${details}`;
+      }
+
+      // Include suggestions if available
+      if (Array.isArray(suggestions) && suggestions.length > 0) {
+        const suggestionsText = suggestions
+          .filter((s) => typeof s === 'string')
+          .map((s, i) => `${i + 1}. ${s}`)
+          .join('\n');
+        if (suggestionsText) {
+          errorMessage += `\n\nSuggestions:\n${suggestionsText}`;
+        }
+      }
+
+      if (errorMessage) return errorMessage;
     }
     return content.text;
   } catch {
@@ -147,13 +171,11 @@ export function getErrorMessage(result: CallToolResult): string {
 export function parseToolResult<T = any>(result: CallToolResult): T {
   validateToolResult(result);
   const content = result.content[0];
-  console.warn('[parseToolResult] text', typeof content === 'object' ? content.type : content);
   if (!content || content.type !== 'text') {
     throw new Error('No text content in tool result');
   }
 
   const text = content.text;
-  console.warn('[parseToolResult] raw', text);
   if (typeof text !== 'string') {
     throw new Error('Tool result text is not a string');
   }
@@ -162,10 +184,18 @@ export function parseToolResult<T = any>(result: CallToolResult): T {
     const parsed = JSON.parse(text) as Record<string, unknown> | T;
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const record = parsed as Record<string, unknown>;
+
+      // Handle backward compatibility - ensure both success and data properties exist
       if ('data' in record) {
+        // Response already has data property, add success if missing
+        if (!('success' in record)) {
+          return { success: true, ...record } as T;
+        }
         return parsed as T;
       }
-      return { ...record, data: parsed } as T;
+
+      // Response doesn't have data property, wrap it and add success
+      return { success: true, data: parsed } as T;
     }
     return parsed as T;
   } catch (error) {
@@ -339,3 +369,72 @@ export const YNABAssertions = {
     expect(typeof payee.name).toBe('string');
   },
 };
+/**
+ * Check if an error is a rate limit error
+ */
+export function isRateLimitError(error: any): boolean {
+  if (!error) return false;
+
+  // Check various ways rate limit errors can appear
+  const errorString = error.toString ? error.toString().toLowerCase() : String(error).toLowerCase();
+  const hasRateLimitMessage =
+    errorString.includes('rate limit') ||
+    errorString.includes('too many requests') ||
+    errorString.includes('429');
+
+  // Check error object properties
+  if (error && typeof error === 'object') {
+    const statusCode = error.status || error.statusCode || error.error?.id;
+    if (statusCode === 429 || statusCode === '429') return true;
+
+    const errorName = error.name || error.error?.name || '';
+    if (errorName.toLowerCase().includes('too_many_requests')) return true;
+
+    // Check nested error objects
+    if (error.error && typeof error.error === 'object') {
+      const nestedId = error.error.id;
+      const nestedName = error.error.name;
+      if (nestedId === '429' || nestedName === 'too_many_requests') return true;
+    }
+  }
+
+  return hasRateLimitMessage;
+}
+
+/**
+ * Wrapper for integration tests that skips gracefully on rate limit
+ *
+ * Usage:
+ * ```typescript
+ * test('my integration test', async (ctx) => {
+ *   await skipOnRateLimit(async () => {
+ *     // Test code that might hit rate limits
+ *     const result = await callYNABAPI();
+ *     expect(result).toBeDefined();
+ *   }, ctx);
+ * });
+ * ```
+ */
+export async function skipOnRateLimit<T>(
+  testFn: () => Promise<T>,
+  context?: { skip: () => void }
+): Promise<T | void> {
+  try {
+    return await testFn();
+  } catch (error) {
+    if (isRateLimitError(error)) {
+      // Log the skip reason
+      console.log('⏭️  Skipping test due to YNAB API rate limit');
+
+      // Skip the test if context is provided
+      if (context?.skip) {
+        context.skip();
+      }
+
+      // Return void to satisfy type system
+      return;
+    }
+    // Re-throw non-rate-limit errors
+    throw error;
+  }
+}

@@ -52,7 +52,7 @@ Configure the cache system using environment variables with sensible defaults:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `YNAB_MCP_CACHE_MAX_ENTRIES` | `1000` | Maximum number of cache entries before LRU eviction |
-| `YNAB_MCP_CACHE_DEFAULT_TTL_MS` | `1800000` (30 minutes) | Default cache TTL in milliseconds |
+| `YNAB_MCP_CACHE_DEFAULT_TTL_MS` | `300000` (5 minutes) | Default cache TTL in milliseconds |
 | `YNAB_MCP_CACHE_STALE_MS` | `120000` (2 minutes) | Stale-while-revalidate window in milliseconds |
 
 ### Configuration Examples
@@ -130,11 +130,14 @@ Returns comprehensive cache metrics for monitoring and optimization.
 
 ```typescript
 interface CacheStats {
-  total_hits: number;      // Total cache hits since startup
-  total_misses: number;    // Total cache misses since startup
-  hit_rate: number;        // Hit rate (0.0 to 1.0)
-  total_entries: number;   // Current number of cached entries
+  size: number;            // Current number of cached entries
+  keys: string[];          // Array of all cache keys
+  hits: number;            // Total cache hits since startup
+  misses: number;          // Total cache misses since startup
   evictions: number;       // Total LRU evictions performed
+  lastCleanup: number | null; // Timestamp of last cleanup
+  maxEntries: number;      // Maximum allowed entries
+  hitRate: number;         // Hit rate (0.0 to 1.0)
 }
 ```
 
@@ -143,11 +146,12 @@ interface CacheStats {
 ```typescript
 const stats = cacheManager.getStats();
 console.log('Cache Performance:', {
-  hitRate: `${(stats.hit_rate * 100).toFixed(1)}%`,
-  totalHits: stats.total_hits,
-  totalMisses: stats.total_misses,
-  currentEntries: stats.total_entries,
-  evictions: stats.evictions
+  hitRate: `${(stats.hitRate * 100).toFixed(1)}%`,
+  totalHits: stats.hits,
+  totalMisses: stats.misses,
+  currentEntries: stats.size,
+  evictions: stats.evictions,
+  maxEntries: stats.maxEntries
 });
 
 // Example output:

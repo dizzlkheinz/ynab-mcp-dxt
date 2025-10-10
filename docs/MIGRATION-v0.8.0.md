@@ -65,7 +65,7 @@ Your existing configuration will continue to work, but you can enhance it with n
 
 Add these optional environment variables to your MCP configuration:
 
-```json
+```jsonc
 {
   "mcpServers": {
     "ynab": {

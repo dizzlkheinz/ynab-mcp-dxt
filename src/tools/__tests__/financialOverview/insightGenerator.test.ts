@@ -178,7 +178,7 @@ describe('generateFinancialInsights', () => {
     const budget = createMockBudgetDetail(mockCategories);
     const trends: SpendingTrend[] = [];
 
-    const insights = generateFinancialInsights(months, budget, [], trends);
+    const insights = generateFinancialInsights(months, budget, trends);
 
     const unallocatedInsight = insights.find(
       (insight) => insight.title === 'Unallocated Funds Available',
@@ -194,10 +194,10 @@ describe('generateFinancialInsights', () => {
     const budget = createMockBudgetDetail(mockCategories);
     const trends = [createMockSpendingTrend('Groceries', 'increasing', 'high')];
 
-    const insights = generateFinancialInsights(months, budget, [], trends);
+    const insights = generateFinancialInsights(months, budget, trends);
 
     const trendInsight = insights.find(
-      (insight) => insight.title === 'Increasing Spending Trend in Groceries',
+      (insight) => insight.title === 'Significant Increase in Groceries',
     );
     expect(trendInsight).toBeDefined();
     expect(trendInsight?.type).toBe('warning');
@@ -214,7 +214,7 @@ describe('generateFinancialInsights', () => {
     ];
     const budget = createMockBudgetDetail(mockCategories);
 
-    const insights = generateFinancialInsights(months, budget, [], []);
+    const insights = generateFinancialInsights(months, budget, []);
 
     const overspentInsight = insights.find(
       (insight) => insight.title === 'Truly Overspent Categories',
@@ -233,7 +233,7 @@ describe('generateFinancialInsights', () => {
     ];
     const budget = createMockBudgetDetail(mockCategories);
 
-    const insights = generateFinancialInsights(months, budget, [], []);
+    const insights = generateFinancialInsights(months, budget, []);
 
     const exceededInsight = insights.find(
       (insight) => insight.title === 'Categories That Exceeded Monthly Budget Assignment',
@@ -257,7 +257,7 @@ describe('generateFinancialInsights', () => {
     ];
     const budget = createMockBudgetDetail(inflowCategories);
 
-    const insights = generateFinancialInsights(months, budget, [], []);
+    const insights = generateFinancialInsights(months, budget, []);
 
     // Should not include inflow categories in exceeded budget analysis
     const exceededInsight = insights.find(
@@ -620,7 +620,7 @@ describe('Integration Tests', () => {
       createMockSpendingTrend('Transportation', 'decreasing', 'high'),
     ];
 
-    const insights = generateFinancialInsights(months, budget, [], trends);
+    const insights = generateFinancialInsights(months, budget, trends);
 
     // Should generate multiple types of insights
     const insightTypes = insights.map((i) => i.type);

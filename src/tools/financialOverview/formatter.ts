@@ -21,6 +21,199 @@ interface AccountBalances {
 }
 
 /**
+ * Calculate comprehensive account balance metrics including liquid and total net worth
+ * Categorizes accounts by type and computes both on-budget and total financial positions
+ */
+export function calculateAccountBalances(accounts: ynab.Account[]) {
+  const balances = {
+    // On-budget (liquid) net worth - only accounts that can be budgeted
+    liquidNetWorth: 0,
+    liquidAssets: 0,
+    totalDebt: 0,
+
+    // True total net worth including all assets and liabilities
+    totalNetWorth: 0,
+    totalAssets: 0,
+    totalLiabilities: 0,
+
+    // Account type breakdowns
+    checkingBalance: 0,
+    savingsBalance: 0,
+    creditCardBalance: 0,
+    investmentBalance: 0,
+    realEstateBalance: 0,
+    mortgageBalance: 0,
+    otherAssetBalance: 0,
+    otherLiabilityBalance: 0,
+  };
+
+  accounts.forEach((account) => {
+    const balance = ynab.utils.convertMilliUnitsToCurrencyAmount(account.balance);
+
+    // Calculate liquid/on-budget net worth (budgetable money)
+    if (account.on_budget) {
+      balances.liquidNetWorth += balance;
+    }
+
+    // Calculate total net worth (all assets minus all liabilities)
+    if (balance > 0) {
+      balances.totalAssets += balance;
+    } else {
+      balances.totalLiabilities += Math.abs(balance);
+    }
+
+    switch (account.type) {
+      case ynab.AccountType.Checking:
+        balances.checkingBalance += balance;
+        balances.liquidAssets += balance;
+        break;
+      case ynab.AccountType.Savings:
+        balances.savingsBalance += balance;
+        balances.liquidAssets += balance;
+        break;
+      case ynab.AccountType.CreditCard:
+        balances.creditCardBalance += balance;
+        if (balance < 0) balances.totalDebt += Math.abs(balance);
+        break;
+      case ynab.AccountType.Mortgage:
+        balances.mortgageBalance += balance; // Will be negative
+        break;
+      case ynab.AccountType.OtherAsset:
+        // Check if this looks like real estate based on balance size or name
+        if (
+          balance > 100000 &&
+          (account.name.toLowerCase().includes('house') ||
+            account.name.toLowerCase().includes('condo') ||
+            account.name.toLowerCase().includes('property') ||
+            account.name.toLowerCase().includes('laguna'))
+        ) {
+          balances.realEstateBalance += balance;
+        } else {
+          // Likely investments (RRSP, TFSA, etc.)
+          balances.investmentBalance += balance;
+        }
+        balances.otherAssetBalance += balance;
+        break;
+      case ynab.AccountType.OtherLiability:
+        balances.otherLiabilityBalance += balance;
+        break;
+      default:
+        if (account.type.toString().toLowerCase().includes('investment')) {
+          balances.investmentBalance += balance;
+        }
+        break;
+    }
+  });
+
+  // Calculate total net worth
+  balances.totalNetWorth = balances.totalAssets - balances.totalLiabilities;
+
+  return balances;
+}
+
+/**
+ * Analyze category performance across multiple months
+ * Calculates average spending, budgeting, and utilization rates for each category
+ */
+export function analyzeCategoryPerformance(months: MonthData[], categories: ynab.Category[]) {
+  // Filter out inflow categories that shouldn't be treated as spending categories
+  const spendingCategories = categories.filter(
+    (category) =>
+      !category.name.toLowerCase().includes('inflow:') &&
+      !category.name.toLowerCase().includes('ready to assign'),
+  );
+
+  const performance = spendingCategories.map((category) => {
+    const monthlyData = months
+      .map((monthData) => {
+        const monthCategory = monthData?.data?.month?.categories?.find((c) => c.id === category.id);
+        return monthCategory
+          ? {
+              month: monthData.data.month.month,
+              budgeted: ynab.utils.convertMilliUnitsToCurrencyAmount(monthCategory.budgeted),
+              activity: ynab.utils.convertMilliUnitsToCurrencyAmount(monthCategory.activity),
+              balance: ynab.utils.convertMilliUnitsToCurrencyAmount(monthCategory.balance),
+            }
+          : null;
+      })
+      .filter((data): data is NonNullable<typeof data> => data !== null);
+
+    const avgBudgeted =
+      monthlyData.reduce((sum, data) => sum + data.budgeted, 0) / (monthlyData.length || 1);
+    const avgActivity =
+      monthlyData.reduce((sum, data) => sum + Math.abs(data.activity), 0) /
+      (monthlyData.length || 1);
+    const utilizationRate = avgBudgeted > 0 ? (avgActivity / avgBudgeted) * 100 : 0;
+
+    // Get current balance from the most recent month to determine true overspending vs using accumulated funds
+    const mostRecentMonth = monthlyData.sort(
+      (a, b) => new Date(b.month).getTime() - new Date(a.month).getTime(),
+    )[0];
+    const currentBalance = mostRecentMonth?.balance || 0;
+
+    return {
+      category_name: category.name,
+      category_id: category.id,
+      average_budgeted: avgBudgeted,
+      average_spent: avgActivity,
+      utilization_rate: utilizationRate,
+      current_balance: currentBalance,
+      monthly_data: monthlyData,
+    };
+  });
+
+  return performance;
+}
+
+/**
+ * @description Calculate net worth trend progression over time.
+ * Provides trend analysis with direction, change amounts, and percentages.
+ *
+ * @important This is a simplified implementation that uses a linear projection based on the current total net worth.
+ * It provides a basic trend direction but does not reflect actual historical net worth fluctuations.
+ * The YNAB API does not provide historical account balances directly, so a true historical calculation
+ * would require iterating through transactions, which is a much more complex and expensive operation.
+ *
+ * @todo Implement a more accurate historical net worth calculation by processing transactions
+ * on a month-by-month basis. This would involve fetching all transactions for the period and
+ * reconstructing the balance of each account at the end of each month.
+ * See: https://github.com/K-Sut/ynab-mcp-dxt/issues/123
+ */
+export function calculateNetWorthTrend(
+  months: MonthData[],
+  accountBalances: ReturnType<typeof calculateAccountBalances>,
+) {
+  if (months.length === 0) {
+    return {
+      direction: 'stable' as const,
+      change_amount: 0,
+      change_percentage: 0,
+      monthly_values: [],
+      analysis: 'Insufficient data to calculate net worth trend',
+    };
+  }
+
+  // Generate neutral monthly values using current net worth as baseline
+  // Until real historical balance data or transaction-derived computations are available
+  const monthlyNetWorth = months.map((monthData) => {
+    return {
+      month: monthData?.data.month.month || new Date().toISOString().slice(0, 7),
+      net_worth: accountBalances.totalNetWorth,
+    };
+  });
+
+  // Return neutral/stable assessment without fabricated trends
+  return {
+    direction: 'stable' as const,
+    change_amount: 0,
+    change_percentage: 0,
+    monthly_values: monthlyNetWorth,
+    analysis:
+      'Net worth trend is neutral/stable. Accurate trend analysis requires real historical balance data or transaction-derived computations to be available.',
+  };
+}
+
+/**
  * Utility function to format milliunit amounts as currency
  * Uses YNAB's built-in conversion for consistency
  */

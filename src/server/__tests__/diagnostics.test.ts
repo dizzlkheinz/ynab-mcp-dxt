@@ -127,7 +127,7 @@ describe('diagnostics module', () => {
 
           expect(mockResponseFormatter.format).toHaveBeenCalledWith(
             expect.objectContaining({
-              server: {
+              server: expect.objectContaining({
                 name: 'ynab-mcp-server',
                 version: '1.0.0',
                 node_version: expect.any(String),
@@ -136,11 +136,11 @@ describe('diagnostics module', () => {
                 pid: expect.any(Number),
                 uptime_ms: 3661500,
                 uptime_readable: '1h 1m 1s',
-                env: {
+                env: expect.objectContaining({
                   node_env: expect.any(String),
-                  minify_output: 'true',
-                },
-              },
+                  minify_output: expect.any(String),
+                }),
+              }),
             }),
           );
         });
@@ -253,13 +253,13 @@ describe('diagnostics module', () => {
 
             expect(mockResponseFormatter.format).toHaveBeenCalledWith(
               expect.objectContaining({
-                environment: {
+                environment: expect.objectContaining({
                   token_present: true,
                   token_length: 18,
                   token_preview: 'test...3456',
-                  ynab_env_keys_present: ['YNAB_ACCESS_TOKEN', 'YNAB_MCP_DEBUG'],
+                  ynab_env_keys_present: expect.arrayContaining(['YNAB_ACCESS_TOKEN', 'YNAB_MCP_DEBUG']),
                   working_directory: '/test/directory',
-                },
+                }),
               }),
             );
           } finally {

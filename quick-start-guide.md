@@ -12,8 +12,8 @@ This guide provides the fastest path to test the YNAB MCP server with Claude Des
 ## Step 1: Environment Setup
 
 ```bash
-# Navigate to project directory (if not already there)
-cd c:/Users/ksutk/projects/ynab-mcp-dxt
+# Navigate to the project directory (replace with your local path)
+cd /path/to/ynab-mcp-dxt
 
 # Install dependencies (if not already done)
 npm install
@@ -57,7 +57,7 @@ npm run start
      - **Name**: `ynab-mcp-server`
      - **Command**: `node`
      - **Arguments**: `["dist/index.js"]`
-     - **Working Directory**: `c:/Users/ksutk/projects/ynab-mcp-dxt`
+     - **Working Directory**: `/path/to/ynab-mcp-dxt`
      - **Environment Variables**:
        ```json
        {

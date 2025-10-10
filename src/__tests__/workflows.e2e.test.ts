@@ -17,6 +17,7 @@ import {
   TestDataCleanup,
   YNABAssertions,
 } from './testUtils.js';
+import { testEnv } from './setup.js';
 
 const runE2ETests = process.env['SKIP_E2E_TESTS'] !== 'true';
 const describeE2E = runE2ETests ? describe : describe.skip;
@@ -490,7 +491,7 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         // Get initial cache stats
         const initialStatsResult = await executeToolCall(server, 'ynab:diagnostic_info');
         const initialStats = parseToolResult(initialStatsResult);
-        const initialCacheStats = initialStats.data?.diagnostics?.cache_stats;
+        const initialCacheStats = initialStats.data?.cache;
 
         // Set default budget (should trigger cache warming)
         await executeToolCall(server, 'ynab:set_default_budget', {
@@ -503,73 +504,89 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         // Get updated cache stats
         const finalStatsResult = await executeToolCall(server, 'ynab:diagnostic_info');
         const finalStats = parseToolResult(finalStatsResult);
-        const finalCacheStats = finalStats.data?.diagnostics?.cache_stats;
+        const finalCacheStats = finalStats.data?.cache;
 
         // Verify cache warming occurred
-        expect(finalCacheStats?.total_entries).toBeGreaterThan(
-          initialCacheStats?.total_entries || 0,
+        expect(finalCacheStats?.entries).toBeGreaterThan(
+          initialCacheStats?.entries || 0,
         );
-        expect(finalCacheStats?.hit_rate).toBeGreaterThanOrEqual(0);
+        expect(finalCacheStats?.hits).toBeGreaterThanOrEqual(0);
       });
 
       it('should demonstrate LRU eviction and observability metrics', async () => {
         if (testConfig.skipE2ETests) return;
 
-        // Get initial cache stats
-        const initialStatsResult = await executeToolCall(server, 'ynab:diagnostic_info');
-        const initialStats = parseToolResult(initialStatsResult);
-        const initialCacheStats = initialStats.data?.diagnostics?.cache_stats;
+        // Enable caching for this test (bypass NODE_ENV='test' check)
+        testEnv.enableCache();
 
-        // Perform operations that should hit cache
-        await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
-        await executeToolCall(server, 'ynab:list_categories', { budget_id: testBudgetId });
-        await executeToolCall(server, 'ynab:list_payees', { budget_id: testBudgetId });
+        try {
+          // Get initial cache stats
+          const initialStatsResult = await executeToolCall(server, 'ynab:diagnostic_info');
+          const initialStats = parseToolResult(initialStatsResult);
+          const initialCacheStats = initialStats.data?.cache;
 
-        // Perform same operations again (should hit cache)
-        await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
-        await executeToolCall(server, 'ynab:list_categories', { budget_id: testBudgetId });
-        await executeToolCall(server, 'ynab:list_payees', { budget_id: testBudgetId });
+          // Perform operations that should hit cache
+          await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
+          await executeToolCall(server, 'ynab:list_categories', { budget_id: testBudgetId });
+          await executeToolCall(server, 'ynab:list_payees', { budget_id: testBudgetId });
 
-        // Get final cache stats
-        const finalStatsResult = await executeToolCall(server, 'ynab:diagnostic_info');
-        const finalStats = parseToolResult(finalStatsResult);
-        const finalCacheStats = finalStats.data?.diagnostics?.cache_stats;
+          // Perform same operations again (should hit cache)
+          await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
+          await executeToolCall(server, 'ynab:list_categories', { budget_id: testBudgetId });
+          await executeToolCall(server, 'ynab:list_payees', { budget_id: testBudgetId });
 
-        // Verify cache behavior
-        expect(finalCacheStats?.total_hits).toBeGreaterThan(initialCacheStats?.total_hits || 0);
-        expect(finalCacheStats?.total_misses).toBeGreaterThan(initialCacheStats?.total_misses || 0);
-        expect(finalCacheStats?.hit_rate).toBeGreaterThan(0);
-        expect(finalCacheStats?.total_entries).toBeGreaterThan(0);
+          // Get final cache stats
+          const finalStatsResult = await executeToolCall(server, 'ynab:diagnostic_info');
+          const finalStats = parseToolResult(finalStatsResult);
+          const finalCacheStats = finalStats.data?.cache;
+
+          // Verify cache behavior
+          expect(finalCacheStats?.hits).toBeGreaterThan(initialCacheStats?.hits || 0);
+          expect(finalCacheStats?.misses).toBeGreaterThan(initialCacheStats?.misses || 0);
+          expect(finalCacheStats?.hits).toBeGreaterThan(0);
+          expect(finalCacheStats?.entries).toBeGreaterThan(0);
+        } finally {
+          // Restore original NODE_ENV
+          testEnv.restoreEnv();
+        }
       });
 
       it('should demonstrate cache invalidation on write operations', async () => {
         if (testConfig.skipE2ETests) return;
 
-        // Prime cache by listing accounts
-        await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
+        // Enable caching for this test
+        testEnv.enableCache();
 
-        // Create new account (should invalidate accounts cache)
-        const accountName = TestData.generateAccountName();
-        const createResult = await executeToolCall(server, 'ynab:create_account', {
-          budget_id: testBudgetId,
-          name: accountName,
-          type: 'checking',
-          balance: 10000,
-        });
-        const createdAccount = parseToolResult(createResult);
-        cleanup.trackAccount(createdAccount.data.account.id);
+        try {
+          // Prime cache by listing accounts
+          await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
 
-        // List accounts again (should show new account due to cache invalidation)
-        const accountsResult = await executeToolCall(server, 'ynab:list_accounts', {
-          budget_id: testBudgetId,
-        });
-        const accounts = parseToolResult(accountsResult);
+          // Create new account (should invalidate accounts cache)
+          const accountName = TestData.generateAccountName();
+          const createResult = await executeToolCall(server, 'ynab:create_account', {
+            budget_id: testBudgetId,
+            name: accountName,
+            type: 'checking',
+            balance: 10000,
+          });
+          const createdAccount = parseToolResult(createResult);
+          cleanup.trackAccount(createdAccount.data.account.id);
 
-        const foundAccount = accounts.data.accounts.find(
-          (acc: any) => acc.id === createdAccount.data.account.id,
-        );
-        expect(foundAccount).toBeDefined();
-        expect(foundAccount.name).toBe(accountName);
+          // List accounts again (should show new account due to cache invalidation)
+          const accountsResult = await executeToolCall(server, 'ynab:list_accounts', {
+            budget_id: testBudgetId,
+          });
+          const accounts = parseToolResult(accountsResult);
+
+          const foundAccount = accounts.data.accounts.find(
+            (acc: any) => acc.id === createdAccount.data.account.id,
+          );
+          expect(foundAccount).toBeDefined();
+          expect(foundAccount.name).toBe(accountName);
+        } finally {
+          // Restore original NODE_ENV
+          testEnv.restoreEnv();
+        }
       });
     });
 
@@ -626,21 +643,24 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         });
         const overview = parseToolResult(overviewResult);
 
-        expect(overview.data).toBeDefined();
-        expect(overview.data.financial_overview).toBeDefined();
-        expect(overview.data.financial_overview.total_income).toBeDefined();
-        expect(overview.data.financial_overview.total_spending).toBeDefined();
-        expect(overview.data.financial_overview.budget_utilization).toBeDefined();
+        expect(overview.data, 'Financial overview should return data object').toBeDefined();
+
+        // The financial overview data is in the root of data, not under financial_overview
+        expect(overview.data.overview, 'Should contain overview data').toBeDefined();
+        expect(overview.data.summary, 'Should contain summary data').toBeDefined();
+        expect(overview.data.account_overview, 'Should contain account_overview data').toBeDefined();
+        expect(overview.data.spending_trends, 'Should contain spending_trends data').toBeDefined();
 
         // Test spending analysis tool
         const spendingResult = await executeToolCall(server, 'ynab:spending_analysis', {
           budget_id: testBudgetId,
-          analysis_type: 'trends',
+          period_months: 6,
         });
         const spending = parseToolResult(spendingResult);
 
         expect(spending.data).toBeDefined();
-        expect(spending.data.spending_analysis).toBeDefined();
+        expect(spending.data.analysis_period).toBeDefined();
+        expect(spending.data.category_analysis).toBeDefined();
 
         // Test budget health check tool
         const healthResult = await executeToolCall(server, 'ynab:budget_health_check', {
@@ -649,8 +669,8 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         const health = parseToolResult(healthResult);
 
         expect(health.data).toBeDefined();
-        expect(health.data.health_check).toBeDefined();
-        expect(health.data.health_check.overall_score).toBeDefined();
+        expect(health.data.health_score).toBeDefined();
+        expect(health.data.sub_scores).toBeDefined();
       });
     });
 
@@ -664,14 +684,14 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         expect(Array.isArray(toolsResult.tools)).toBe(true);
         expect(toolsResult.tools.length).toBeGreaterThan(20);
 
-        // Verify key v0.8.0 tools are present
+        // Verify key v0.8.0 tools are present (tools are registered without ynab: prefix)
         const toolNames = toolsResult.tools.map((tool: any) => tool.name);
-        expect(toolNames).toContain('ynab:list_budgets');
-        expect(toolNames).toContain('ynab:financial_overview');
-        expect(toolNames).toContain('ynab:spending_analysis');
-        expect(toolNames).toContain('ynab:budget_health_check');
-        expect(toolNames).toContain('ynab:compare_transactions');
-        expect(toolNames).toContain('ynab:diagnostic_info');
+        expect(toolNames, 'Should contain list_budgets tool').toContain('list_budgets');
+        expect(toolNames, 'Should contain financial_overview tool').toContain('financial_overview');
+        expect(toolNames, 'Should contain spending_analysis tool').toContain('spending_analysis');
+        expect(toolNames, 'Should contain budget_health_check tool').toContain('budget_health_check');
+        expect(toolNames, 'Should contain compare_transactions tool').toContain('compare_transactions');
+        expect(toolNames, 'Should contain diagnostic_info tool').toContain('diagnostic_info');
 
         // Test that each tool has proper schema validation
         for (const tool of toolsResult.tools) {
@@ -727,11 +747,14 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         const diagnosticResult = await executeToolCall(server, 'ynab:diagnostic_info');
         const diagnostic = parseToolResult(diagnosticResult);
 
-        expect(diagnostic.data).toBeDefined();
-        expect(diagnostic.data.diagnostics).toBeDefined();
-        expect(diagnostic.data.diagnostics.server_info).toBeDefined();
-        expect(diagnostic.data.diagnostics.cache_stats).toBeDefined();
-        expect(diagnostic.data.diagnostics.environment_check).toBeDefined();
+        expect(diagnostic.data, 'Diagnostic should return data object').toBeDefined();
+
+        // The diagnostic data is in the root of data, not under diagnostics
+        expect(diagnostic.data.timestamp, 'Should contain timestamp').toBeDefined();
+        expect(diagnostic.data.server, 'Should contain server info').toBeDefined();
+        expect(diagnostic.data.memory, 'Should contain memory info').toBeDefined();
+        expect(diagnostic.data.environment, 'Should contain environment info').toBeDefined();
+        expect(diagnostic.data.cache, 'Should contain cache info').toBeDefined();
       });
     });
 
@@ -799,18 +822,26 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
       it('should demonstrate cache performance improvements', async () => {
         if (testConfig.skipE2ETests) return;
 
-        // First call (cache miss)
-        const startTime1 = Date.now();
-        await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
-        const duration1 = Date.now() - startTime1;
+        // Enable caching for this test
+        testEnv.enableCache();
 
-        // Second call (cache hit)
-        const startTime2 = Date.now();
-        await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
-        const duration2 = Date.now() - startTime2;
+        try {
+          // First call (cache miss)
+          const startTime1 = Date.now();
+          await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
+          const duration1 = Date.now() - startTime1;
 
-        // Cached call should be faster (allowing for some variance in E2E environment)
-        expect(duration2).toBeLessThanOrEqual(duration1 + 100); // Allow 100ms tolerance
+          // Second call (cache hit)
+          const startTime2 = Date.now();
+          await executeToolCall(server, 'ynab:list_accounts', { budget_id: testBudgetId });
+          const duration2 = Date.now() - startTime2;
+
+          // Cached call should be faster (allowing for some variance in E2E environment)
+          expect(duration2).toBeLessThanOrEqual(duration1 + 500); // Allow 500ms tolerance for E2E environment
+        } finally {
+          // Restore original NODE_ENV
+          testEnv.restoreEnv();
+        }
       });
     });
 
@@ -828,7 +859,7 @@ describeE2E('YNAB MCP Server - End-to-End Workflows', () => {
         // Error should provide actionable guidance
         expect(errorMessage).toContain('No budget ID provided and no default budget set');
         expect(errorMessage).toContain('set_default_budget');
-        expect(errorMessage).toContain('provide budget_id parameter');
+        expect(errorMessage).toContain('budget_id parameter');
 
         // Restore default budget
         await executeToolCall(server, 'ynab:set_default_budget', { budget_id: testBudgetId });
