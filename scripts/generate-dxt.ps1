@@ -44,6 +44,19 @@ if (-not (Test-Path "manifest.json")) {
     }
 }
 
+# Sync version from package.json to manifest.json
+Write-Host "Syncing version from package.json to manifest.json..." -ForegroundColor Yellow
+$ManifestPath = "manifest.json"
+$ManifestContent = Get-Content $ManifestPath -Raw
+$Manifest = $ManifestContent | ConvertFrom-Json
+
+if ($Manifest.version -ne $Version) {
+    Write-Host "Updating manifest version from $($Manifest.version) to $Version" -ForegroundColor Cyan
+    # Use regex to update version while preserving formatting
+    $UpdatedContent = $ManifestContent -replace '("version"\s*:\s*)"[^"]*"', "`$1`"$Version`""
+    $UpdatedContent | Set-Content $ManifestPath -NoNewline
+}
+
 # Validate the manifest
 Write-Host "Validating manifest..." -ForegroundColor Yellow
 & dxt validate manifest.json
