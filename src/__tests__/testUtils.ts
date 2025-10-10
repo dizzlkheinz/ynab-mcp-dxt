@@ -418,13 +418,13 @@ export function isRateLimitError(error: any): boolean {
 export async function skipOnRateLimit<T>(
   testFn: () => Promise<T>,
   context?: { skip: () => void }
-): Promise<T | void> {
+): Promise<T | undefined> {
   try {
     return await testFn();
   } catch (error) {
     if (isRateLimitError(error)) {
       // Log the skip reason
-      console.log('⏭️  Skipping test due to YNAB API rate limit');
+      console.warn('⏭️  Skipping test due to YNAB API rate limit');
 
       // Skip the test if context is provided
       if (context?.skip) {

@@ -300,6 +300,8 @@ export class ToolRegistry {
     for (const key of MINIFY_HINT_KEYS) {
       const value = args[key];
       if (typeof value === 'boolean') {
+        // Remove the minify hint key from args
+        // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
         delete args[key];
         return value;
       }
