@@ -157,3 +157,6 @@ ynab-mcp-dxt-updated/
 
 # CSV files (test data)
 *.csv/test-results/
+
+# Generated PR description
+.pr-description.md

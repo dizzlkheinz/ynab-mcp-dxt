@@ -1,0 +1,55 @@
+name: PR Description Check
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  check-description:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Description Format
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            // Required sections from template
+            const requiredSections = [
+              'Type of change',
+              'Public API surface checklist',
+              'Versioning and release'
+            ];
+
+            const missingSections = requiredSections.filter(section =>
+              !body.includes(section)
+            );
+
+            if (missingSections.length > 0) {
+              const comment = `⚠️ **PR Description Check Failed**
+
+The PR description is missing required sections from the template:
+${missingSections.map(s => `- ${s}`).join('\n')}
+
+Please update the description to include these sections. You can view the template at:
+https://github.com/${context.repo.owner}/${context.repo.repo}/blob/master/.github/pull_request_template.md
+
+Or run this command to update it:
+\`\`\`bash
+gh pr edit ${context.payload.pull_request.number} --body-file .github/pull_request_template.md
+\`\`\`
+`;
+
+              // Post comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: comment
+              });
+
+              // Fail the check
+              core.setFailed(`Missing required sections: ${missingSections.join(', ')}`);
+            } else {
+              console.log('✅ All required sections present in PR description');
+            }
